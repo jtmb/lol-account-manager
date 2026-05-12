@@ -1,45 +1,72 @@
 # League of Legends Account Manager
 
-A secure desktop application for Windows 11 that lets you quickly switch between saved League of Legends accounts.
-
-## ⭐ Quick Start
-
-### Just double-click `run.bat`!
-
-That's it. The script will:
-1. ✅ Check for Python (downloads & installs if needed)
-2. ✅ Create a virtual environment
-3. ✅ Install dependencies automatically
-4. ✅ Launch the app
-
-**First time takes 2-5 minutes. Subsequent runs are instant!**
-
-If `run.bat` doesn't work, try right-clicking `run.ps1` → "Run with PowerShell"
-
-See [QUICKSTART.md](QUICKSTART.md) for more options.
+A Windows desktop app for saving, organizing, and launching multiple League of Legends accounts from one place.
 
 ## Features
 
-- 🔐 **Secure Password Storage**: Encrypted credential storage using AES-256 encryption
-- 👥 **Account Management**: Add, edit, and delete multiple League of Legends accounts
-- ⚡ **Quick Launch**: One-click account switching with automatic LoL client login
-- 🎮 **Auto-Launch**: Automatically launches League of Legends after successful login
-- 🔑 **Master Password**: Protected with a master password for additional security
-- 🚀 **No Python Required**: Auto-installs Python if needed
+- Secure local credential storage protected by a master password
+- Add, edit, and delete saved League accounts
+- One-click Riot Client login and League launch flow
+- Automatic cleanup of existing Riot / League processes before switching accounts
+- Custom display names for easier account management
+- Ban status tracking per account
+- Temporary ban end date support
+- Red / green account indicators based on current ban state
+- Encrypted backup export and import
+- Merge or replace restore modes when importing a backup
+- Custom League install path override if auto-detection fails
+- Dark mode and light mode toggle
+- Native Windows title bar theming support
+- Standalone executable build support with app icon support
 
 ## Installation
 
-### Option 1: Auto-Installation (Easiest) ⭐
-```bash
-Double-click run.bat
-```
+1. Go to the GitHub releases page for this project.
+2. Download the latest release.
+3. Extract it if the release is packaged as a zip.
+4. Run `LoLAccountManager.exe`.
 
-### Option 2: PowerShell
-```bash
-Right-click run.ps1 → Run with PowerShell
-```
+## First Launch
 
-### Option 3: Manual
+1. Set a master password.
+2. Add one or more League accounts.
+3. Optionally set ban status and ban end date for each account.
+4. Select an account and click `Launch Selected Account`.
+
+## Backup and Restore
+
+Use `Backup / Restore...` in the main window to:
+
+- Export an encrypted backup of your saved accounts
+- Import a previously exported backup
+- Merge imported accounts with your current list
+- Replace your current list with the imported backup
+
+Backups are encrypted and require the master password that was active when the backup was created.
+
+## Security
+
+- Credentials are stored locally only
+- Account passwords are encrypted before being written to disk
+- The master password is hashed and verified locally
+- No telemetry or account data is sent by this app
+
+Application data is stored in:
+
+- `%APPDATA%\LoLAccountManager\accounts.json`
+- `%APPDATA%\LoLAccountManager\master.key`
+- `%APPDATA%\LoLAccountManager\settings.json`
+
+## Requirements
+
+- Windows
+- Riot Client installed
+- League of Legends installed
+
+## Running From Source
+
+If you want to run or build the project yourself:
+
 ```bash
 python -m venv venv
 venv\Scripts\activate.bat
@@ -47,73 +74,22 @@ pip install -r requirements.txt
 python src/main.py
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed instructions.
+## Building the EXE
 
-## First Time Setup
+```bash
+build_exe.bat
+```
 
-1. Set a master password to encrypt your account credentials
-2. Add your League of Legends accounts
-3. Select an account and click "Launch" to automatically log in and start LoL
-
-## Security
-
-- All passwords are encrypted with **AES-256**
-- Master password is required to access stored credentials
-- Credentials are never logged or sent anywhere
-- All data is stored locally on your computer
-- No telemetry or external connections
-
-## Requirements
-
-- **Windows 11** (Windows 10 may also work)
-- **League of Legends** installed
-- **Riot Client** installed (comes with League of Legends)
-- ✅ **Python 3.9+** (auto-installs if needed!)
-
-## Architecture
-
-- **main.py**: Application entry point
-- **ui/**: Qt-based user interface
-- **core/**: Core logic for account management and Riot client integration
-- **security/**: Encryption and credential management
-- **config/**: Configuration and file paths
-
-## Technology Stack
-
-- **PyQt5**: User interface
-- **cryptography**: Secure password encryption (AES-256)
-- **Python 3.9+**: Application runtime
-- **Windows Registry API**: Riot client integration
+If `assets/icon.ico` exists, it will be used for the built executable and runtime window icon.
 
 ## Documentation
 
-- [QUICKSTART.md](QUICKSTART.md) - Quick 5-minute setup
-- [USAGE.md](USAGE.md) - How to use features
-- [INSTALL.md](INSTALL.md) - Installation options
-- [CONFIGURATION.md](CONFIGURATION.md) - Custom paths setup
-- [DEVELOPER.md](DEVELOPER.md) - Architecture & development
+- [Usage Guide](docs/USAGE.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Developer Guide](docs/DEVELOPER.md)
 
-## Troubleshooting
+## Notes
 
-**Installer doesn't work?**
-- Try `run.ps1` (right-click → Run with PowerShell)
-- Or manually install Python from https://www.python.org/
-
-**League of Legends not found?**
-- Ensure it's installed in the default location
-- See [CONFIGURATION.md](CONFIGURATION.md) for custom paths
-
-**App won't start?**
-- Try running again (sometimes needs 2 attempts)
-- Check internet connection (first setup downloads dependencies)
-- See [USAGE.md#troubleshooting](USAGE.md#troubleshooting) for more
-
-## Next Steps
-
-1. **Quick Start**: Open [QUICKSTART.md](QUICKSTART.md)
-2. **Just Run**: Double-click `run.bat` or `run.ps1`
-3. **Learn More**: See [USAGE.md](USAGE.md)
-
----
-
-**Ready? Just double-click `run.bat` and let it handle everything!** 🎮
+- The app is designed around Riot Client based launching.
+- If Riot login UI changes significantly, automation behavior may need updating.
+- If League is installed in a non-standard location, use `Set LoL Path...` in the app.
