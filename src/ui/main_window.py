@@ -242,9 +242,27 @@ class AccountListItem(QFrame):
         name_label.setFont(name_font)
         text_layout.addWidget(name_label)
 
+        user_row = QHBoxLayout()
+        user_row.setSpacing(6)
+
         username_label = QLabel(f"@{self.account.username}")
         username_label.setStyleSheet("color: #666666;")
-        text_layout.addWidget(username_label)
+        user_row.addWidget(username_label)
+
+        if self.account.ban_status == "permanent":
+            ban_label = QLabel("⛔ Permanently Banned")
+            ban_label.setStyleSheet("color: #e74c3c; font-size: 10px;")
+            user_row.addWidget(ban_label)
+        elif self.account.ban_status == "temporary" and self.account.ban_end_date:
+            if self.account.is_banned():
+                ban_label = QLabel(f"⛔ Banned until {self.account.ban_end_date}")
+            else:
+                ban_label = QLabel(f"✅ Ban lifted ({self.account.ban_end_date})")
+            ban_label.setStyleSheet("color: #e67e22; font-size: 10px;")
+            user_row.addWidget(ban_label)
+
+        user_row.addStretch()
+        text_layout.addLayout(user_row)
 
         outer.addLayout(text_layout)
         outer.addStretch()
