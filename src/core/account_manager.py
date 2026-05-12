@@ -1,8 +1,8 @@
 """Account management and storage"""
 import json
 import os
+from dataclasses import dataclass, asdict, fields
 from typing import List, Dict, Optional
-from dataclasses import dataclass, asdict
 from pathlib import Path
 from src.config.paths import ACCOUNTS_FILE, MASTER_PASSWORD_FILE, ensure_app_data_dir
 from src.security.encryption import PasswordEncryption
@@ -174,7 +174,75 @@ class AccountManager:
     def get_all_accounts(self) -> List[Account]:
         """Get all accounts"""
         return self.accounts.copy()
-    
+
+    def export_to_file(self, file_path: str):
+        """Export accounts to a backup file encrypted with the current master password."""
+        if not self.encryption:
+            raise RuntimeError("Encryption not initialized.")
+
+        encrypted_accounts = []
+        for account in self.accounts:
+            account_dict = account.to_dict()
+            account_dict['password'] = self.encryption.encrypt_password(account.password)
+            encrypted_accounts.append(account_dict)
+
+        backup = {
+            "version": 1,
+            "app": "LoLAccountManager",
+            "accounts": encrypted_accounts,
+        }
+
+        with open(file_path, 'w') as f:
+            json.dump(backup, f, indent=2)
+
+    def import_from_file(self, file_path: str, source_password: str, merge: bool = True) -> int:
+        """Import accounts from a backup file.
+
+        Args:
+            file_path: Path to the backup file.
+            source_password: Master password that was active when the backup was created.
+            merge: If True, skip accounts that already exist. If False, replace all accounts.
+
+        Returns:
+            Number of accounts successfully imported.
+        """
+        source_encryption = PasswordEncryption(source_password)
+
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+
+        # Support both a versioned backup dict and a raw list (plain accounts.json copy)
+        if isinstance(data, list):
+            account_dicts = data
+        else:
+            if data.get('app') != 'LoLAccountManager':
+                raise ValueError("This file does not appear to be a valid LoL Account Manager backup.")
+            account_dicts = data.get('accounts', [])
+
+        imported: List[Account] = []
+        for account_dict in account_dicts:
+            try:
+                d = dict(account_dict)
+                d['password'] = source_encryption.decrypt_password(d['password'])
+                # Strip unknown keys so Account(**d) doesn't fail on future schema changes
+                valid_fields = {f.name for f in fields(Account)}
+                d = {k: v for k, v in d.items() if k in valid_fields}
+                imported.append(Account(**d))
+            except Exception as e:
+                print(f"Skipping account '{account_dict.get('username', 'unknown')}': {e}")
+
+        if not merge:
+            self.accounts = []
+
+        count = 0
+        for account in imported:
+            if not self.account_exists(account.username):
+                self.accounts.append(account)
+                count += 1
+
+        self.save_accounts()
+        return count
+
     @staticmethod
     def master_password_set() -> bool:
         """Check if master password is set"""

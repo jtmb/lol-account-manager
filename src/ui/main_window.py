@@ -355,6 +355,21 @@ class MainWindow(QMainWindow):
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
 
+        # Export / Import row
+        backup_layout = QHBoxLayout()
+        self.export_btn = QPushButton("Export Backup...")
+        self.export_btn.setToolTip("Save all accounts to an encrypted backup file")
+        self.export_btn.clicked.connect(self.export_accounts)
+        backup_layout.addWidget(self.export_btn)
+
+        self.import_btn = QPushButton("Import Backup...")
+        self.import_btn.setToolTip("Restore accounts from a backup file")
+        self.import_btn.clicked.connect(self.import_accounts)
+        backup_layout.addWidget(self.import_btn)
+
+        backup_layout.addStretch()
+        layout.addLayout(backup_layout)
+
         self.lol_path_label = QLabel()
         self.lol_path_label.setStyleSheet("color: #666666;")
         self.lol_path_label.setTextInteractionFlags(
@@ -663,6 +678,94 @@ class MainWindow(QMainWindow):
                             QMessageBox.critical(self, "Error", f"Failed to update password: {str(e)}")
             else:
                 self._show_error("Error", "Incorrect password!")
+
+    def export_accounts(self):
+        """Export all accounts to an encrypted backup file."""
+        if not self.account_manager:
+            return
+
+        if not self.account_manager.get_all_accounts():
+            QMessageBox.information(self, "No Accounts", "There are no accounts to export.")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Backup",
+            "lol_accounts_backup.lolbak",
+            "LoL Backup (*.lolbak);;JSON files (*.json);;All files (*)",
+        )
+        if not file_path:
+            return
+
+        try:
+            self.account_manager.export_to_file(file_path)
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"Accounts exported to:\n{file_path}\n\n"
+                "The backup is encrypted with your current master password.\n"
+                "You will need it to import this backup.",
+            )
+        except Exception as e:
+            self._show_error("Export Failed", f"Could not export accounts:\n{str(e)}")
+
+    def import_accounts(self):
+        """Import accounts from a backup file."""
+        if not self.account_manager:
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Backup",
+            "",
+            "LoL Backup (*.lolbak);;JSON files (*.json);;All files (*)",
+        )
+        if not file_path:
+            return
+
+        # Ask for the master password used when the backup was created
+        pwd_dialog = MasterPasswordDialog(self, is_setup=False)
+        pwd_dialog.setWindowTitle("Backup Password")
+        pwd_dialog.findChild(QLabel).setText(
+            "Enter the master password that was active when this backup was created:"
+        )
+        if pwd_dialog.exec_() != QDialog.Accepted:
+            return
+        source_password = pwd_dialog.password_input.text()
+        if not source_password:
+            return
+
+        # Merge vs Replace
+        existing = self.account_manager.get_all_accounts()
+        merge = True
+        if existing:
+            reply = QMessageBox.question(
+                self,
+                "Import Mode",
+                "How would you like to import?\n\n"
+                "• Merge — add new accounts, keep existing ones\n"
+                "• Replace — delete all current accounts and import fresh",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            merge = (reply == QMessageBox.Yes)
+            # Re-label buttons for clarity
+        else:
+            merge = False  # No existing accounts; behaves the same either way
+
+        try:
+            count = self.account_manager.import_from_file(file_path, source_password, merge=merge)
+            self.refresh_account_list()
+            QMessageBox.information(
+                self,
+                "Import Successful",
+                f"{count} account(s) imported successfully.",
+            )
+        except ValueError as e:
+            self._show_error("Import Failed", str(e))
+        except Exception as e:
+            self._show_error("Import Failed", f"Could not import backup:\n{str(e)}")
 
     def browse_for_lol(self):
         """Let the user manually locate LeagueClient.exe."""
