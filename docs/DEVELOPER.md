@@ -19,7 +19,8 @@ lol-account-manager/
 ├── setup.py                      # Setup script
 ├── run.bat                       # Quick launcher for Windows
 ├── build_exe.py                  # Build standalone executable
-├── test_app.py                   # Unit tests
+├── tests/
+│   └── test_app.py               # Unit tests
 ├── README.md                     # Project overview
 ├── INSTALL.md                    # Installation instructions
 ├── USAGE.md                      # Usage guide
@@ -132,7 +133,7 @@ venv\Scripts\activate.bat
 pip install -r requirements.txt
 
 # Run tests
-python -m unittest test_app.py
+python -m unittest tests.test_app
 
 # Run application
 python src/main.py
@@ -156,10 +157,10 @@ python src/main.py
 
 Run the test suite:
 ```bash
-python -m unittest test_app.py -v
+python -m unittest tests.test_app -v
 ```
 
-Add new tests to `test_app.py`:
+Add new tests to `tests/test_app.py`:
 ```python
 class TestNewFeature(unittest.TestCase):
     def test_something(self):
@@ -237,7 +238,7 @@ type %APPDATA%\LoLAccountManager\master.key
 
 1. Create a feature branch: `git checkout -b feature/awesome-feature`
 2. Make changes and add tests
-3. Run tests: `python -m unittest test_app.py`
+3. Run tests: `python -m unittest tests.test_app`
 4. Commit: `git commit -am 'Add awesome feature'`
 5. Push: `git push origin feature/awesome-feature`
 6. Open Pull Request
