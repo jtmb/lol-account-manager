@@ -168,15 +168,25 @@ class RiotClientIntegration:
     def _attempt_keyboard_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
         """Fallback keyboard-driven login when UIA fields are unavailable."""
         try:
-            # Try a few focus patterns because Riot's login form can shift layout.
+            # Try explicit field clicks because tab order/focus can be inconsistent.
             for _ in range(3):
-                RiotClientIntegration._focus_and_click_login_area(hwnd)
-                time.sleep(0.25)
+                RiotClientIntegration._focus_window(hwnd)
 
-                # Assume first focused control is username, then tab to password.
+                # Username field area (upper input)
+                RiotClientIntegration._click_relative(hwnd, 0.50, 0.42)
+                time.sleep(0.12)
+                RiotClientIntegration._clear_focused_field()
                 RiotClientIntegration._paste_text(username)
-                RiotClientIntegration._tap_key(win32con.VK_TAB)
+
+                # Password field area (lower input)
+                RiotClientIntegration._click_relative(hwnd, 0.50, 0.50)
+                time.sleep(0.12)
+                RiotClientIntegration._clear_focused_field()
                 RiotClientIntegration._paste_text(password)
+
+                # Submit button area then Enter as fallback submit.
+                RiotClientIntegration._click_relative(hwnd, 0.50, 0.62)
+                time.sleep(0.08)
                 RiotClientIntegration._tap_key(win32con.VK_RETURN)
                 time.sleep(0.8)
 
@@ -226,6 +236,29 @@ class RiotClientIntegration:
         win32api.SetCursorPos((x, y))
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+
+    @staticmethod
+    def _click_relative(hwnd: int, x_ratio: float, y_ratio: float):
+        """Click at a coordinate relative to the Riot window bounds."""
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        x = left + int(width * x_ratio)
+        y = top + int(height * y_ratio)
+        win32api.SetCursorPos((x, y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+
+    @staticmethod
+    def _clear_focused_field():
+        """Clear active input field using Ctrl+A then Backspace."""
+        win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
+        win32api.keybd_event(ord('A'), 0, 0, 0)
+        time.sleep(0.03)
+        win32api.keybd_event(ord('A'), 0, win32con.KEYEVENTF_KEYUP, 0)
+        win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
+        time.sleep(0.05)
+        RiotClientIntegration._tap_key(win32con.VK_BACK)
 
     @staticmethod
     def _tap_key(vk_code: int):
