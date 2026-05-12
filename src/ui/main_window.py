@@ -1,9 +1,9 @@
 """Main application window"""
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit, QGraphicsDropShadowEffect
+    QDateEdit, QGraphicsDropShadowEffect, QMenu
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor
@@ -527,6 +527,8 @@ class MainWindow(QMainWindow):
         self.account_list = QListWidget()
         self.account_list.itemClicked.connect(self.on_account_selected)
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
+        self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         layout.addWidget(self.account_list)
         
         # Button layout
@@ -754,6 +756,38 @@ class MainWindow(QMainWindow):
             if isinstance(widget, AccountListItem):
                 widget.set_dark_mode(self._dark_mode)
                 widget.set_selected(item.isSelected())
+
+    def show_account_context_menu(self, position):
+        """Show copy actions for the account row under the cursor."""
+        item = self.account_list.itemAt(position)
+        if not item or not self.account_manager:
+            return
+
+        username = item.data(Qt.UserRole)
+        account = self.account_manager.get_account(username)
+        if not account:
+            return
+
+        self.account_list.setCurrentItem(item)
+        self.update_account_item_states()
+
+        menu = QMenu(self)
+        copy_username_action = menu.addAction("Copy Username")
+        copy_password_action = menu.addAction("Copy Password")
+        copy_friend_code_action = menu.addAction("Copy Friend Code")
+
+        chosen_action = menu.exec_(self.account_list.viewport().mapToGlobal(position))
+        if chosen_action == copy_username_action:
+            self.copy_to_clipboard(account.username)
+        elif chosen_action == copy_password_action:
+            self.copy_to_clipboard(account.password)
+        elif chosen_action == copy_friend_code_action:
+            friend_code = f"{account.display_name} {getattr(account, 'tag_line', 'NA1')}"
+            self.copy_to_clipboard(friend_code)
+
+    def copy_to_clipboard(self, text: str):
+        """Copy text to the system clipboard."""
+        QApplication.clipboard().setText(text)
 
     def edit_account(self):
         """Edit the selected account"""
