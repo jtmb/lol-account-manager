@@ -216,7 +216,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         
         # Title
-        title = QLabel("Account Manager")
+        title = QLabel("League of Legends Account Manager")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
