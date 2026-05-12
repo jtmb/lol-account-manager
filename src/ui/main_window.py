@@ -526,6 +526,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Saved Accounts:"))
         self.account_list = QListWidget()
         self.account_list.itemClicked.connect(self.on_account_selected)
+        self.account_list.itemDoubleClicked.connect(lambda _: self.launch_account())
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
         self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
@@ -772,6 +773,7 @@ class MainWindow(QMainWindow):
         self.update_account_item_states()
 
         menu = QMenu(self)
+        menu.setStyleSheet(self._account_context_menu_stylesheet())
         copy_username_action = menu.addAction("Copy Username")
         copy_password_action = menu.addAction("Copy Password")
         copy_friend_code_action = menu.addAction("Copy Friend Code")
@@ -782,12 +784,61 @@ class MainWindow(QMainWindow):
         elif chosen_action == copy_password_action:
             self.copy_to_clipboard(account.password)
         elif chosen_action == copy_friend_code_action:
-            friend_code = f"{account.display_name} {getattr(account, 'tag_line', 'NA1')}"
+            friend_code = f"{account.display_name} #{getattr(account, 'tag_line', 'NA1')}"
             self.copy_to_clipboard(friend_code)
 
     def copy_to_clipboard(self, text: str):
         """Copy text to the system clipboard."""
         QApplication.clipboard().setText(text)
+
+    def _account_context_menu_stylesheet(self):
+        """Return a theme-matched stylesheet for the account context menu."""
+        if self._dark_mode:
+            return """
+QMenu {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 10px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 8px 24px 8px 18px;
+    border-radius: 6px;
+}
+QMenu::item:selected {
+    background-color: #45475a;
+    color: #ffffff;
+}
+QMenu::separator {
+    height: 1px;
+    background: #313244;
+    margin: 6px 10px;
+}
+"""
+
+        return """
+QMenu {
+    background-color: #ffffff;
+    color: #1f2937;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 6px;
+}
+QMenu::item {
+    padding: 8px 24px 8px 18px;
+    border-radius: 6px;
+}
+QMenu::item:selected {
+    background-color: #e5e7eb;
+    color: #111827;
+}
+QMenu::separator {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 6px 10px;
+}
+"""
 
     def edit_account(self):
         """Edit the selected account"""
