@@ -355,17 +355,12 @@ class MainWindow(QMainWindow):
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
 
-        # Export / Import row
+        # Backup row
         backup_layout = QHBoxLayout()
-        self.export_btn = QPushButton("Export Backup...")
-        self.export_btn.setToolTip("Save all accounts to an encrypted backup file")
-        self.export_btn.clicked.connect(self.export_accounts)
-        backup_layout.addWidget(self.export_btn)
-
-        self.import_btn = QPushButton("Import Backup...")
-        self.import_btn.setToolTip("Restore accounts from a backup file")
-        self.import_btn.clicked.connect(self.import_accounts)
-        backup_layout.addWidget(self.import_btn)
+        self.backup_btn = QPushButton("Backup / Restore...")
+        self.backup_btn.setToolTip("Export or import an encrypted account backup")
+        self.backup_btn.clicked.connect(self.open_backup_dialog)
+        backup_layout.addWidget(self.backup_btn)
 
         backup_layout.addStretch()
         layout.addLayout(backup_layout)
@@ -678,6 +673,21 @@ class MainWindow(QMainWindow):
                             QMessageBox.critical(self, "Error", f"Failed to update password: {str(e)}")
             else:
                 self._show_error("Error", "Incorrect password!")
+
+    def open_backup_dialog(self):
+        """Prompt user to choose between export and import."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Backup / Restore")
+        msg.setText("Would you like to export your accounts to a backup file, or import from an existing backup?")
+        export_btn = msg.addButton("Export Backup", QMessageBox.AcceptRole)
+        import_btn = msg.addButton("Import Backup", QMessageBox.AcceptRole)
+        msg.addButton("Cancel", QMessageBox.RejectRole)
+        msg.exec_()
+        clicked = msg.clickedButton()
+        if clicked is export_btn:
+            self.export_accounts()
+        elif clicked is import_btn:
+            self.import_accounts()
 
     def export_accounts(self):
         """Export all accounts to an encrypted backup file."""
