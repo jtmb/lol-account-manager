@@ -83,6 +83,7 @@ class TestAccountManager(unittest.TestCase):
         self.assertEqual(account.password, "test_password")
         self.assertEqual(account.display_name, "Test Account")
         self.assertEqual(account.ban_status, "none")
+        self.assertEqual(account.tag_line, "NA1")
 
     def test_add_account_with_ban_metadata(self):
         """Test adding an account with ban details."""
@@ -127,12 +128,14 @@ class TestAccountManager(unittest.TestCase):
             "user1",
             password="new_pass",
             display_name="Updated",
+            tag_line="EUW1",
             ban_status="permanent",
         )
 
         account = self.manager.get_account("user1")
         self.assertEqual(account.password, "new_pass")
         self.assertEqual(account.display_name, "Updated")
+        self.assertEqual(account.tag_line, "EUW1")
         self.assertEqual(account.ban_status, "permanent")
         self.assertTrue(account.is_banned())
 

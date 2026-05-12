@@ -223,6 +223,13 @@ class AddAccountDialog(QDialog):
         layout.addWidget(QLabel("Username (or Email):"))
         self.username_input = QLineEdit()
         layout.addWidget(self.username_input)
+
+        # Tag Line
+        layout.addWidget(QLabel("Tag Line:"))
+        self.tag_line_input = QLineEdit()
+        self.tag_line_input.setPlaceholderText("NA1")
+        self.tag_line_input.setText("NA1")
+        layout.addWidget(self.tag_line_input)
         
         # Password
         layout.addWidget(QLabel("Password:"))
@@ -274,6 +281,7 @@ class AddAccountDialog(QDialog):
 
         if self.editing_account:
             self.username_input.setText(self.editing_account.username)
+            self.tag_line_input.setText(getattr(self.editing_account, "tag_line", "NA1"))
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
             region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
@@ -310,6 +318,7 @@ class AddAccountDialog(QDialog):
             ban_end_date = self.ban_end_date_edit.date().toString("yyyy-MM-dd")
         return {
             'username': self.username_input.text().strip(),
+            'tag_line': self.tag_line_input.text().strip() or "NA1",
             'password': self.password_input.text(),
             'display_name': self.display_name_input.text().strip() or self.username_input.text().strip(),
             'region': self.region_combo.currentText(),
@@ -370,7 +379,8 @@ class AccountListItem(QFrame):
         user_row.setSpacing(6)
 
         region = self.account.region if getattr(self.account, "region", None) else "NA"
-        username_label = QLabel(f"@{self.account.username} ({region})")
+        tag_line = self.account.tag_line if getattr(self.account, "tag_line", None) else "NA1"
+        username_label = QLabel(f"@{self.account.username} #{tag_line} ({region})")
         username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
         username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
@@ -743,6 +753,7 @@ class MainWindow(QMainWindow):
                     password=data['password'],
                     display_name=data['display_name'],
                     region=data['region'],
+                    tag_line=data['tag_line'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -768,6 +779,7 @@ class MainWindow(QMainWindow):
                     data['password'],
                     data['display_name'],
                     region=data['region'],
+                    tag_line=data['tag_line'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -944,6 +956,7 @@ class MainWindow(QMainWindow):
                                     account.password,
                                     account.display_name,
                                     region=account.region,
+                                    tag_line=account.tag_line,
                                     ban_status=account.ban_status,
                                     ban_end_date=account.ban_end_date,
                                 )
