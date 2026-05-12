@@ -6,9 +6,6 @@ from pathlib import Path
 from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_executable, get_lol_path
 
-import win32api
-import win32clipboard
-import win32con
 import win32gui
 
 
@@ -110,13 +107,7 @@ class RiotClientIntegration:
                 ok, reason = RiotClientIntegration._attempt_uia_login(hwnd, username, password)
                 if ok:
                     return True, "UI Automation login submitted"
-
-                # Fallback if Riot controls are not exposed through UIA.
-                ok, kb_reason = RiotClientIntegration._attempt_keyboard_login(hwnd, username, password)
-                if ok:
-                    return True, f"Keyboard fallback login submitted ({reason})"
-
-                last_reason = f"UIA: {reason}; Keyboard: {kb_reason}"
+                last_reason = f"UIA: {reason}"
             time.sleep(0.5)
         return False, last_reason
 
@@ -154,47 +145,13 @@ class RiotClientIntegration:
             for button in buttons:
                 name = (button.window_text() or "").strip().lower()
                 if name in {"sign in", "login", "log in", "play"}:
-                    button.click_input()
-                    return True, "clicked sign-in button"
+                    try:
+                        button.invoke()
+                    except Exception:
+                        button.click_input()
+                    return True, "invoked sign-in button"
 
-            # If sign-in button label is not discoverable, submit via Enter.
-            pass_edit.set_focus()
-            RiotClientIntegration._tap_key(win32con.VK_RETURN)
-            return True, "submitted with Enter key"
-        except Exception as e:
-            return False, str(e)
-
-    @staticmethod
-    def _attempt_keyboard_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
-        """Fallback keyboard-driven login when UIA fields are unavailable."""
-        try:
-            # Try explicit field clicks because tab order/focus can be inconsistent.
-            for _ in range(3):
-                RiotClientIntegration._focus_window(hwnd)
-
-                # Username field area (upper input)
-                RiotClientIntegration._click_relative(hwnd, 0.50, 0.42)
-                time.sleep(0.12)
-                RiotClientIntegration._clear_focused_field()
-                RiotClientIntegration._paste_text(username)
-
-                # Password field area (lower input)
-                RiotClientIntegration._click_relative(hwnd, 0.50, 0.50)
-                time.sleep(0.12)
-                RiotClientIntegration._clear_focused_field()
-                RiotClientIntegration._paste_text(password)
-
-                # Submit button area then Enter as fallback submit.
-                RiotClientIntegration._click_relative(hwnd, 0.50, 0.62)
-                time.sleep(0.08)
-                RiotClientIntegration._tap_key(win32con.VK_RETURN)
-                time.sleep(0.8)
-
-                # If login was accepted, Riot login window title may change or hide quickly.
-                if not RiotClientIntegration._find_riot_window():
-                    return True, "submitted and login window changed"
-
-            return True, "submitted credentials via keyboard fallback"
+            return False, "sign-in button not found in UI Automation tree"
         except Exception as e:
             return False, str(e)
 
@@ -224,70 +181,6 @@ class RiotClientIntegration:
         win32gui.SetForegroundWindow(hwnd)
 
     @staticmethod
-    def _focus_and_click_login_area(hwnd: int):
-        """Bring Riot window to front and click where login form usually appears."""
-        RiotClientIntegration._focus_window(hwnd)
-
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        width = max(1, right - left)
-        height = max(1, bottom - top)
-        x = left + int(width * 0.5)
-        y = top + int(height * 0.46)
-        win32api.SetCursorPos((x, y))
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-
-    @staticmethod
-    def _click_relative(hwnd: int, x_ratio: float, y_ratio: float):
-        """Click at a coordinate relative to the Riot window bounds."""
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        width = max(1, right - left)
-        height = max(1, bottom - top)
-        x = left + int(width * x_ratio)
-        y = top + int(height * y_ratio)
-        win32api.SetCursorPos((x, y))
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-
-    @staticmethod
-    def _clear_focused_field():
-        """Clear active input field using Ctrl+A then Backspace."""
-        win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-        win32api.keybd_event(ord('A'), 0, 0, 0)
-        time.sleep(0.03)
-        win32api.keybd_event(ord('A'), 0, win32con.KEYEVENTF_KEYUP, 0)
-        win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
-        time.sleep(0.05)
-        RiotClientIntegration._tap_key(win32con.VK_BACK)
-
-    @staticmethod
-    def _tap_key(vk_code: int):
-        """Press and release a virtual key code."""
-        win32api.keybd_event(vk_code, 0, 0, 0)
-        time.sleep(0.03)
-        win32api.keybd_event(vk_code, 0, win32con.KEYEVENTF_KEYUP, 0)
-        time.sleep(0.08)
-
-    @staticmethod
-    def _paste_text(text: str):
-        """Paste text into focused control using clipboard + Ctrl+V."""
-        RiotClientIntegration._set_clipboard_text(text)
-        win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-        win32api.keybd_event(ord('V'), 0, 0, 0)
-        time.sleep(0.03)
-        win32api.keybd_event(ord('V'), 0, win32con.KEYEVENTF_KEYUP, 0)
-        win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
-        time.sleep(0.12)
-
-    @staticmethod
-    def _set_clipboard_text(text: str):
-        """Set text into clipboard for paste automation."""
-        win32clipboard.OpenClipboard()
-        try:
-            win32clipboard.EmptyClipboard()
-            win32clipboard.SetClipboardText(text, win32con.CF_UNICODETEXT)
-        finally:
-            win32clipboard.CloseClipboard()
     
     @staticmethod
     def _kill_riot_client():
