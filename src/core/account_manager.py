@@ -1,6 +1,7 @@
 """Account management and storage"""
 import json
 import os
+from datetime import date
 from dataclasses import dataclass, asdict, fields
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -96,9 +97,27 @@ class AccountManager:
                     self.accounts.append(account)
                 except Exception as e:
                     print(f"Error loading account {account_dict.get('username', 'unknown')}: {e}")
+            if self._clear_expired_temporary_bans():
+                self.save_accounts()
         except Exception as e:
             print(f"Error loading accounts: {e}")
             self.accounts = []
+
+    def _clear_expired_temporary_bans(self) -> bool:
+        """Clear temporary ban metadata once the end date has passed."""
+        changed = False
+        today = date.today()
+        for account in self.accounts:
+            if account.ban_status == "temporary" and account.ban_end_date:
+                try:
+                    end = date.fromisoformat(account.ban_end_date)
+                except ValueError:
+                    continue
+                if today > end:
+                    account.ban_status = "none"
+                    account.ban_end_date = ""
+                    changed = True
+        return changed
     
     def add_account(
         self,
@@ -162,6 +181,8 @@ class AccountManager:
     
     def get_account(self, username: str) -> Optional[Account]:
         """Get an account by username"""
+        if self._clear_expired_temporary_bans():
+            self.save_accounts()
         for account in self.accounts:
             if account.username == username:
                 return account
@@ -173,6 +194,8 @@ class AccountManager:
     
     def get_all_accounts(self) -> List[Account]:
         """Get all accounts"""
+        if self._clear_expired_temporary_bans():
+            self.save_accounts()
         return self.accounts.copy()
 
     def export_to_file(self, file_path: str):

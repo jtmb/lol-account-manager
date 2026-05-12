@@ -177,6 +177,21 @@ class TestAccountManager(unittest.TestCase):
         self.assertEqual(imported.ban_status, "temporary")
         self.assertEqual(imported.ban_end_date, "2030-01-01")
 
+    def test_expired_temporary_ban_is_auto_cleared(self):
+        """Temporary bans should clear once the end date is in the past."""
+        self.manager.add_account(
+            "expired_user",
+            "pass1",
+            "Expired",
+            ban_status="temporary",
+            ban_end_date="2000-01-01",
+        )
+
+        account = self.manager.get_account("expired_user")
+        self.assertIsNotNone(account)
+        self.assertEqual(account.ban_status, "none")
+        self.assertEqual(account.ban_end_date, "")
+
 
 if __name__ == "__main__":
     unittest.main()
