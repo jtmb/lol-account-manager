@@ -348,10 +348,8 @@ class AccountListItem(QFrame):
         elif self.account.ban_status == "temporary" and self.account.ban_end_date:
             if self.account.is_banned():
                 ban_label = QLabel(f"⛔ Banned until {self.account.ban_end_date}")
-            else:
-                ban_label = QLabel(f"✅ Ban lifted ({self.account.ban_end_date})")
-            ban_label.setStyleSheet("background: transparent; border: none; color: #e67e22; font-size: 10px;")
-            user_row.addWidget(ban_label)
+                ban_label.setStyleSheet("background: transparent; border: none; color: #e67e22; font-size: 10px;")
+                user_row.addWidget(ban_label)
 
         user_row.addStretch()
         text_layout.addLayout(user_row)

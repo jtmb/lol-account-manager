@@ -26,7 +26,8 @@ class Account:
         if self.ban_status == "temporary" and self.ban_end_date:
             from datetime import date
             try:
-                return date.today() <= date.fromisoformat(self.ban_end_date)
+                # Ban is active strictly before end date; on the end date it is considered lifted.
+                return date.today() < date.fromisoformat(self.ban_end_date)
             except ValueError:
                 return False
         return False
@@ -113,7 +114,8 @@ class AccountManager:
                     end = date.fromisoformat(account.ban_end_date)
                 except ValueError:
                     continue
-                if today > end:
+                # Clear once the configured date is reached.
+                if today >= end:
                     account.ban_status = "none"
                     account.ban_end_date = ""
                     changed = True
