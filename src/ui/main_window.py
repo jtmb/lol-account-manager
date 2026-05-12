@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit
+    QDateEdit, QToolBar, QAction
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate
 from PyQt5.QtGui import QFont
@@ -20,7 +20,73 @@ from src.config.paths import (
     set_custom_lol_exe,
     reset_settings,
     get_default_lol_executable_path,
+    load_settings,
+    save_settings,
 )
+
+
+DARK_STYLESHEET = """
+QMainWindow, QDialog, QWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+QListWidget {
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 6px;
+    color: #cdd6f4;
+}
+QListWidget::item:selected {
+    background-color: #45475a;
+}
+QListWidget::item:hover {
+    background-color: #313244;
+}
+QPushButton {
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 5px;
+    padding: 5px 10px;
+}
+QPushButton:hover {
+    background-color: #45475a;
+}
+QPushButton:pressed {
+    background-color: #585b70;
+}
+QPushButton:disabled {
+    background-color: #1e1e2e;
+    color: #585b70;
+    border: 1px solid #313244;
+}
+QLineEdit, QComboBox, QDateEdit {
+    background-color: #181825;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 4px;
+}
+QComboBox QAbstractItemView {
+    background-color: #181825;
+    color: #cdd6f4;
+    selection-background-color: #45475a;
+}
+QLabel {
+    color: #cdd6f4;
+}
+QToolBar {
+    background-color: #181825;
+    border-bottom: 1px solid #313244;
+    spacing: 4px;
+}
+QProgressDialog {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+"""
+
+LIGHT_STYLESHEET = ""
 
 
 class LoginThread(QThread):
@@ -278,14 +344,34 @@ class MainWindow(QMainWindow):
         self.login_thread: Optional[LoginThread] = None
         self.launch_progress: Optional[QProgressDialog] = None
         self.current_launch_username: Optional[str] = None
+        self._dark_mode: bool = load_settings().get('dark_mode', True)
         self.init_ui()
+        self._apply_theme()
         self.check_master_password()
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
         self.setMinimumSize(500, 400)
         self.resize(500, 400)
-        
+
+        # Toolbar with theme toggle (top-right aligned)
+        toolbar = QToolBar()
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        spacer = QWidget()
+        spacer.setSizePolicy(
+            spacer.sizePolicy().horizontalPolicy(),
+            spacer.sizePolicy().verticalPolicy(),
+        )
+        from PyQt5.QtWidgets import QSizePolicy
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        toolbar.addWidget(spacer)
+        self._theme_action = QAction("☀  Light Mode", self)
+        self._theme_action.setToolTip("Switch between dark and light mode")
+        self._theme_action.triggered.connect(self.toggle_theme)
+        toolbar.addAction(self._theme_action)
+        self.addToolBar(Qt.TopToolBarArea, toolbar)
+
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -343,27 +429,17 @@ class MainWindow(QMainWindow):
         self.browse_lol_btn.clicked.connect(self.browse_for_lol)
         settings_layout.addWidget(self.browse_lol_btn)
 
-        self.reset_settings_btn = QPushButton("Reset Settings")
-        self.reset_settings_btn.setToolTip("Reset custom path and other app settings to defaults")
-        self.reset_settings_btn.clicked.connect(self.reset_app_settings)
-        settings_layout.addWidget(self.reset_settings_btn)
-
         self.about_btn = QPushButton("About")
         self.about_btn.clicked.connect(self.show_about)
         settings_layout.addWidget(self.about_btn)
 
-        settings_layout.addStretch()
-        layout.addLayout(settings_layout)
-
-        # Backup row
-        backup_layout = QHBoxLayout()
         self.backup_btn = QPushButton("Backup / Restore...")
         self.backup_btn.setToolTip("Export or import an encrypted account backup")
         self.backup_btn.clicked.connect(self.open_backup_dialog)
-        backup_layout.addWidget(self.backup_btn)
+        settings_layout.addWidget(self.backup_btn)
 
-        backup_layout.addStretch()
-        layout.addLayout(backup_layout)
+        settings_layout.addStretch()
+        layout.addLayout(settings_layout)
 
         self.lol_path_label = QLabel()
         self.lol_path_label.setStyleSheet("color: #666666;")
@@ -375,6 +451,23 @@ class MainWindow(QMainWindow):
         
         central_widget.setLayout(layout)
     
+    def toggle_theme(self):
+        """Toggle between dark and light mode."""
+        self._dark_mode = not self._dark_mode
+        self._apply_theme()
+        settings = load_settings()
+        settings['dark_mode'] = self._dark_mode
+        save_settings(settings)
+
+    def _apply_theme(self):
+        """Apply the current theme stylesheet."""
+        if self._dark_mode:
+            self.setStyleSheet(DARK_STYLESHEET)
+            self._theme_action.setText("☀  Light Mode")
+        else:
+            self.setStyleSheet(LIGHT_STYLESHEET)
+            self._theme_action.setText("🌙  Dark Mode")
+
     def check_master_password(self):
         """Check if master password is set, if not show setup dialog"""
         if not AccountManager.master_password_set():
