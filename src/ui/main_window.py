@@ -296,6 +296,7 @@ class AccountListItem(QFrame):
         self.setMouseTracking(True)
         self._selected = False
         self._hovered = False
+        self._dark_mode = True
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setOffset(0, 3)
         self._shadow.setBlurRadius(0)
@@ -354,6 +355,10 @@ class AccountListItem(QFrame):
         self.setLayout(outer)
         self._update_visual_state()
 
+    def set_dark_mode(self, enabled: bool):
+        self._dark_mode = enabled
+        self._update_visual_state()
+
     def set_selected(self, selected: bool):
         self._selected = selected
         self._update_visual_state()
@@ -369,6 +374,12 @@ class AccountListItem(QFrame):
         super().leaveEvent(event)
 
     def _update_visual_state(self):
+        if not self._dark_mode:
+            self.setStyleSheet("")
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
+            return
+
         active = self._selected or self._hovered
         if active:
             self.setStyleSheet(
@@ -516,6 +527,7 @@ class MainWindow(QMainWindow):
             self.setStyleSheet(LIGHT_STYLESHEET)
             self._theme_button.setText("🌙  Dark Mode")
 
+        self.update_account_item_states()
         self._apply_title_bar_theme()
 
     def _apply_title_bar_theme(self):
@@ -664,6 +676,7 @@ class MainWindow(QMainWindow):
             item = self.account_list.item(index)
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
+                widget.set_dark_mode(self._dark_mode)
                 widget.set_selected(item.isSelected())
 
     def edit_account(self):
