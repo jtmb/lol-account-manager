@@ -15,7 +15,21 @@ class Account:
     password: str  # Will be encrypted in storage
     display_name: str = ""
     is_encrypted: bool = True
-    
+    ban_status: str = "none"   # "none", "temporary", "permanent"
+    ban_end_date: str = ""     # ISO date "YYYY-MM-DD", only for temporary bans
+
+    def is_banned(self) -> bool:
+        """Return True if the account is currently under an active ban."""
+        if self.ban_status == "permanent":
+            return True
+        if self.ban_status == "temporary" and self.ban_end_date:
+            from datetime import date
+            try:
+                return date.today() <= date.fromisoformat(self.ban_end_date)
+            except ValueError:
+                return False
+        return False
+
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
         return asdict(self)
@@ -86,16 +100,29 @@ class AccountManager:
             print(f"Error loading accounts: {e}")
             self.accounts = []
     
-    def add_account(self, username: str, password: str, display_name: str = "") -> Account:
+    def add_account(
+        self,
+        username: str,
+        password: str,
+        display_name: str = "",
+        ban_status: str = "none",
+        ban_end_date: str = "",
+    ) -> Account:
         """Add a new account"""
         if not display_name:
             display_name = username
-        
+
         # Check if account already exists
         if self.account_exists(username):
             raise ValueError(f"Account with username '{username}' already exists")
-        
-        account = Account(username=username, password=password, display_name=display_name)
+
+        account = Account(
+            username=username,
+            password=password,
+            display_name=display_name,
+            ban_status=ban_status,
+            ban_end_date=ban_end_date,
+        )
         self.accounts.append(account)
         self.save_accounts()
         return account
@@ -111,6 +138,8 @@ class AccountManager:
         new_username: Optional[str] = None,
         password: Optional[str] = None,
         display_name: Optional[str] = None,
+        ban_status: Optional[str] = None,
+        ban_end_date: Optional[str] = None,
     ):
         """Update an account's username, password, or display name."""
         for account in self.accounts:
@@ -123,6 +152,10 @@ class AccountManager:
                     account.password = password
                 if display_name is not None:
                     account.display_name = display_name
+                if ban_status is not None:
+                    account.ban_status = ban_status
+                if ban_end_date is not None:
+                    account.ban_end_date = ban_end_date
                 self.save_accounts()
                 return account
         raise ValueError(f"Account '{username}' not found")

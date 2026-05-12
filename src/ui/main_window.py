@@ -2,9 +2,10 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog, QProgressDialog
+    QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
+    QDateEdit
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate
 from PyQt5.QtGui import QFont
 from pathlib import Path
 from typing import Optional
@@ -137,16 +138,33 @@ class AddAccountDialog(QDialog):
         self.display_name_input = QLineEdit()
         layout.addWidget(self.display_name_input)
         
+        # Ban Status
+        layout.addWidget(QLabel("Ban Status:"))
+        self.ban_status_combo = QComboBox()
+        self.ban_status_combo.addItem("Not Banned", "none")
+        self.ban_status_combo.addItem("Temporary Ban", "temporary")
+        self.ban_status_combo.addItem("Permanent Ban", "permanent")
+        self.ban_status_combo.currentIndexChanged.connect(self._on_ban_status_changed)
+        layout.addWidget(self.ban_status_combo)
+
+        self.ban_end_date_label = QLabel("Ban End Date:")
+        layout.addWidget(self.ban_end_date_label)
+        self.ban_end_date_edit = QDateEdit()
+        self.ban_end_date_edit.setCalendarPopup(True)
+        self.ban_end_date_edit.setDate(QDate.currentDate())
+        self.ban_end_date_edit.setDisplayFormat("yyyy-MM-dd")
+        layout.addWidget(self.ban_end_date_edit)
+
         button_layout = QHBoxLayout()
-        
+
         add_btn = QPushButton("Save Changes" if is_edit else "Add Account")
         add_btn.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(add_btn)
-        
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
-        
+
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
@@ -154,6 +172,20 @@ class AddAccountDialog(QDialog):
             self.username_input.setText(self.editing_account.username)
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
+            idx = self.ban_status_combo.findData(self.editing_account.ban_status)
+            if idx >= 0:
+                self.ban_status_combo.setCurrentIndex(idx)
+            if self.editing_account.ban_end_date:
+                self.ban_end_date_edit.setDate(
+                    QDate.fromString(self.editing_account.ban_end_date, "yyyy-MM-dd")
+                )
+
+        self._on_ban_status_changed()
+
+    def _on_ban_status_changed(self):
+        is_temporary = self.ban_status_combo.currentData() == "temporary"
+        self.ban_end_date_label.setVisible(is_temporary)
+        self.ban_end_date_edit.setVisible(is_temporary)
     
     def validate_and_accept(self):
         if not self.username_input.text().strip():
@@ -165,10 +197,16 @@ class AddAccountDialog(QDialog):
         self.accept()
     
     def get_data(self):
+        ban_status = self.ban_status_combo.currentData()
+        ban_end_date = ""
+        if ban_status == "temporary":
+            ban_end_date = self.ban_end_date_edit.date().toString("yyyy-MM-dd")
         return {
             'username': self.username_input.text().strip(),
             'password': self.password_input.text(),
-            'display_name': self.display_name_input.text().strip() or self.username_input.text().strip()
+            'display_name': self.display_name_input.text().strip() or self.username_input.text().strip(),
+            'ban_status': ban_status,
+            'ban_end_date': ban_end_date,
         }
 
 
@@ -181,22 +219,36 @@ class AccountListItem(QFrame):
         self.init_ui()
     
     def init_ui(self):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(10, 5, 10, 5)
-        
+        outer = QHBoxLayout()
+        outer.setContentsMargins(10, 5, 10, 5)
+        outer.setSpacing(8)
+
+        # Colored status circle
+        circle = QLabel("\u25CF")
+        circle.setFixedWidth(16)
+        circle.setAlignment(Qt.AlignVCenter)
+        color = "#e74c3c" if self.account.is_banned() else "#2ecc71"
+        circle.setStyleSheet(f"color: {color}; font-size: 16px;")
+        outer.addWidget(circle)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+
         name_font = QFont()
         name_font.setBold(True)
         name_font.setPointSize(11)
-        
+
         name_label = QLabel(self.account.display_name)
         name_label.setFont(name_font)
-        layout.addWidget(name_label)
-        
+        text_layout.addWidget(name_label)
+
         username_label = QLabel(f"@{self.account.username}")
         username_label.setStyleSheet("color: #666666;")
-        layout.addWidget(username_label)
-        
-        self.setLayout(layout)
+        text_layout.addWidget(username_label)
+
+        outer.addLayout(text_layout)
+        outer.addStretch()
+        self.setLayout(outer)
 
 
 class MainWindow(QMainWindow):
@@ -401,6 +453,8 @@ class MainWindow(QMainWindow):
                     new_username=data['username'],
                     password=data['password'],
                     display_name=data['display_name'],
+                    ban_status=data['ban_status'],
+                    ban_end_date=data['ban_end_date'],
                 )
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account updated successfully!")
@@ -422,7 +476,9 @@ class MainWindow(QMainWindow):
                 self.account_manager.add_account(
                     data['username'],
                     data['password'],
-                    data['display_name']
+                    data['display_name'],
+                    ban_status=data['ban_status'],
+                    ban_end_date=data['ban_end_date'],
                 )
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account added successfully!")
