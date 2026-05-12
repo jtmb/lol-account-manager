@@ -2,9 +2,9 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog
+    QMessageBox, QFrame, QFileDialog, QProgressDialog
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
 from PyQt5.QtGui import QFont
 from pathlib import Path
 from typing import Optional
@@ -198,6 +198,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.account_manager: Optional[AccountManager] = None
+        self.login_thread: Optional[LoginThread] = None
+        self.launch_progress: Optional[QProgressDialog] = None
         self.init_ui()
         self.check_master_password()
     
@@ -410,6 +412,10 @@ class MainWindow(QMainWindow):
         """Launch selected account"""
         if not self.account_manager:
             return
+
+        if self.login_thread and self.login_thread.isRunning():
+            self._show_error("Error", "A launch is already in progress.")
+            return
         
         selected = self.account_list.currentItem()
         if not selected:
@@ -421,12 +427,21 @@ class MainWindow(QMainWindow):
         if not account:
             return
         
-        # Show progress dialog
-        progress = QMessageBox(self)
-        progress.setWindowTitle("Launching...")
-        progress.setText(f"Starting League of Legends for {account.display_name}...")
-        progress.setStandardButtons(QMessageBox.NoButton)
-        progress.show()
+        # Show cancellable progress dialog
+        self.launch_progress = QProgressDialog(
+            f"Starting League of Legends for {account.display_name}...",
+            "Close",
+            0,
+            0,
+            self,
+        )
+        self.launch_progress.setWindowTitle("Launching...")
+        self.launch_progress.setWindowModality(Qt.WindowModal)
+        self.launch_progress.setAutoClose(False)
+        self.launch_progress.setAutoReset(False)
+        self.launch_progress.setMinimumDuration(0)
+        self.launch_progress.canceled.connect(self._dismiss_launch_progress)
+        self.launch_progress.show()
         
         # Launch in background thread
         self.login_thread = LoginThread(
@@ -434,31 +449,48 @@ class MainWindow(QMainWindow):
             account.password,
             auto_launch_lol=True
         )
-        self.login_thread.finished.connect(
-            lambda success: self.on_launch_finished(success, progress)
-        )
-        self.login_thread.error.connect(
-            lambda error: self.on_launch_error(error, progress)
-        )
+        self.login_thread.finished.connect(self.on_launch_finished)
+        self.login_thread.error.connect(self.on_launch_error)
+        self.login_thread.finished.connect(lambda _: self._dismiss_launch_progress())
+        self.login_thread.error.connect(lambda _: self._dismiss_launch_progress())
         self.login_thread.start()
+
+        # Safety net: if background flow hangs, close the dialog and inform user.
+        QTimer.singleShot(60000, self._handle_launch_timeout)
     
-    def on_launch_finished(self, success, progress_dialog):
+    def on_launch_finished(self, success):
         """Handle launch completion"""
-        progress_dialog.close()
+        self._dismiss_launch_progress()
         
         if success:
             QMessageBox.information(
                 self,
                 "Success",
-                "Riot Client launched! Complete the login if needed and League of Legends will start."
+                "Riot Client login submitted and League launch requested."
             )
         else:
             self._show_error("Error", "Failed to launch. Make sure League of Legends is installed.")
     
-    def on_launch_error(self, error, progress_dialog):
+    def on_launch_error(self, error):
         """Handle launch error"""
-        progress_dialog.close()
+        self._dismiss_launch_progress()
         self._show_error("Error", f"Launch failed: {error}")
+
+    def _dismiss_launch_progress(self):
+        """Close and clear launch progress UI if it exists."""
+        if self.launch_progress:
+            self.launch_progress.close()
+            self.launch_progress.deleteLater()
+            self.launch_progress = None
+
+    def _handle_launch_timeout(self):
+        """Avoid stuck launch dialogs if background thread hangs."""
+        if self.login_thread and self.login_thread.isRunning() and self.launch_progress:
+            self._dismiss_launch_progress()
+            self._show_error(
+                "Error",
+                "Launch is taking too long. Riot may be waiting on a security prompt or blocked by permissions.",
+            )
     
     def change_master_password(self):
         """Change master password"""
