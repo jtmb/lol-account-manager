@@ -3,13 +3,14 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit, QToolBar, QAction
+    QDateEdit
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate
 from PyQt5.QtGui import QFont
 from pathlib import Path
 from typing import Optional
 import sys
+import ctypes
 import time
 
 from src.core.account_manager import AccountManager, Account
@@ -75,11 +76,6 @@ QComboBox QAbstractItemView {
 QLabel {
     color: #cdd6f4;
 }
-QToolBar {
-    background-color: #181825;
-    border-bottom: 1px solid #313244;
-    spacing: 4px;
-}
 QProgressDialog {
     background-color: #1e1e2e;
     color: #cdd6f4;
@@ -87,6 +83,11 @@ QProgressDialog {
 """
 
 LIGHT_STYLESHEET = ""
+
+if sys.platform.startswith("win"):
+    DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    DWMWA_CAPTION_COLOR = 35
+    DWMWA_TEXT_COLOR = 36
 
 
 class LoginThread(QThread):
@@ -354,24 +355,6 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(500, 400)
         self.resize(500, 400)
 
-        # Toolbar with theme toggle (top-right aligned)
-        toolbar = QToolBar()
-        toolbar.setMovable(False)
-        toolbar.setFloatable(False)
-        spacer = QWidget()
-        spacer.setSizePolicy(
-            spacer.sizePolicy().horizontalPolicy(),
-            spacer.sizePolicy().verticalPolicy(),
-        )
-        from PyQt5.QtWidgets import QSizePolicy
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        toolbar.addWidget(spacer)
-        self._theme_action = QAction("☀  Light Mode", self)
-        self._theme_action.setToolTip("Switch between dark and light mode")
-        self._theme_action.triggered.connect(self.toggle_theme)
-        toolbar.addAction(self._theme_action)
-        self.addToolBar(Qt.TopToolBarArea, toolbar)
-
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -379,6 +362,14 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
+
+        top_row = QHBoxLayout()
+        top_row.addStretch()
+        self._theme_button = QPushButton()
+        self._theme_button.setToolTip("Switch between dark and light mode")
+        self._theme_button.clicked.connect(self.toggle_theme)
+        top_row.addWidget(self._theme_button)
+        layout.addLayout(top_row)
         
         # Title
         title = QLabel("LOL Account Manager")
@@ -463,10 +454,53 @@ class MainWindow(QMainWindow):
         """Apply the current theme stylesheet."""
         if self._dark_mode:
             self.setStyleSheet(DARK_STYLESHEET)
-            self._theme_action.setText("☀  Light Mode")
+            self._theme_button.setText("☀  Light Mode")
         else:
             self.setStyleSheet(LIGHT_STYLESHEET)
-            self._theme_action.setText("🌙  Dark Mode")
+            self._theme_button.setText("🌙  Dark Mode")
+
+        self._apply_title_bar_theme()
+
+    def _apply_title_bar_theme(self):
+        """Update the native Windows title bar to match the active theme."""
+        if not sys.platform.startswith("win"):
+            return
+
+        try:
+            hwnd = int(self.winId())
+            value = ctypes.c_int(1 if self._dark_mode else 0)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value),
+                ctypes.sizeof(value),
+            )
+
+            if self._dark_mode:
+                caption_color = ctypes.c_int(0x302B2B)
+                text_color = ctypes.c_int(0xF4D6CD)
+            else:
+                caption_color = ctypes.c_int(0xF3F3F3)
+                text_color = ctypes.c_int(0x1E1E1E)
+
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_CAPTION_COLOR,
+                ctypes.byref(caption_color),
+                ctypes.sizeof(caption_color),
+            )
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_TEXT_COLOR,
+                ctypes.byref(text_color),
+                ctypes.sizeof(text_color),
+            )
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._apply_title_bar_theme()
 
     def check_master_password(self):
         """Check if master password is set, if not show setup dialog"""
