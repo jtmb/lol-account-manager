@@ -369,50 +369,34 @@ class AccountListItem(QFrame):
         name_font.setBold(True)
         name_font.setPointSize(11)
 
-        user_row = QHBoxLayout()
-        user_row.setSpacing(6)
         region = self.account.region if getattr(self.account, "region", None) else "NA"
         tag_line = self.account.tag_line if getattr(self.account, "tag_line", None) else "NA1"
-        username_label = QLabel(f"@{self.account.username} ({region})")
+
+        name_label = QLabel(f"@{self.account.username} ({region})")
+        name_label.setFont(name_font)
+        name_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        name_label.setStyleSheet("background: transparent; border: none;")
+        text_layout.addWidget(name_label)
+
+        user_row = QHBoxLayout()
+        user_row.setSpacing(6)
+        username_label = QLabel(f"{self.account.display_name} #{tag_line}")
         username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
         username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
 
-        user_row.addStretch()
-        text_layout.addLayout(user_row)
-
-        name_row = QHBoxLayout()
-        name_row.setSpacing(6)
-
-        name_label = QLabel(self.account.display_name)
-        name_label.setFont(name_font)
-        name_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        name_label.setStyleSheet("background: transparent; border: none;")
-        name_row.addWidget(name_label)
-
-        tag_label = QLabel(f"#{tag_line}")
-        tag_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        tag_label.setStyleSheet("background: transparent; border: none; color: #7f849c;")
-        name_row.addWidget(tag_label)
-
-        name_row.addStretch()
-        text_layout.addLayout(name_row)
-
-        status_row = QHBoxLayout()
-        status_row.setSpacing(6)
-
         if self.account.ban_status == "permanent":
             ban_label = QLabel("⛔ Permanently Banned")
             ban_label.setStyleSheet("background: transparent; border: none; color: #e74c3c; font-size: 10px;")
-            status_row.addWidget(ban_label)
+            user_row.addWidget(ban_label)
         elif self.account.ban_status == "temporary" and self.account.ban_end_date:
             if self.account.is_banned():
                 ban_label = QLabel(f"⛔ Banned until {self.account.ban_end_date}")
                 ban_label.setStyleSheet("background: transparent; border: none; color: #e67e22; font-size: 10px;")
-                status_row.addWidget(ban_label)
+                user_row.addWidget(ban_label)
 
-        status_row.addStretch()
-        text_layout.addLayout(status_row)
+        user_row.addStretch()
+        text_layout.addLayout(user_row)
 
         outer.addLayout(text_layout)
         outer.addStretch()
