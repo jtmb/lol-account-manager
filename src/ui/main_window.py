@@ -205,7 +205,8 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(718, 699)
+        self.resize(718, 699)
         
         # Central widget
         central_widget = QWidget()
@@ -216,7 +217,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
         
         # Title
-        title = QLabel("League of Legends Account Manager")
+        title = QLabel("LOL Account Manager")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -263,6 +264,10 @@ class MainWindow(QMainWindow):
         self.reset_settings_btn.setToolTip("Reset custom path and other app settings to defaults")
         self.reset_settings_btn.clicked.connect(self.reset_app_settings)
         settings_layout.addWidget(self.reset_settings_btn)
+
+        self.about_btn = QPushButton("About")
+        self.about_btn.clicked.connect(self.show_about)
+        settings_layout.addWidget(self.about_btn)
 
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
@@ -577,6 +582,44 @@ class MainWindow(QMainWindow):
                 )
             except Exception as e:
                 self._show_error("Error", f"Failed to reset settings: {str(e)}")
+
+    def show_about(self):
+        """Show About dialog."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("About")
+        dlg.setMinimumWidth(380)
+        dlg.setModal(True)
+
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        title = QLabel("LoL Account Manager")
+        title_font = QFont()
+        title_font.setPointSize(14)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        dev_label = QLabel("Developer: jtmb")
+        dev_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(dev_label)
+
+        repo_label = QLabel('<a href="https://github.com/jtmb/lol-account-manager">github.com/jtmb/lol-account-manager</a>')
+        repo_label.setAlignment(Qt.AlignCenter)
+        repo_label.setOpenExternalLinks(True)
+        repo_label.setTextInteractionFlags(
+            Qt.TextBrowserInteraction
+        )
+        layout.addWidget(repo_label)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignCenter)
+
+        dlg.setLayout(layout)
+        dlg.exec_()
 
     def _refresh_lol_path_label(self):
         """Update the LoL path label to reflect the currently active path."""
