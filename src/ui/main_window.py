@@ -739,18 +739,21 @@ class MainWindow(QMainWindow):
         existing = self.account_manager.get_all_accounts()
         merge = True
         if existing:
-            reply = QMessageBox.question(
-                self,
-                "Import Mode",
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Import Mode")
+            msg.setText(
                 "How would you like to import?\n\n"
-                "• Merge — add new accounts, keep existing ones\n"
-                "• Replace — delete all current accounts and import fresh",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                "\u2022 Merge \u2014 add new accounts, keep existing ones\n"
+                "\u2022 Replace \u2014 delete all current accounts and import fresh"
             )
-            if reply == QMessageBox.Cancel:
+            merge_btn = msg.addButton("Merge", QMessageBox.AcceptRole)
+            replace_btn = msg.addButton("Replace", QMessageBox.DestructiveRole)
+            msg.addButton("Cancel", QMessageBox.RejectRole)
+            msg.exec_()
+            clicked = msg.clickedButton()
+            if clicked is None or clicked.text() == "Cancel":
                 return
-            merge = (reply == QMessageBox.Yes)
-            # Re-label buttons for clarity
+            merge = (clicked is merge_btn)
         else:
             merge = False  # No existing accounts; behaves the same either way
 
