@@ -60,10 +60,21 @@ class RiotClientIntegration:
         """Check if League of Legends is running"""
         try:
             for proc in psutil.process_iter(['name']):
-                if 'LeagueClientUx' in proc.name() or 'League of Legends' in proc.name():
+                proc_name = proc.name() or ''
+                if any(name in proc_name for name in RiotClientIntegration.LOL_PROCESS_NAMES):
                     return True
         except:
             pass
+        return False
+
+    @staticmethod
+    def _wait_for_lol_start(timeout_seconds: int = 20) -> bool:
+        """Wait for League processes to appear after a launch request."""
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            if RiotClientIntegration.is_lol_running():
+                return True
+            time.sleep(0.5)
         return False
     
     @staticmethod
@@ -234,8 +245,7 @@ class RiotClientIntegration:
             True if launch was successful
         """
         try:
-            # Preferred path: ask Riot Client to launch LoL.
-            # This is more reliable than directly starting game executables.
+            # First try launching via Riot Client services.
             riot_path = get_riot_client_path()
             if riot_path and riot_path.exists():
                 subprocess.Popen(
@@ -247,9 +257,10 @@ class RiotClientIntegration:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
-                return True
+                if RiotClientIntegration._wait_for_lol_start(timeout_seconds=20):
+                    return True
 
-            # Fallback: launch League Client directly.
+            # Fallback: launch League Client directly and verify it starts.
             lol_exec = get_lol_executable()
 
             if not lol_exec:
@@ -269,7 +280,7 @@ class RiotClientIntegration:
                 stderr=subprocess.DEVNULL
             )
 
-            return True
+            return RiotClientIntegration._wait_for_lol_start(timeout_seconds=20)
             
         except Exception as e:
             print(f"Error launching League of Legends: {e}")
