@@ -12,6 +12,19 @@ import win32gui
 
 class RiotClientIntegration:
     """Handle integration with Riot Client and League of Legends"""
+
+    RIOT_PROCESS_NAMES = {
+        'RiotClientServices',
+        'RiotClientUx',
+        'RiotClientUxRender',
+    }
+
+    LOL_PROCESS_NAMES = {
+        'LeagueClient',
+        'LeagueClientUx',
+        'LeagueClientUxRender',
+        'League of Legends',
+    }
     
     @staticmethod
     def find_lol_launch_dir() -> Optional[Path]:
@@ -70,6 +83,10 @@ class RiotClientIntegration:
             raise FileNotFoundError("Riot Client not found. Please ensure League of Legends is installed.")
         
         try:
+            # Always close existing League/Riot session before launching selected account.
+            RiotClientIntegration._kill_lol_client()
+            time.sleep(0.5)
+
             # Kill existing Riot Client if running
             RiotClientIntegration._kill_riot_client()
             time.sleep(1)
@@ -189,9 +206,22 @@ class RiotClientIntegration:
         """Kill running Riot Client process"""
         try:
             for proc in psutil.process_iter(['name']):
-                if 'RiotClientServices' in proc.name() or 'RiotClientUx' in proc.name():
+                proc_name = proc.name() or ''
+                if any(name in proc_name for name in RiotClientIntegration.RIOT_PROCESS_NAMES):
                     proc.kill()
                     time.sleep(0.5)
+        except:
+            pass
+
+    @staticmethod
+    def _kill_lol_client():
+        """Kill running League of Legends client/game processes."""
+        try:
+            for proc in psutil.process_iter(['name']):
+                proc_name = proc.name() or ''
+                if any(name in proc_name for name in RiotClientIntegration.LOL_PROCESS_NAMES):
+                    proc.kill()
+                    time.sleep(0.3)
         except:
             pass
     
