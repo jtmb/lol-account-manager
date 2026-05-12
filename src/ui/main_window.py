@@ -90,6 +90,29 @@ QListWidget {
 }
 """
 
+REGION_OPTIONS = [
+    ("NA", "North America"),
+    ("EUW", "Europe West"),
+    ("EUNE", "Europe Nordic & East"),
+    ("KR", "Korea"),
+    ("JP", "Japan"),
+    ("OCE", "Oceania"),
+    ("BR", "Brazil"),
+    ("LAN", "Latin America North"),
+    ("LAS", "Latin America South"),
+    ("RU", "Russia"),
+    ("TR", "Turkey"),
+    ("ME", "Middle East"),
+    ("PH", "Philippines"),
+    ("SG", "Singapore"),
+    ("TH", "Thailand"),
+    ("TW", "Taiwan"),
+    ("VN", "Vietnam"),
+    ("CN", "China"),
+    ("PBE", "Public Beta Environment"),
+]
+REGION_NAMES = {code: label for code, label in REGION_OPTIONS}
+
 if sys.platform.startswith("win"):
     DWMWA_USE_IMMERSIVE_DARK_MODE = 20
     DWMWA_WINDOW_CORNER_PREFERENCE = 33
@@ -183,28 +206,6 @@ class MasterPasswordDialog(QDialog):
 class AddAccountDialog(QDialog):
     """Dialog for adding or editing an account"""
 
-    REGIONS = [
-        "NA",
-        "EUW",
-        "EUNE",
-        "KR",
-        "JP",
-        "OCE",
-        "BR",
-        "LAN",
-        "LAS",
-        "RU",
-        "TR",
-        "ME",
-        "PH",
-        "SG",
-        "TH",
-        "TW",
-        "VN",
-        "CN",
-        "PBE",
-    ]
-
     def __init__(self, parent=None, account: Optional[Account] = None):
         super().__init__(parent)
         self.editing_account = account
@@ -245,8 +246,9 @@ class AddAccountDialog(QDialog):
         # Region
         layout.addWidget(QLabel("Region:"))
         self.region_combo = QComboBox()
-        self.region_combo.addItems(self.REGIONS)
-        self.region_combo.setCurrentText("NA")
+        for code, label in REGION_OPTIONS:
+            self.region_combo.addItem(label, code)
+        self.region_combo.setCurrentIndex(self.region_combo.findData("NA"))
         layout.addWidget(self.region_combo)
         
         # Ban Status
@@ -285,8 +287,11 @@ class AddAccountDialog(QDialog):
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
             region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
-            if self.region_combo.findText(region) >= 0:
-                self.region_combo.setCurrentText(region)
+            idx = self.region_combo.findData(region)
+            if idx < 0:
+                idx = self.region_combo.findText(region)
+            if idx >= 0:
+                self.region_combo.setCurrentIndex(idx)
             idx = self.ban_status_combo.findData(self.editing_account.ban_status)
             if idx >= 0:
                 self.ban_status_combo.setCurrentIndex(idx)
@@ -321,7 +326,7 @@ class AddAccountDialog(QDialog):
             'tag_line': self.tag_line_input.text().strip() or "NA1",
             'password': self.password_input.text(),
             'display_name': self.display_name_input.text().strip() or self.username_input.text().strip(),
-            'region': self.region_combo.currentText(),
+            'region': self.region_combo.currentData(),
             'ban_status': ban_status,
             'ban_end_date': ban_end_date,
         }
@@ -374,7 +379,8 @@ class AccountListItem(QFrame):
         tag_font.setPointSize(10)
         tag_font.setWeight(QFont.DemiBold)
 
-        region = self.account.region if getattr(self.account, "region", None) else "NA"
+        region_code = self.account.region if getattr(self.account, "region", None) else "NA"
+        region = REGION_NAMES.get(region_code, region_code)
         tag_line = self.account.tag_line if getattr(self.account, "tag_line", None) else "NA1"
 
         name_row = QHBoxLayout()
@@ -397,10 +403,15 @@ class AccountListItem(QFrame):
 
         user_row = QHBoxLayout()
         user_row.setSpacing(6)
-        username_label = QLabel(f"@{self.account.username} ({region})")
+        username_label = QLabel(f"@{self.account.username}")
         username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
         username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
+
+        region_label = QLabel(f"{region}")
+        region_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        region_label.setStyleSheet("background: transparent; border: none; color: #8b93a8; font-size: 10px;")
+        user_row.addWidget(region_label)
 
         if self.account.ban_status == "permanent":
             ban_label = QLabel("⛔ Permanently Banned")
