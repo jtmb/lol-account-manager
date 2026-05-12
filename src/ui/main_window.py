@@ -398,8 +398,6 @@ class MainWindow(QMainWindow):
         
         if not account:
             return
-
-        self.current_launch_username = account.username
         
         reply = QMessageBox.question(
             self,
@@ -434,6 +432,8 @@ class MainWindow(QMainWindow):
         
         if not account:
             return
+
+        self.current_launch_username = account.username
         
         # Show cancellable progress dialog
         self.launch_progress = QProgressDialog(
