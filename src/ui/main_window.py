@@ -82,7 +82,13 @@ QProgressDialog {
 }
 """
 
-LIGHT_STYLESHEET = ""
+LIGHT_STYLESHEET = """
+QListWidget {
+    background-color: #ffffff;
+    border: 1px solid #cfcfcf;
+    border-radius: 6px;
+}
+"""
 
 if sys.platform.startswith("win"):
     DWMWA_USE_IMMERSIVE_DARK_MODE = 20
