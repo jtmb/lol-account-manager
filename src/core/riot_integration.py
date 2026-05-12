@@ -11,8 +11,6 @@ import win32clipboard
 import win32con
 import win32gui
 
-from pywinauto import Desktop
-
 
 class RiotClientIntegration:
     """Handle integration with Riot Client and League of Legends"""
@@ -126,6 +124,9 @@ class RiotClientIntegration:
     def _attempt_uia_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
         """Try to set login fields through Windows UI Automation tree."""
         try:
+            # Import lazily to avoid COM initialization conflicts during app startup.
+            from pywinauto import Desktop
+
             RiotClientIntegration._focus_window(hwnd)
             win = Desktop(backend="uia").window(handle=hwnd)
             win.wait("visible", timeout=4)
@@ -167,14 +168,23 @@ class RiotClientIntegration:
     def _attempt_keyboard_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
         """Fallback keyboard-driven login when UIA fields are unavailable."""
         try:
-            RiotClientIntegration._focus_and_click_login_area(hwnd)
-            time.sleep(0.2)
+            # Try a few focus patterns because Riot's login form can shift layout.
+            for _ in range(3):
+                RiotClientIntegration._focus_and_click_login_area(hwnd)
+                time.sleep(0.25)
 
-            RiotClientIntegration._paste_text(username)
-            RiotClientIntegration._tap_key(win32con.VK_TAB)
-            RiotClientIntegration._paste_text(password)
-            RiotClientIntegration._tap_key(win32con.VK_RETURN)
-            return True, "pasted credentials and submitted"
+                # Assume first focused control is username, then tab to password.
+                RiotClientIntegration._paste_text(username)
+                RiotClientIntegration._tap_key(win32con.VK_TAB)
+                RiotClientIntegration._paste_text(password)
+                RiotClientIntegration._tap_key(win32con.VK_RETURN)
+                time.sleep(0.8)
+
+                # If login was accepted, Riot login window title may change or hide quickly.
+                if not RiotClientIntegration._find_riot_window():
+                    return True, "submitted and login window changed"
+
+            return True, "submitted credentials via keyboard fallback"
         except Exception as e:
             return False, str(e)
 
