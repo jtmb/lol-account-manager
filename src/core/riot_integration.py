@@ -4,7 +4,7 @@ import time
 import psutil
 from pathlib import Path
 from typing import Optional, Tuple
-from src.config.paths import get_riot_client_path, get_lol_executable, get_lol_path
+from src.config.paths import get_riot_client_path, get_lol_path
 
 import win32con
 import win32gui
@@ -239,15 +239,18 @@ class RiotClientIntegration:
     @staticmethod
     def launch_lol() -> bool:
         """
-        Launch League of Legends
-        
+        Launch League of Legends via Riot Client only.
+
         Returns:
             True if launch was successful
         """
         try:
-            # First try launching via Riot Client services.
             riot_path = get_riot_client_path()
-            if riot_path and riot_path.exists():
+            if not riot_path or not riot_path.exists():
+                raise FileNotFoundError("Riot Client not found. Please ensure Riot Client is installed.")
+
+            # Retry launch request and Play button in case Riot UI is late to become ready.
+            for _ in range(4):
                 subprocess.Popen(
                     [
                         str(riot_path),
@@ -257,34 +260,45 @@ class RiotClientIntegration:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
-                if RiotClientIntegration._wait_for_lol_start(timeout_seconds=20):
+
+                time.sleep(2)
+                RiotClientIntegration._click_play_button_uia()
+
+                if RiotClientIntegration._wait_for_lol_start(timeout_seconds=12):
                     return True
 
-            # Fallback: launch League Client directly and verify it starts.
-            lol_exec = get_lol_executable()
+            return False
 
-            if not lol_exec:
-                raise FileNotFoundError(
-                    "League of Legends executable not found. "
-                    "Please ensure League of Legends is installed."
-                )
-            if not lol_exec.is_file():
-                raise FileNotFoundError(
-                    f"Configured LoL path is not a file: {lol_exec}"
-                )
-
-            subprocess.Popen(
-                [str(lol_exec)],
-                cwd=str(lol_exec.parent),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-
-            return RiotClientIntegration._wait_for_lol_start(timeout_seconds=20)
-            
         except Exception as e:
             print(f"Error launching League of Legends: {e}")
             return False
+
+    @staticmethod
+    def _click_play_button_uia() -> bool:
+        """Attempt to invoke Riot's Play button via UI Automation."""
+        try:
+            from pywinauto import Desktop
+
+            hwnd = RiotClientIntegration._find_riot_window()
+            if not hwnd:
+                return False
+
+            RiotClientIntegration._focus_window(hwnd)
+            win = Desktop(backend="uia").window(handle=hwnd)
+            win.wait("visible", timeout=3)
+
+            buttons = [b for b in win.descendants(control_type="Button") if b.is_visible()]
+            for button in buttons:
+                name = (button.window_text() or "").strip().lower()
+                if name in {"play", "launch", "start"}:
+                    try:
+                        button.invoke()
+                    except Exception:
+                        button.click_input()
+                    return True
+        except Exception:
+            return False
+        return False
     
     @staticmethod
     def login_and_launch(username: str, password: str, launch_lol: bool = True) -> bool:

@@ -493,13 +493,10 @@ class MainWindow(QMainWindow):
         progress.deleteLater()
 
     def _handle_launch_timeout(self):
-        """Avoid stuck launch dialogs if background thread hangs."""
+        """Keep waiting quietly while the launch thread continues retries."""
         if self.login_thread and self.login_thread.isRunning() and self.launch_progress:
-            self._dismiss_launch_progress()
-            self._show_error(
-                "Error",
-                "Launch is taking too long. Riot may be waiting on a security prompt or blocked by permissions.",
-            )
+            # Do not interrupt with an error popup; retry logic runs in background.
+            QTimer.singleShot(60000, self._handle_launch_timeout)
     
     def change_master_password(self):
         """Change master password"""
