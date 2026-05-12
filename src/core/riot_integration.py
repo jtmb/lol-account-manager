@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_executable, get_lol_path
 
+import win32con
 import win32gui
 
 
@@ -117,6 +118,7 @@ class RiotClientIntegration:
         try:
             # Import lazily to avoid COM initialization conflicts during app startup.
             from pywinauto import Desktop
+            from pywinauto.keyboard import send_keys
 
             RiotClientIntegration._focus_window(hwnd)
             win = Desktop(backend="uia").window(handle=hwnd)
@@ -130,16 +132,10 @@ class RiotClientIntegration:
             pass_edit = edits[1]
 
             user_edit.set_focus()
-            try:
-                user_edit.set_edit_text(username)
-            except Exception:
-                RiotClientIntegration._paste_text(username)
+            user_edit.set_edit_text(username)
 
             pass_edit.set_focus()
-            try:
-                pass_edit.set_edit_text(password)
-            except Exception:
-                RiotClientIntegration._paste_text(password)
+            pass_edit.set_edit_text(password)
 
             buttons = [b for b in win.descendants(control_type="Button") if b.is_visible()]
             for button in buttons:
@@ -151,7 +147,15 @@ class RiotClientIntegration:
                         button.click_input()
                     return True, "invoked sign-in button"
 
-            return False, "sign-in button not found in UI Automation tree"
+            # Deterministic fallback discovered by user: from username, tab 8 times to sign-in.
+            user_edit.set_focus()
+            time.sleep(0.08)
+            send_keys('{TAB 8}')
+            time.sleep(0.05)
+            send_keys('{SPACE}')
+            time.sleep(0.15)
+            send_keys('{ENTER}')
+            return True, "submitted via tab-focus fallback (TAB x8 + SPACE/ENTER)"
         except Exception as e:
             return False, str(e)
 
@@ -180,8 +184,6 @@ class RiotClientIntegration:
             pass
         win32gui.SetForegroundWindow(hwnd)
 
-    @staticmethod
-    
     @staticmethod
     def _kill_riot_client():
         """Kill running Riot Client process"""
