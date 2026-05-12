@@ -1,11 +1,11 @@
 """Main application window"""
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QProgressDialog, QComboBox, QFrame, QSpinBox
+    QMessageBox, QFrame
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QIcon, QFont, QColor, QPixmap
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt5.QtGui import QFont
 from pathlib import Path
 from typing import Optional
 import sys
@@ -314,7 +314,7 @@ class MainWindow(QMainWindow):
             for account in accounts:
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QItemSize(100))
+                item.setSizeHint(QSize(0, 60))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
@@ -347,9 +347,9 @@ class MainWindow(QMainWindow):
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account added successfully!")
             except ValueError as e:
-                QMessageBox.warning(self, "Error", str(e))
+                self._show_error("Error", str(e))
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to add account: {str(e)}")
+                self._show_error("Error", f"Failed to add account: {str(e)}")
     
     def delete_account(self):
         """Delete selected account"""
@@ -379,7 +379,7 @@ class MainWindow(QMainWindow):
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to delete account: {str(e)}")
+                self._show_error("Error", f"Failed to delete account: {str(e)}")
     
     def launch_account(self):
         """Launch selected account"""
@@ -428,20 +428,12 @@ class MainWindow(QMainWindow):
                 "Riot Client launched! Complete the login if needed and League of Legends will start."
             )
         else:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Failed to launch. Make sure League of Legends is installed."
-            )
+            self._show_error("Error", "Failed to launch. Make sure League of Legends is installed.")
     
     def on_launch_error(self, error, progress_dialog):
         """Handle launch error"""
         progress_dialog.close()
-        QMessageBox.critical(
-            self,
-            "Error",
-            f"Launch failed: {error}"
-        )
+        self._show_error("Error", f"Launch failed: {error}")
     
     def change_master_password(self):
         """Change master password"""
@@ -475,8 +467,17 @@ class MainWindow(QMainWindow):
                         except Exception as e:
                             QMessageBox.critical(self, "Error", f"Failed to update password: {str(e)}")
             else:
-                QMessageBox.warning(self, "Error", "Incorrect password!")
+                self._show_error("Error", "Incorrect password!")
 
-
-from PyQt5.QtCore import QSize
-QItemSize = QSize
+    def _show_error(self, title: str, message: str, icon=QMessageBox.Critical):
+        """Show an error dialog with selectable/copyable text."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle(title)
+        msg.setText(message)
+        msg.setIcon(icon)
+        msg.setStandardButtons(QMessageBox.Ok)
+        for label in msg.findChildren(QLabel):
+            label.setTextInteractionFlags(
+                Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+            )
+        msg.exec_()
