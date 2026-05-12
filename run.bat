@@ -92,19 +92,6 @@ if not exist requirements.txt (
     exit /b 1
 )
 
-if exist "src\security\encryption.py" (
-    findstr /R /C:"PBKDF2" "src\security\encryption.py" >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo [*] Applying compatibility fix for encryption module...
-        "%PYTHON_EXE%" -c "from pathlib import Path; import re; p=Path(r'src/security/encryption.py'); t=p.read_text(encoding='utf-8'); t=re.sub(r'from\\s+cryptography\\.hazmat\\.primitives\\.kdf\\.pbkdf2\\s+import\\s+\\w+', 'from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC', t); t=t.replace('PBKDF2HMACHMAC','PBKDF2HMAC'); t=re.sub(r'kdf\\s*=\\s*PBKDF2(?:HMAC)*\\s*\\(', 'kdf = PBKDF2HMAC(', t); p.write_text(t, encoding='utf-8')"
-        if !errorlevel! neq 0 (
-            echo [ERROR] Failed to apply compatibility fix to src\security\encryption.py
-            pause
-            exit /b 1
-        )
-    )
-)
-
 if not exist venv (
     echo [*] Creating virtual environment...
     "%PYTHON_EXE%" -m venv venv
