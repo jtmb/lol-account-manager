@@ -105,15 +105,17 @@ class MasterPasswordDialog(QDialog):
 
 
 class AddAccountDialog(QDialog):
-    """Dialog for adding a new account"""
-    
-    def __init__(self, parent=None):
+    """Dialog for adding or editing an account"""
+
+    def __init__(self, parent=None, account: Optional[Account] = None):
         super().__init__(parent)
+        self.editing_account = account
         self.account = None
         self.init_ui()
     
     def init_ui(self):
-        self.setWindowTitle("Add Account")
+        is_edit = self.editing_account is not None
+        self.setWindowTitle("Edit Account" if is_edit else "Add Account")
         self.setModal(True)
         self.setMinimumWidth(350)
         
@@ -137,7 +139,7 @@ class AddAccountDialog(QDialog):
         
         button_layout = QHBoxLayout()
         
-        add_btn = QPushButton("Add Account")
+        add_btn = QPushButton("Save Changes" if is_edit else "Add Account")
         add_btn.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(add_btn)
         
@@ -147,6 +149,11 @@ class AddAccountDialog(QDialog):
         
         layout.addLayout(button_layout)
         self.setLayout(layout)
+
+        if self.editing_account:
+            self.username_input.setText(self.editing_account.username)
+            self.password_input.setText(self.editing_account.password)
+            self.display_name_input.setText(self.editing_account.display_name)
     
     def validate_and_accept(self):
         if not self.username_input.text().strip():
@@ -242,6 +249,11 @@ class MainWindow(QMainWindow):
         self.add_btn = QPushButton("+ Add Account")
         self.add_btn.clicked.connect(self.add_account)
         button_layout.addWidget(self.add_btn)
+
+        self.edit_btn = QPushButton("Edit Selected")
+        self.edit_btn.clicked.connect(self.edit_account)
+        self.edit_btn.setEnabled(False)
+        button_layout.addWidget(self.edit_btn)
         
         self.delete_btn = QPushButton("Delete")
         self.delete_btn.clicked.connect(self.delete_account)
@@ -342,6 +354,7 @@ class MainWindow(QMainWindow):
             item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
             self.account_list.addItem(item)
             self.launch_btn.setEnabled(False)
+            self.edit_btn.setEnabled(False)
             self.delete_btn.setEnabled(False)
         else:
             for account in accounts:
@@ -360,7 +373,41 @@ class MainWindow(QMainWindow):
         if selected:
             username = selected.data(Qt.UserRole)
             self.launch_btn.setEnabled(username is not None)
+            self.edit_btn.setEnabled(username is not None)
             self.delete_btn.setEnabled(username is not None)
+
+    def edit_account(self):
+        """Edit the selected account"""
+        if not self.account_manager:
+            return
+
+        selected = self.account_list.currentItem()
+        if not selected:
+            return
+
+        username = selected.data(Qt.UserRole)
+        account = self.account_manager.get_account(username)
+
+        if not account:
+            return
+
+        dialog = AddAccountDialog(self, account=account)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+
+            try:
+                self.account_manager.update_account(
+                    username=username,
+                    new_username=data['username'],
+                    password=data['password'],
+                    display_name=data['display_name'],
+                )
+                self.refresh_account_list()
+                QMessageBox.information(self, "Success", "Account updated successfully!")
+            except ValueError as e:
+                self._show_error("Error", str(e))
+            except Exception as e:
+                self._show_error("Error", f"Failed to update account: {str(e)}")
     
     def add_account(self):
         """Add a new account"""

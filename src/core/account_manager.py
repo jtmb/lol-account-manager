@@ -105,11 +105,20 @@ class AccountManager:
         self.accounts = [acc for acc in self.accounts if acc.username != username]
         self.save_accounts()
     
-    def update_account(self, username: str, password: Optional[str] = None, 
-                      display_name: Optional[str] = None):
-        """Update an account's password or display name"""
+    def update_account(
+        self,
+        username: str,
+        new_username: Optional[str] = None,
+        password: Optional[str] = None,
+        display_name: Optional[str] = None,
+    ):
+        """Update an account's username, password, or display name."""
         for account in self.accounts:
             if account.username == username:
+                if new_username is not None and new_username != username:
+                    if self.account_exists(new_username):
+                        raise ValueError(f"Account with username '{new_username}' already exists")
+                    account.username = new_username
                 if password is not None:
                     account.password = password
                 if display_name is not None:
