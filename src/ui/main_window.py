@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame
+    QMessageBox, QFrame, QFileDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QFont
@@ -14,6 +14,7 @@ import time
 from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
 from src.security.encryption import PasswordEncryption
+from src.config.paths import get_lol_executable, set_custom_lol_exe
 
 
 class LoginThread(QThread):
@@ -245,6 +246,12 @@ class MainWindow(QMainWindow):
         self.master_password_btn = QPushButton("Change Master Password")
         self.master_password_btn.clicked.connect(self.change_master_password)
         settings_layout.addWidget(self.master_password_btn)
+
+        self.browse_lol_btn = QPushButton("Set LoL Path...")
+        self.browse_lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
+        self.browse_lol_btn.clicked.connect(self.browse_for_lol)
+        settings_layout.addWidget(self.browse_lol_btn)
+
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
         
@@ -468,6 +475,31 @@ class MainWindow(QMainWindow):
                             QMessageBox.critical(self, "Error", f"Failed to update password: {str(e)}")
             else:
                 self._show_error("Error", "Incorrect password!")
+
+    def browse_for_lol(self):
+        """Let the user manually locate LeagueClient.exe."""
+        current = get_lol_executable()
+        start_dir = str(current.parent) if current else "C:\\"
+        exe_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Locate LeagueClient.exe",
+            start_dir,
+            "Executable (*.exe);;All files (*)"
+        )
+        if exe_path:
+            from pathlib import Path
+            p = Path(exe_path)
+            if p.name.lower() not in ('leagueclient.exe', 'league of legends.exe'):
+                QMessageBox.warning(
+                    self, "Unexpected file",
+                    f"Expected LeagueClient.exe but got '{p.name}'.\n"
+                    "Saving anyway — update if launch fails."
+                )
+            set_custom_lol_exe(p)
+            QMessageBox.information(
+                self, "LoL Path Saved",
+                f"League of Legends path set to:\n{exe_path}"
+            )
 
     def _show_error(self, title: str, message: str, icon=QMessageBox.Critical):
         """Show an error dialog with selectable/copyable text."""

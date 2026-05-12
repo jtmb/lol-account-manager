@@ -9,6 +9,42 @@ APPDATA = Path(os.getenv('APPDATA', os.path.expanduser('~')))
 APP_DATA_DIR = APPDATA / 'LoLAccountManager'
 ACCOUNTS_FILE = APP_DATA_DIR / 'accounts.json'
 MASTER_PASSWORD_FILE = APP_DATA_DIR / 'master.key'
+SETTINGS_FILE = APP_DATA_DIR / 'settings.json'
+
+
+def load_settings() -> dict:
+    """Load settings from disk, return empty dict if missing."""
+    try:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def save_settings(settings: dict):
+    """Persist settings to disk."""
+    ensure_app_data_dir()
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=2)
+
+
+def get_custom_lol_exe() -> Optional[Path]:
+    """Return user-specified LeagueClient.exe path, or None."""
+    p = load_settings().get('lol_exe')
+    if p:
+        path = Path(p)
+        if path.exists():
+            return path
+    return None
+
+
+def set_custom_lol_exe(path: Path):
+    """Persist user-specified LeagueClient.exe path."""
+    settings = load_settings()
+    settings['lol_exe'] = str(path)
+    save_settings(settings)
 
 # Riot client paths
 RIOT_CLIENT_PATHS = [
@@ -53,10 +89,13 @@ def get_lol_path() -> Optional[Path]:
 
 
 def get_lol_executable() -> Optional[Path]:
-    """Get League of Legends executable path"""
+    """Get League of Legends executable path.
+    Checks user-specified path first, then auto-detects."""
+    custom = get_custom_lol_exe()
+    if custom:
+        return custom
     lol_path = get_lol_path()
     if lol_path:
-        # Try different possible executable names
         candidates = [
             lol_path / 'LeagueClient.exe',
             lol_path / 'LeagueClient' / 'LeagueClient.exe',
