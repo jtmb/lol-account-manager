@@ -3,13 +3,15 @@ import subprocess
 import time
 import psutil
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_executable, get_lol_path
 
 import win32api
 import win32clipboard
 import win32con
 import win32gui
+
+from pywinauto import Desktop
 
 
 class RiotClientIntegration:
@@ -85,8 +87,9 @@ class RiotClientIntegration:
             )
 
             # Wait for the client window and fill credentials.
-            if not RiotClientIntegration._attempt_ui_login(username, password):
-                raise RuntimeError("Could not automate Riot login screen.")
+            ok, reason = RiotClientIntegration._attempt_ui_login(username, password)
+            if not ok:
+                raise RuntimeError(f"Could not automate Riot login screen: {reason}")
             
             return True
             
@@ -95,21 +98,85 @@ class RiotClientIntegration:
             return False
 
     @staticmethod
-    def _attempt_ui_login(username: str, password: str, timeout_seconds: int = 20) -> bool:
-        """Locate Riot window, focus it, and enter credentials."""
+    def _attempt_ui_login(
+        username: str,
+        password: str,
+        timeout_seconds: int = 30,
+    ) -> Tuple[bool, str]:
+        """Locate Riot window, then enter credentials using robust methods."""
         deadline = time.time() + timeout_seconds
+        last_reason = "Riot login window not detected yet"
         while time.time() < deadline:
             hwnd = RiotClientIntegration._find_riot_window()
             if hwnd:
-                RiotClientIntegration._focus_and_click(hwnd)
-                time.sleep(0.3)
-                RiotClientIntegration._paste_text(username)
-                RiotClientIntegration._tap_key(win32con.VK_TAB)
-                RiotClientIntegration._paste_text(password)
-                RiotClientIntegration._tap_key(win32con.VK_RETURN)
-                return True
+                ok, reason = RiotClientIntegration._attempt_uia_login(hwnd, username, password)
+                if ok:
+                    return True, "UI Automation login submitted"
+
+                # Fallback if Riot controls are not exposed through UIA.
+                ok, kb_reason = RiotClientIntegration._attempt_keyboard_login(hwnd, username, password)
+                if ok:
+                    return True, f"Keyboard fallback login submitted ({reason})"
+
+                last_reason = f"UIA: {reason}; Keyboard: {kb_reason}"
             time.sleep(0.5)
-        return False
+        return False, last_reason
+
+    @staticmethod
+    def _attempt_uia_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
+        """Try to set login fields through Windows UI Automation tree."""
+        try:
+            RiotClientIntegration._focus_window(hwnd)
+            win = Desktop(backend="uia").window(handle=hwnd)
+            win.wait("visible", timeout=4)
+
+            edits = [e for e in win.descendants(control_type="Edit") if e.is_visible()]
+            if len(edits) < 2:
+                return False, f"found {len(edits)} visible edit controls"
+
+            user_edit = edits[0]
+            pass_edit = edits[1]
+
+            user_edit.set_focus()
+            try:
+                user_edit.set_edit_text(username)
+            except Exception:
+                RiotClientIntegration._paste_text(username)
+
+            pass_edit.set_focus()
+            try:
+                pass_edit.set_edit_text(password)
+            except Exception:
+                RiotClientIntegration._paste_text(password)
+
+            buttons = [b for b in win.descendants(control_type="Button") if b.is_visible()]
+            for button in buttons:
+                name = (button.window_text() or "").strip().lower()
+                if name in {"sign in", "login", "log in", "play"}:
+                    button.click_input()
+                    return True, "clicked sign-in button"
+
+            # If sign-in button label is not discoverable, submit via Enter.
+            pass_edit.set_focus()
+            RiotClientIntegration._tap_key(win32con.VK_RETURN)
+            return True, "submitted with Enter key"
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
+    def _attempt_keyboard_login(hwnd: int, username: str, password: str) -> Tuple[bool, str]:
+        """Fallback keyboard-driven login when UIA fields are unavailable."""
+        try:
+            RiotClientIntegration._focus_and_click_login_area(hwnd)
+            time.sleep(0.2)
+
+            RiotClientIntegration._paste_text(username)
+            RiotClientIntegration._tap_key(win32con.VK_TAB)
+            RiotClientIntegration._paste_text(password)
+            RiotClientIntegration._tap_key(win32con.VK_RETURN)
+            return True, "pasted credentials and submitted"
+        except Exception as e:
+            return False, str(e)
 
     @staticmethod
     def _find_riot_window() -> Optional[int]:
@@ -128,17 +195,24 @@ class RiotClientIntegration:
         return found[0] if found else None
 
     @staticmethod
-    def _focus_and_click(hwnd: int):
-        """Bring Riot window to front and click center to focus form fields."""
+    def _focus_window(hwnd: int):
+        """Bring Riot window to front."""
         try:
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
         except Exception:
             pass
         win32gui.SetForegroundWindow(hwnd)
 
+    @staticmethod
+    def _focus_and_click_login_area(hwnd: int):
+        """Bring Riot window to front and click where login form usually appears."""
+        RiotClientIntegration._focus_window(hwnd)
+
         left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        x = int((left + right) / 2)
-        y = int((top + bottom) / 2)
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        x = left + int(width * 0.5)
+        y = top + int(height * 0.46)
         win32api.SetCursorPos((x, y))
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
