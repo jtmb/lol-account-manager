@@ -50,40 +50,38 @@ lol-account-manager/
 
 ## 🚀 Getting Started
 
-### Option 1: Quick Start (Recommended) ⭐
+### ⭐ The Easiest Way - Just Click!
 
-1. **Download Python** (if not installed):
-   - Visit https://www.python.org/downloads/
-   - Install Python 3.9 or later
-   - ⚠️ Check "Add Python to PATH" during install
-   - Restart your computer
+That's literally it:
+1. **Double-click `run.bat`**
+2. **Wait 2-5 minutes** (first time only - auto installs Python & dependencies)
+3. **Set your master password**
+4. **Add your League accounts**
+5. **Launch and play!**
 
-2. **Run the App**:
-   - Double-click `run.bat` in this folder
-   - Wait for dependencies to install
-   - App launches automatically!
+The script handles everything - even if Python isn't installed yet!
 
-3. **First Use**:
-   - Set a master password
-   - Add your League accounts
-   - Click "Launch Selected Account" to play!
+### Alternative Launchers
 
-### Option 2: Manual Setup
+If `run.bat` doesn't work:
 
-See [INSTALL.md](INSTALL.md) for detailed instructions.
+**PowerShell version** (more reliable):
+- Right-click `run.ps1`
+- Select "Run with PowerShell"
+- Follow the prompts
 
-### Option 3: Build Standalone Executable
-
-See [DEVELOPER.md](DEVELOPER.md) for PyInstaller instructions (creates `.exe` that doesn't need Python).
+**Manual setup** (if neither works):
+- See [INSTALL.md](INSTALL.md) for detailed steps
 
 ## 📖 Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [QUICKSTART.md](QUICKSTART.md) | 5-minute setup guide - **START HERE** |
+| [QUICKSTART.md](QUICKSTART.md) | **START HERE** - Just click and go! |
 | [USAGE.md](USAGE.md) | Feature guide and troubleshooting |
 | [INSTALL.md](INSTALL.md) | Detailed installation steps |
 | [DEVELOPER.md](DEVELOPER.md) | Architecture, development, building |
+| [CONFIGURATION.md](CONFIGURATION.md) | Custom League installation paths |
 | [README.md](README.md) | Project overview |
 
 ## 🔐 Security Features
