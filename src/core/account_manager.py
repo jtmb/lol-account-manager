@@ -16,6 +16,7 @@ class Account:
     password: str  # Will be encrypted in storage
     display_name: str = ""
     is_encrypted: bool = True
+    region: str = "NA"
     ban_status: str = "none"   # "none", "temporary", "permanent"
     ban_end_date: str = ""     # ISO date "YYYY-MM-DD", only for temporary bans
 
@@ -126,6 +127,7 @@ class AccountManager:
         username: str,
         password: str,
         display_name: str = "",
+        region: str = "NA",
         ban_status: str = "none",
         ban_end_date: str = "",
     ) -> Account:
@@ -141,6 +143,7 @@ class AccountManager:
             username=username,
             password=password,
             display_name=display_name,
+            region=region,
             ban_status=ban_status,
             ban_end_date=ban_end_date,
         )
@@ -159,6 +162,7 @@ class AccountManager:
         new_username: Optional[str] = None,
         password: Optional[str] = None,
         display_name: Optional[str] = None,
+        region: Optional[str] = None,
         ban_status: Optional[str] = None,
         ban_end_date: Optional[str] = None,
     ):
@@ -173,6 +177,8 @@ class AccountManager:
                     account.password = password
                 if display_name is not None:
                     account.display_name = display_name
+                if region is not None:
+                    account.region = region
                 if ban_status is not None:
                     account.ban_status = ban_status
                 if ban_end_date is not None:

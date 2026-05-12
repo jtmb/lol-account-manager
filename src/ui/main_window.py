@@ -183,6 +183,28 @@ class MasterPasswordDialog(QDialog):
 class AddAccountDialog(QDialog):
     """Dialog for adding or editing an account"""
 
+    REGIONS = [
+        "NA",
+        "EUW",
+        "EUNE",
+        "KR",
+        "JP",
+        "OCE",
+        "BR",
+        "LAN",
+        "LAS",
+        "RU",
+        "TR",
+        "ME",
+        "PH",
+        "SG",
+        "TH",
+        "TW",
+        "VN",
+        "CN",
+        "PBE",
+    ]
+
     def __init__(self, parent=None, account: Optional[Account] = None):
         super().__init__(parent)
         self.editing_account = account
@@ -212,6 +234,13 @@ class AddAccountDialog(QDialog):
         layout.addWidget(QLabel("Display Name (optional):"))
         self.display_name_input = QLineEdit()
         layout.addWidget(self.display_name_input)
+
+        # Region
+        layout.addWidget(QLabel("Region:"))
+        self.region_combo = QComboBox()
+        self.region_combo.addItems(self.REGIONS)
+        self.region_combo.setCurrentText("NA")
+        layout.addWidget(self.region_combo)
         
         # Ban Status
         layout.addWidget(QLabel("Ban Status:"))
@@ -247,6 +276,9 @@ class AddAccountDialog(QDialog):
             self.username_input.setText(self.editing_account.username)
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
+            region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
+            if self.region_combo.findText(region) >= 0:
+                self.region_combo.setCurrentText(region)
             idx = self.ban_status_combo.findData(self.editing_account.ban_status)
             if idx >= 0:
                 self.ban_status_combo.setCurrentIndex(idx)
@@ -280,6 +312,7 @@ class AddAccountDialog(QDialog):
             'username': self.username_input.text().strip(),
             'password': self.password_input.text(),
             'display_name': self.display_name_input.text().strip() or self.username_input.text().strip(),
+            'region': self.region_combo.currentText(),
             'ban_status': ban_status,
             'ban_end_date': ban_end_date,
         }
@@ -336,7 +369,8 @@ class AccountListItem(QFrame):
         user_row = QHBoxLayout()
         user_row.setSpacing(6)
 
-        username_label = QLabel(f"@{self.account.username}")
+        region = self.account.region if getattr(self.account, "region", None) else "NA"
+        username_label = QLabel(f"@{self.account.username} ({region})")
         username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
         username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
@@ -708,6 +742,7 @@ class MainWindow(QMainWindow):
                     new_username=data['username'],
                     password=data['password'],
                     display_name=data['display_name'],
+                    region=data['region'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -732,6 +767,7 @@ class MainWindow(QMainWindow):
                     data['username'],
                     data['password'],
                     data['display_name'],
+                    region=data['region'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -906,7 +942,10 @@ class MainWindow(QMainWindow):
                                 self.account_manager.add_account(
                                     account.username,
                                     account.password,
-                                    account.display_name
+                                    account.display_name,
+                                    region=account.region,
+                                    ban_status=account.ban_status,
+                                    ban_end_date=account.ban_end_date,
                                 )
                             
                             QMessageBox.information(self, "Success", "Master password updated!")
