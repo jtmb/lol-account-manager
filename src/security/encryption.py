@@ -3,7 +3,7 @@ import os
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from typing import Tuple
 import json
@@ -25,7 +25,7 @@ class PasswordEncryption:
     def _create_cipher(self) -> Fernet:
         """Create a Fernet cipher from the master password"""
         # Derive a key from the master password
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=b'LoL_Account_Manager_Salt_v1',  # Fixed salt for consistency
@@ -75,7 +75,7 @@ class PasswordEncryption:
         Returns:
             Base64 encoded hash
         """
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=b'LoL_Master_Password_Hash_Salt',
