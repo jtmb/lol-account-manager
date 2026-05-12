@@ -1,6 +1,6 @@
 @echo off
 REM League of Legends Account Manager - Windows Launcher
-setlocal enabledelayedexpansion
+setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 
 if not defined LOL_STAGED (
@@ -93,10 +93,10 @@ if not exist requirements.txt (
 )
 
 if exist "src\security\encryption.py" (
-    findstr /C:"from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2" "src\security\encryption.py" >nul 2>&1
+    findstr /R /C:"PBKDF2" "src\security\encryption.py" >nul 2>&1
     if !errorlevel! equ 0 (
         echo [*] Applying compatibility fix for encryption module...
-        "%PYTHON_EXE%" -c "from pathlib import Path; p=Path(r'src/security/encryption.py'); t=p.read_text(encoding='utf-8'); t=t.replace('from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2','from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC'); t=t.replace('kdf = PBKDF2(','kdf = PBKDF2HMAC('); p.write_text(t, encoding='utf-8')"
+        "%PYTHON_EXE%" -c "from pathlib import Path; import re; p=Path(r'src/security/encryption.py'); t=p.read_text(encoding='utf-8'); t=re.sub(r'from\\s+cryptography\\.hazmat\\.primitives\\.kdf\\.pbkdf2\\s+import\\s+\\w+', 'from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC', t); t=t.replace('PBKDF2HMACHMAC','PBKDF2HMAC'); t=re.sub(r'kdf\\s*=\\s*PBKDF2(?:HMAC)*\\s*\\(', 'kdf = PBKDF2HMAC(', t); p.write_text(t, encoding='utf-8')"
         if !errorlevel! neq 0 (
             echo [ERROR] Failed to apply compatibility fix to src\security\encryption.py
             pause
