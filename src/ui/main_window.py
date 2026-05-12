@@ -267,13 +267,13 @@ class MainWindow(QMainWindow):
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
 
-        default_lol_path = str(get_default_lol_executable_path())
-        self.default_lol_path_label = QLabel(f"Default LoL path: {default_lol_path}")
-        self.default_lol_path_label.setStyleSheet("color: #666666;")
-        self.default_lol_path_label.setTextInteractionFlags(
+        self.lol_path_label = QLabel()
+        self.lol_path_label.setStyleSheet("color: #666666;")
+        self.lol_path_label.setTextInteractionFlags(
             Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
         )
-        layout.addWidget(self.default_lol_path_label)
+        layout.addWidget(self.lol_path_label)
+        self._refresh_lol_path_label()
         
         central_widget.setLayout(layout)
     
@@ -551,6 +551,7 @@ class MainWindow(QMainWindow):
                     "Saving anyway — update if launch fails."
                 )
             set_custom_lol_exe(p)
+            self._refresh_lol_path_label()
             QMessageBox.information(
                 self, "LoL Path Saved",
                 f"League of Legends path set to:\n{exe_path}"
@@ -568,6 +569,7 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             try:
                 reset_settings()
+                self._refresh_lol_path_label()
                 QMessageBox.information(
                     self,
                     "Settings Reset",
@@ -575,6 +577,15 @@ class MainWindow(QMainWindow):
                 )
             except Exception as e:
                 self._show_error("Error", f"Failed to reset settings: {str(e)}")
+
+    def _refresh_lol_path_label(self):
+        """Update the LoL path label to reflect the currently active path."""
+        active = get_lol_executable()
+        if active:
+            self.lol_path_label.setText(f"LoL path: {active}")
+        else:
+            default = get_default_lol_executable_path()
+            self.lol_path_label.setText(f"LoL path (default): {default}")
 
     def _show_error(self, title: str, message: str, icon=QMessageBox.Critical):
         """Show an error dialog with selectable/copyable text."""
