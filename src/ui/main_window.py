@@ -801,10 +801,11 @@ QMenu {
     border: 1px solid #45475a;
     border-radius: 10px;
     padding: 6px;
+    margin: 0px;
 }
 QMenu::item {
     padding: 8px 24px 8px 18px;
-    border-radius: 6px;
+    background: transparent;
 }
 QMenu::item:selected {
     background-color: #45475a;
@@ -824,10 +825,11 @@ QMenu {
     border: 1px solid #d1d5db;
     border-radius: 10px;
     padding: 6px;
+    margin: 0px;
 }
 QMenu::item {
     padding: 8px 24px 8px 18px;
-    border-radius: 6px;
+    background: transparent;
 }
 QMenu::item:selected {
     background-color: #e5e7eb;
