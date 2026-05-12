@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
-        self.setMinimumSize(718, 699)
+        self.setMinimumSize(500, 400)
         self.resize(718, 699)
         
         # Central widget
