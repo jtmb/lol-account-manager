@@ -7,17 +7,24 @@ from pathlib import Path
 root_dir = Path(__file__).parent
 spec_file = root_dir / 'build' / 'lol_account_manager.spec'
 
+icon_file = root_dir / 'assets' / 'icon.ico'
+
 # Create build command
-PyInstaller.__main__.run([
+args = [
     'src/main.py',
     '--name', 'LoL Account Manager',
     '--windowed',  # Hide console window
     '--onefile',  # Create single executable
-    '--icon', 'assets/icon.ico' if (root_dir / 'assets' / 'icon.ico').exists() else None,
     '--add-data', f'src:src',
     '--distpath', 'dist',
     '--buildpath', 'build/.build',
     '--specpath', 'build',
-])
+]
+
+if icon_file.exists():
+    args.extend(['--icon', str(icon_file)])
+    args.extend(['--add-data', f'{icon_file}:assets'])
+
+PyInstaller.__main__.run(args)
 
 print("\nBuild complete! Executable is in the 'dist' folder.")

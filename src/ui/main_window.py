@@ -810,6 +810,7 @@ class MainWindow(QMainWindow):
         self.launch_progress.setMinimumDuration(0)
         self.launch_progress.canceled.connect(self._dismiss_launch_progress)
         self.launch_progress.show()
+        QTimer.singleShot(0, self._center_launch_progress)
         
         # Launch in background thread
         self.login_thread = LoginThread(
@@ -862,6 +863,19 @@ class MainWindow(QMainWindow):
 
         progress.close()
         progress.deleteLater()
+
+    def _center_launch_progress(self):
+        """Center launch progress dialog over the main window."""
+        progress = self.launch_progress
+        if not progress:
+            return
+
+        progress.adjustSize()
+        parent_geo = self.frameGeometry()
+        dlg_geo = progress.frameGeometry()
+        x = parent_geo.x() + (parent_geo.width() - dlg_geo.width()) // 2
+        y = parent_geo.y() + (parent_geo.height() - dlg_geo.height()) // 2
+        progress.move(max(x, 0), max(y, 0))
 
     def _handle_launch_timeout(self):
         """Keep waiting quietly while the launch thread continues retries."""

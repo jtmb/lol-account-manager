@@ -40,11 +40,17 @@ if exist dist rmdir /s /q dist
 if exist LoLAccountManager.spec del /q LoLAccountManager.spec
 
 echo [*] Running PyInstaller...
+set "ICON_ARG="
+set "DATA_ARG="
+if exist "assets\icon.ico" set "ICON_ARG=--icon assets\icon.ico"
+if exist "assets\icon.ico" set "DATA_ARG=--add-data assets\icon.ico;assets"
 "%VENV_PY%" -m PyInstaller ^
   --noconfirm ^
   --clean ^
   --name "LoLAccountManager" ^
   --windowed ^
+    %ICON_ARG% ^
+    %DATA_ARG% ^
   --collect-all pywinauto ^
   src\main.py
 
