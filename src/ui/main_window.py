@@ -773,6 +773,9 @@ class MainWindow(QMainWindow):
         self.update_account_item_states()
 
         menu = QMenu(self)
+        menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        menu.setAttribute(Qt.WA_TranslucentBackground, True)
+        menu.setContentsMargins(0, 0, 0, 0)
         menu.setStyleSheet(self._account_context_menu_stylesheet())
         copy_username_action = menu.addAction("Copy Username")
         copy_password_action = menu.addAction("Copy Password")
@@ -799,17 +802,19 @@ QMenu {
     background-color: #1e1e2e;
     color: #cdd6f4;
     border: 1px solid #45475a;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 6px;
     margin: 0px;
 }
 QMenu::item {
     padding: 8px 24px 8px 18px;
     background: transparent;
+    margin: 0px 4px;
 }
 QMenu::item:selected {
     background-color: #45475a;
     color: #ffffff;
+    border-radius: 8px;
 }
 QMenu::separator {
     height: 1px;
@@ -823,17 +828,19 @@ QMenu {
     background-color: #ffffff;
     color: #1f2937;
     border: 1px solid #d1d5db;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 6px;
     margin: 0px;
 }
 QMenu::item {
     padding: 8px 24px 8px 18px;
     background: transparent;
+    margin: 0px 4px;
 }
 QMenu::item:selected {
     background-color: #e5e7eb;
     color: #111827;
+    border-radius: 8px;
 }
 QMenu::separator {
     height: 1px;
