@@ -3,10 +3,10 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit
+    QDateEdit, QGraphicsDropShadowEffect
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
+from PyQt5.QtGui import QFont, QColor
 from pathlib import Path
 from typing import Optional
 import sys
@@ -291,6 +291,16 @@ class AccountListItem(QFrame):
         outer = QHBoxLayout()
         outer.setContentsMargins(10, 5, 10, 5)
         outer.setSpacing(8)
+        self.setObjectName("accountListItem")
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setMouseTracking(True)
+        self._selected = False
+        self._hovered = False
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setOffset(0, 3)
+        self._shadow.setBlurRadius(0)
+        self._shadow.setColor(QColor(0, 0, 0, 0))
+        self.setGraphicsEffect(self._shadow)
 
         # Colored status circle
         circle = QLabel("\u25CF")
@@ -309,6 +319,7 @@ class AccountListItem(QFrame):
 
         name_label = QLabel(self.account.display_name)
         name_label.setFont(name_font)
+        name_label.setAttribute(Qt.WA_TranslucentBackground, True)
         text_layout.addWidget(name_label)
 
         user_row = QHBoxLayout()
@@ -316,6 +327,7 @@ class AccountListItem(QFrame):
 
         username_label = QLabel(f"@{self.account.username}")
         username_label.setStyleSheet("color: #666666;")
+        username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
 
         if self.account.ban_status == "permanent":
@@ -336,6 +348,44 @@ class AccountListItem(QFrame):
         outer.addLayout(text_layout)
         outer.addStretch()
         self.setLayout(outer)
+        self._update_visual_state()
+
+    def set_selected(self, selected: bool):
+        self._selected = selected
+        self._update_visual_state()
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self._update_visual_state()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self._update_visual_state()
+        super().leaveEvent(event)
+
+    def _update_visual_state(self):
+        active = self._selected or self._hovered
+        if active:
+            self.setStyleSheet(
+                "#accountListItem {"
+                "background-color: rgba(69, 71, 90, 180);"
+                "border: 1px solid rgba(137, 180, 250, 140);"
+                "border-radius: 10px;"
+                "}"
+            )
+            self._shadow.setBlurRadius(18)
+            self._shadow.setColor(QColor(0, 0, 0, 120))
+        else:
+            self.setStyleSheet(
+                "#accountListItem {"
+                "background-color: transparent;"
+                "border: 1px solid transparent;"
+                "border-radius: 10px;"
+                "}"
+            )
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
 
 
 class MainWindow(QMainWindow):
@@ -385,6 +435,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("Saved Accounts:"))
         self.account_list = QListWidget()
         self.account_list.itemClicked.connect(self.on_account_selected)
+        self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
         layout.addWidget(self.account_list)
         
         # Button layout
@@ -591,6 +642,8 @@ class MainWindow(QMainWindow):
                 # Create custom widget
                 widget = AccountListItem(account)
                 self.account_list.setItemWidget(item, widget)
+
+            self.update_account_item_states()
     
     def on_account_selected(self):
         """Handle account selection"""
@@ -600,6 +653,14 @@ class MainWindow(QMainWindow):
             self.launch_btn.setEnabled(username is not None)
             self.edit_btn.setEnabled(username is not None)
             self.delete_btn.setEnabled(username is not None)
+
+    def update_account_item_states(self):
+        """Refresh hover/selected visuals for account rows."""
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            widget = self.account_list.itemWidget(item)
+            if isinstance(widget, AccountListItem):
+                widget.set_selected(item.isSelected())
 
     def edit_account(self):
         """Edit the selected account"""
