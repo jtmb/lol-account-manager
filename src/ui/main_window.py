@@ -369,14 +369,31 @@ class AccountListItem(QFrame):
         name_font.setBold(True)
         name_font.setPointSize(11)
 
+        tag_font = QFont()
+        tag_font.setBold(True)
+        tag_font.setPointSize(10)
+        tag_font.setWeight(QFont.DemiBold)
+
         region = self.account.region if getattr(self.account, "region", None) else "NA"
         tag_line = self.account.tag_line if getattr(self.account, "tag_line", None) else "NA1"
 
-        name_label = QLabel(f"{self.account.display_name} #{tag_line}")
+        name_row = QHBoxLayout()
+        name_row.setSpacing(4)
+
+        name_label = QLabel(self.account.display_name)
         name_label.setFont(name_font)
         name_label.setAttribute(Qt.WA_TranslucentBackground, True)
         name_label.setStyleSheet("background: transparent; border: none;")
-        text_layout.addWidget(name_label)
+        name_row.addWidget(name_label)
+
+        tag_label = QLabel(f"#{tag_line}")
+        tag_label.setFont(tag_font)
+        tag_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        tag_label.setStyleSheet("background: transparent; border: none; color: #9aa1b2;")
+        name_row.addWidget(tag_label)
+
+        name_row.addStretch()
+        text_layout.addLayout(name_row)
 
         user_row = QHBoxLayout()
         user_row.setSpacing(6)
