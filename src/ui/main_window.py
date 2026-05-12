@@ -372,7 +372,7 @@ class AccountListItem(QFrame):
         region = self.account.region if getattr(self.account, "region", None) else "NA"
         tag_line = self.account.tag_line if getattr(self.account, "tag_line", None) else "NA1"
 
-        name_label = QLabel(f"@{self.account.username} ({region})")
+        name_label = QLabel(f"{self.account.display_name} #{tag_line}")
         name_label.setFont(name_font)
         name_label.setAttribute(Qt.WA_TranslucentBackground, True)
         name_label.setStyleSheet("background: transparent; border: none;")
@@ -380,7 +380,7 @@ class AccountListItem(QFrame):
 
         user_row = QHBoxLayout()
         user_row.setSpacing(6)
-        username_label = QLabel(f"{self.account.display_name} #{tag_line}")
+        username_label = QLabel(f"@{self.account.username} ({region})")
         username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
         username_label.setAttribute(Qt.WA_TranslucentBackground, True)
         user_row.addWidget(username_label)
