@@ -200,6 +200,7 @@ class MainWindow(QMainWindow):
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.launch_progress: Optional[QProgressDialog] = None
+        self.current_launch_username: Optional[str] = None
         self.init_ui()
         self.check_master_password()
     
@@ -397,6 +398,8 @@ class MainWindow(QMainWindow):
         
         if not account:
             return
+
+        self.current_launch_username = account.username
         
         reply = QMessageBox.question(
             self,
@@ -468,13 +471,16 @@ class MainWindow(QMainWindow):
         self._dismiss_launch_progress()
         
         if success:
+            username = self.current_launch_username or "Unknown"
             QMessageBox.information(
                 self,
                 "Success",
-                "Riot Client login submitted and League launch requested."
+                f"{username} login successful!"
             )
         else:
             self._show_error("Error", "Failed to launch. Make sure League of Legends is installed.")
+
+        self.current_launch_username = None
     
     def on_launch_error(self, error):
         """Handle launch error"""
