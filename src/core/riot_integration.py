@@ -114,22 +114,41 @@ class RiotClientIntegration:
             True if launch was successful
         """
         try:
-            # Find League Client executable
+            # Preferred path: ask Riot Client to launch LoL.
+            # This is more reliable than directly starting game executables.
+            riot_path = get_riot_client_path()
+            if riot_path and riot_path.exists():
+                subprocess.Popen(
+                    [
+                        str(riot_path),
+                        "--launch-product=league_of_legends",
+                        "--launch-patchline=live",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                return True
+
+            # Fallback: launch League Client directly.
             lol_exec = get_lol_executable()
-            
+
             if not lol_exec:
                 raise FileNotFoundError(
                     "League of Legends executable not found. "
                     "Please ensure League of Legends is installed."
                 )
-            
-            # Launch League Client
+            if not lol_exec.is_file():
+                raise FileNotFoundError(
+                    f"Configured LoL path is not a file: {lol_exec}"
+                )
+
             subprocess.Popen(
                 [str(lol_exec)],
+                cwd=str(lol_exec.parent),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            
+
             return True
             
         except Exception as e:

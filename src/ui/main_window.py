@@ -14,7 +14,12 @@ import time
 from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
 from src.security.encryption import PasswordEncryption
-from src.config.paths import get_lol_executable, set_custom_lol_exe
+from src.config.paths import (
+    get_lol_executable,
+    set_custom_lol_exe,
+    reset_settings,
+    get_default_lol_executable_path,
+)
 
 
 class LoginThread(QThread):
@@ -252,8 +257,21 @@ class MainWindow(QMainWindow):
         self.browse_lol_btn.clicked.connect(self.browse_for_lol)
         settings_layout.addWidget(self.browse_lol_btn)
 
+        self.reset_settings_btn = QPushButton("Reset Settings")
+        self.reset_settings_btn.setToolTip("Reset custom path and other app settings to defaults")
+        self.reset_settings_btn.clicked.connect(self.reset_app_settings)
+        settings_layout.addWidget(self.reset_settings_btn)
+
         settings_layout.addStretch()
         layout.addLayout(settings_layout)
+
+        default_lol_path = str(get_default_lol_executable_path())
+        self.default_lol_path_label = QLabel(f"Default LoL path: {default_lol_path}")
+        self.default_lol_path_label.setStyleSheet("color: #666666;")
+        self.default_lol_path_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+        )
+        layout.addWidget(self.default_lol_path_label)
         
         central_widget.setLayout(layout)
     
@@ -487,7 +505,6 @@ class MainWindow(QMainWindow):
             "Executable (*.exe);;All files (*)"
         )
         if exe_path:
-            from pathlib import Path
             p = Path(exe_path)
             if p.name.lower() not in ('leagueclient.exe', 'league of legends.exe'):
                 QMessageBox.warning(
@@ -500,6 +517,26 @@ class MainWindow(QMainWindow):
                 self, "LoL Path Saved",
                 f"League of Legends path set to:\n{exe_path}"
             )
+
+    def reset_app_settings(self):
+        """Reset app settings to defaults."""
+        reply = QMessageBox.question(
+            self,
+            "Reset Settings",
+            "Reset all launcher settings to defaults?\n\n"
+            "This clears your custom LoL path and other saved app settings.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                reset_settings()
+                QMessageBox.information(
+                    self,
+                    "Settings Reset",
+                    "Settings reset to default values.",
+                )
+            except Exception as e:
+                self._show_error("Error", f"Failed to reset settings: {str(e)}")
 
     def _show_error(self, title: str, message: str, icon=QMessageBox.Critical):
         """Show an error dialog with selectable/copyable text."""

@@ -60,6 +60,9 @@ LOL_PATHS = [
     Path('C:\\Riot Games\\League of Legends'),
 ]
 
+# Preferred default location shown in UI
+DEFAULT_LOL_INSTALL_DIR = Path('C:\\Riot Games\\League of Legends')
+
 # Riot client configuration paths
 RIOT_CONFIG_PATHS = [
     APPDATA / 'Riot Games' / 'Riot Client' / 'Config' / 'RiotClientSettings.yaml',
@@ -105,6 +108,17 @@ def get_lol_executable() -> Optional[Path]:
             if candidate.exists():
                 return candidate
     return None
+
+
+def get_default_lol_executable_path() -> Path:
+    """Return the default LeagueClient.exe path shown to the user."""
+    return DEFAULT_LOL_INSTALL_DIR / 'LeagueClient.exe'
+
+
+def reset_settings():
+    """Reset app settings to defaults by removing overrides."""
+    if SETTINGS_FILE.exists():
+        SETTINGS_FILE.unlink()
 
 
 def get_riot_config_path() -> Optional[Path]:
