@@ -478,10 +478,19 @@ class MainWindow(QMainWindow):
 
     def _dismiss_launch_progress(self):
         """Close and clear launch progress UI if it exists."""
-        if self.launch_progress:
-            self.launch_progress.close()
-            self.launch_progress.deleteLater()
-            self.launch_progress = None
+        progress = self.launch_progress
+        if not progress:
+            return
+
+        # Clear shared reference first to avoid re-entrant double-close crashes.
+        self.launch_progress = None
+        try:
+            progress.canceled.disconnect(self._dismiss_launch_progress)
+        except Exception:
+            pass
+
+        progress.close()
+        progress.deleteLater()
 
     def _handle_launch_timeout(self):
         """Avoid stuck launch dialogs if background thread hangs."""
