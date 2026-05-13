@@ -393,11 +393,11 @@ class LoginThread(QThread):
 
 
 class InGameWatcherThread(QThread):
-    """Poll local Live Client API until an active match is detected."""
+    """Poll Live Client API and emit once for each newly started match."""
 
     ingame_detected = pyqtSignal(str)  # op.gg url
 
-    def __init__(self, opgg_url: str, timeout_seconds: int = 900, poll_interval_seconds: float = 3.0):
+    def __init__(self, opgg_url: str, timeout_seconds: int = 21600, poll_interval_seconds: float = 3.0):
         super().__init__()
         self._opgg_url = opgg_url
         self._timeout_seconds = timeout_seconds
@@ -405,12 +405,27 @@ class InGameWatcherThread(QThread):
 
     def run(self):
         deadline = time.time() + self._timeout_seconds
+        opened_for_current_game = False
+        consecutive_out_of_game_polls = 0
+
         while time.time() < deadline:
             if self.isInterruptionRequested():
                 return
-            if RiotClientIntegration.is_in_active_game(timeout_seconds=1.5):
-                self.ingame_detected.emit(self._opgg_url)
-                return
+
+            in_game = RiotClientIntegration.is_in_active_game(timeout_seconds=1.5)
+
+            if in_game:
+                consecutive_out_of_game_polls = 0
+                if not opened_for_current_game:
+                    self.ingame_detected.emit(self._opgg_url)
+                    opened_for_current_game = True
+            else:
+                # Require two consecutive out-of-game polls before re-arming.
+                # This avoids duplicate opens from short local API hiccups.
+                consecutive_out_of_game_polls += 1
+                if consecutive_out_of_game_polls >= 2:
+                    opened_for_current_game = False
+
             self.msleep(max(200, int(self._poll_interval_seconds * 1000)))
 
 
