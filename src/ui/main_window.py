@@ -14,6 +14,8 @@ import sys
 import ctypes
 import time
 import random
+import webbrowser
+from urllib.parse import quote
 
 if sys.platform.startswith("win"):
     import winreg
@@ -21,6 +23,7 @@ if sys.platform.startswith("win"):
 from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
 from src.core.opgg_service import fetch_rank
+from src.core.opgg_service import OPGG_REGION_MAP
 from src.security.encryption import PasswordEncryption
 from src.config.paths import (
     get_lol_executable,
@@ -310,6 +313,28 @@ class LoginThread(QThread):
             self.error.emit(str(e))
 
 
+class InGameWatcherThread(QThread):
+    """Poll local Live Client API until an active match is detected."""
+
+    ingame_detected = pyqtSignal(str)  # op.gg url
+
+    def __init__(self, opgg_url: str, timeout_seconds: int = 900, poll_interval_seconds: float = 3.0):
+        super().__init__()
+        self._opgg_url = opgg_url
+        self._timeout_seconds = timeout_seconds
+        self._poll_interval_seconds = poll_interval_seconds
+
+    def run(self):
+        deadline = time.time() + self._timeout_seconds
+        while time.time() < deadline:
+            if self.isInterruptionRequested():
+                return
+            if RiotClientIntegration.is_in_active_game(timeout_seconds=1.5):
+                self.ingame_detected.emit(self._opgg_url)
+                return
+            self.msleep(max(200, int(self._poll_interval_seconds * 1000)))
+
+
 class MasterPasswordDialog(QDialog):
     """Dialog for setting/entering master password"""
     
@@ -597,6 +622,10 @@ class SettingsDialog(QDialog):
         self.show_tags_checkbox.setChecked(bool(self._settings.get("show_tags", True)))
         layout.addWidget(self.show_tags_checkbox)
 
+        self.auto_open_ingame_checkbox = QCheckBox("Auto-open op.gg live game page")
+        self.auto_open_ingame_checkbox.setChecked(bool(self._settings.get("auto_open_ingame_page", True)))
+        layout.addWidget(self.auto_open_ingame_checkbox)
+
         tag_size_row = QHBoxLayout()
         tag_size_row.addWidget(QLabel("Tag size:"))
         self.tag_size_combo = QComboBox()
@@ -710,6 +739,7 @@ class SettingsDialog(QDialog):
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
             "show_tags": self.show_tags_checkbox.isChecked(),
+            "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_spin.value()),
@@ -1113,12 +1143,14 @@ class MainWindow(QMainWindow):
         self._settings = load_settings()
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
+        self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.launch_progress: Optional[QProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._show_tags: bool = self._settings.get('show_tags', True)
+        self._auto_open_ingame_page: bool = bool(self._settings.get('auto_open_ingame_page', True))
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._window_size: str = self._settings.get('window_size', '800x600')
@@ -1318,6 +1350,7 @@ class MainWindow(QMainWindow):
         self._show_ranks = bool(values['show_ranks'])
         self._show_rank_images = bool(values['show_rank_images'])
         self._show_tags = bool(values['show_tags'])
+        self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
         self._tag_size = str(values['tag_size'])
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._window_size = values['window_size']
@@ -1754,6 +1787,8 @@ QMenu::separator {
         if not account:
             return
 
+        self._stop_ingame_watcher()
+
         self.current_launch_username = account.username
         
         # Show cancellable progress dialog
@@ -1794,6 +1829,9 @@ QMenu::separator {
         
         if success:
             username = self.current_launch_username or "Unknown"
+            account = self.account_manager.get_account(username) if self.account_manager else None
+            if account and self._auto_open_ingame_page:
+                self._start_ingame_watcher(account)
             QMessageBox.information(
                 self,
                 "Success",
@@ -1807,7 +1845,46 @@ QMenu::separator {
     def on_launch_error(self, error):
         """Handle launch error"""
         self._dismiss_launch_progress()
+        self._stop_ingame_watcher()
         self._show_error("Error", f"Launch failed: {error}")
+
+    def _build_opgg_ingame_url(self, account: Account) -> str:
+        """Build op.gg in-game spectator URL for an account."""
+        region_code = (getattr(account, "region", "NA") or "NA").upper()
+        region_slug = OPGG_REGION_MAP.get(region_code, region_code.lower())
+        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
+        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
+        encoded_name = quote(display_name, safe="")
+        encoded_tag = quote(tag_line, safe="")
+        return f"https://op.gg/lol/summoners/{region_slug}/{encoded_name}-{encoded_tag}/ingame"
+
+    def _start_ingame_watcher(self, account: Account):
+        """Start watching for active-game state and open op.gg once detected."""
+        self._stop_ingame_watcher()
+        opgg_url = self._build_opgg_ingame_url(account)
+        self.ingame_watch_thread = InGameWatcherThread(opgg_url)
+        self.ingame_watch_thread.ingame_detected.connect(self._open_ingame_webpage)
+        self.ingame_watch_thread.finished.connect(self._clear_ingame_watcher)
+        self.ingame_watch_thread.start()
+
+    def _open_ingame_webpage(self, url: str):
+        """Open op.gg in-game page in the system browser."""
+        try:
+            webbrowser.open_new_tab(url)
+        except Exception:
+            webbrowser.open(url)
+
+    def _stop_ingame_watcher(self):
+        """Stop any existing in-game watcher thread."""
+        watcher = self.ingame_watch_thread
+        if watcher and watcher.isRunning():
+            watcher.requestInterruption()
+            watcher.wait(1200)
+        self.ingame_watch_thread = None
+
+    def _clear_ingame_watcher(self):
+        """Clear completed watcher thread reference."""
+        self.ingame_watch_thread = None
 
     def _dismiss_launch_progress(self):
         """Close and clear launch progress UI if it exists."""

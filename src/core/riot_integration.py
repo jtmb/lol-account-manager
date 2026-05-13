@@ -2,6 +2,7 @@
 import subprocess
 import time
 import psutil
+import requests
 from pathlib import Path
 from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_path
@@ -66,6 +67,22 @@ class RiotClientIntegration:
         except:
             pass
         return False
+
+    @staticmethod
+    def is_in_active_game(timeout_seconds: float = 1.5) -> bool:
+        """Return True when the local Live Client API indicates an active match.
+
+        The endpoint is only available while the game process is in-match.
+        """
+        try:
+            response = requests.get(
+                "https://127.0.0.1:2999/liveclientdata/allgamedata",
+                timeout=timeout_seconds,
+                verify=False,
+            )
+            return response.status_code == 200 and bool(response.text.strip())
+        except requests.RequestException:
+            return False
 
     @staticmethod
     def _wait_for_lol_start(timeout_seconds: int = 20) -> bool:
