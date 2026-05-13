@@ -38,7 +38,7 @@ def _escape_html(text: str) -> str:
 
 
 def _build_rank_pixmap(image_bytes: bytes) -> QPixmap:
-    """Convert fetched medal bytes into a small row icon."""
+    """Convert fetched medal bytes into a row icon."""
     pixmap = QPixmap()
     if image_bytes:
         pixmap.loadFromData(image_bytes)
@@ -466,13 +466,15 @@ class AccountListItem(QFrame):
 
         # Rank block (right side)
         rank_widget = QWidget()
+        rank_widget.setAttribute(Qt.WA_TranslucentBackground, True)
+        rank_widget.setStyleSheet("background: transparent; border: none;")
         rank_layout = QHBoxLayout(rank_widget)
         rank_layout.setContentsMargins(0, 0, 0, 0)
         rank_layout.setSpacing(6)
 
         self.rank_icon_label = QLabel()
-        self.rank_icon_label.setFixedSize(18, 18)
-        self.rank_icon_label.setScaledContents(True)
+        self.rank_icon_label.setFixedSize(24, 24)
+        self.rank_icon_label.setScaledContents(False)
         self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
         rank_layout.addWidget(self.rank_icon_label)
@@ -482,9 +484,9 @@ class AccountListItem(QFrame):
         self.rank_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_label.setTextFormat(Qt.RichText)
         self.rank_label.setStyleSheet(
-            "background: transparent; border: none; color: #8b93a8; font-size: 10px;"
+            "background: transparent; border: none; color: #8b93a8; font-size: 11px;"
         )
-        self.rank_label.setMinimumWidth(150)
+        self.rank_label.setMinimumWidth(190)
         rank_layout.addWidget(self.rank_label)
 
         outer.addWidget(rank_widget)
@@ -502,8 +504,11 @@ class AccountListItem(QFrame):
             wins = _escape_html(f"{rank_data.get('wins', '')}W / {rank_data.get('losses', '')}L")
             win_rate = _escape_html(f"{rank_data.get('win_rate', '')}% WR")
             neutral_color = "#8b93a8" if self._dark_mode else "#4b5563"
-            self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 10px;")
-            self.rank_icon_label.setPixmap(_build_rank_pixmap(rank_data.get("medal_bytes", b"")))
+            self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 11px;")
+            pixmap = _build_rank_pixmap(rank_data.get("medal_bytes", b""))
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.rank_icon_label.setPixmap(pixmap)
             self.rank_icon_label.setVisible(not self.rank_icon_label.pixmap().isNull())
             self.rank_label.setText(
                 f"<span style='color:{color}; font-weight:600;'>{tier}</span> "
@@ -513,14 +518,14 @@ class AccountListItem(QFrame):
             self.rank_icon_label.clear()
             self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
-                "background: transparent; border: none; color: #585b70; font-size: 10px;"
+                "background: transparent; border: none; color: #585b70; font-size: 11px;"
             )
             self.rank_label.setText("Unranked")
         else:
             self.rank_icon_label.clear()
             self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
-                "background: transparent; border: none; color: #585b70; font-size: 10px;"
+                "background: transparent; border: none; color: #585b70; font-size: 11px;"
             )
             self.rank_label.setText("")
 
