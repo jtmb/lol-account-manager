@@ -638,6 +638,8 @@ class AddAccountDialog(QDialog):
 class SettingsDialog(QDialog):
     """Dialog for global app settings."""
 
+    CUSTOM_SIZE_VALUE = "__custom__"
+
     COMMON_RESOLUTIONS = [
         "640x480",
         "800x600",
@@ -680,23 +682,38 @@ class SettingsDialog(QDialog):
         self.startup_checkbox = QCheckBox("Start Program at Windows startup")
         self.startup_checkbox.setChecked(bool(startup_default))
         self.startup_checkbox.setEnabled(sys.platform.startswith("win"))
+        self.startup_checkbox.setToolTip("Launch the app automatically when you sign in to Windows.")
         if not sys.platform.startswith("win"):
             self.startup_checkbox.setToolTip("Available on Windows only")
         layout.addWidget(self.startup_checkbox)
 
         layout.addWidget(QLabel("Window size:"))
         self.window_size_combo = QComboBox()
+        self.current_window_size = str(self._settings.get("current_window_size", self._settings.get("window_size", "800x600")))
+        custom_label = f"Remember current size ({self.current_window_size})"
+        self.window_size_combo.addItem(custom_label, self.CUSTOM_SIZE_VALUE)
         self.window_size_combo.addItems(self.COMMON_RESOLUTIONS)
+        self.window_size_combo.setToolTip(
+            "Choose a fixed startup size, or select Remember current size to keep the last manually resized window."
+        )
         current_resolution = self._settings.get("window_size", "800x600")
-        if current_resolution not in self.COMMON_RESOLUTIONS:
-            self.window_size_combo.addItem(current_resolution)
-        self.window_size_combo.setCurrentText(current_resolution)
+        current_mode = str(self._settings.get("window_size_mode", "")).strip().lower()
+        if current_mode not in {"static", "custom"}:
+            current_mode = "custom" if current_resolution not in self.COMMON_RESOLUTIONS else "static"
+        if current_mode == "custom":
+            self.window_size_combo.setCurrentIndex(0)
+        else:
+            index = self.window_size_combo.findText(current_resolution)
+            if index < 0:
+                index = 0
+            self.window_size_combo.setCurrentIndex(index)
         layout.addWidget(self.window_size_combo)
 
         layout.addWidget(QLabel("Text Size:"))
         self.text_zoom_combo = QComboBox()
         for label, value in self.TEXT_ZOOM_OPTIONS:
             self.text_zoom_combo.addItem(label, value)
+        self.text_zoom_combo.setToolTip("Increase or decrease the UI text size for readability.")
         current_zoom = int(self._settings.get("text_zoom_percent", 110))
         zoom_index = self.text_zoom_combo.findData(current_zoom)
         if zoom_index < 0:
@@ -707,20 +724,26 @@ class SettingsDialog(QDialog):
 
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
+        self.show_ranks_checkbox.setToolTip("Show or hide op.gg rank information on each account row.")
         layout.addWidget(self.show_ranks_checkbox)
 
         self.show_images_checkbox = QCheckBox("Show rank images")
         self.show_images_checkbox.setChecked(bool(self._settings.get("show_rank_images", True)))
+        self.show_images_checkbox.setToolTip("Show or hide the rank medal image next to each account.")
         layout.addWidget(self.show_images_checkbox)
         self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
 
         self.show_tags_checkbox = QCheckBox("Show tags")
         self.show_tags_checkbox.setChecked(bool(self._settings.get("show_tags", True)))
+        self.show_tags_checkbox.setToolTip("Show or hide account tags under each account entry.")
         layout.addWidget(self.show_tags_checkbox)
 
         self.auto_open_ingame_checkbox = QCheckBox("Auto-open op.gg live game page")
         self.auto_open_ingame_checkbox.setChecked(bool(self._settings.get("auto_open_ingame_page", True)))
+        self.auto_open_ingame_checkbox.setToolTip(
+            "Automatically open the op.gg in-game page when a live match is detected."
+        )
         layout.addWidget(self.auto_open_ingame_checkbox)
 
         tag_size_row = QHBoxLayout()
@@ -728,6 +751,7 @@ class SettingsDialog(QDialog):
         self.tag_size_combo = QComboBox()
         for label, value in self.TAG_SIZE_OPTIONS:
             self.tag_size_combo.addItem(label, value)
+        self.tag_size_combo.setToolTip("Choose how large the tag badges appear on account rows.")
         current_tag_size = str(self._settings.get("tag_size", "medium"))
         tag_size_index = self.tag_size_combo.findData(current_tag_size)
         self.tag_size_combo.setCurrentIndex(max(0, tag_size_index))
@@ -739,6 +763,9 @@ class SettingsDialog(QDialog):
 
         self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
         self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
+        self.auto_backup_checkbox.setToolTip(
+            "Create an encrypted backup each time account data is saved."
+        )
         layout.addWidget(self.auto_backup_checkbox)
 
         backup_keep_row = QHBoxLayout()
@@ -844,9 +871,12 @@ class SettingsDialog(QDialog):
 
     def get_values(self) -> dict:
         """Collect validated settings values."""
+        window_size_mode = "custom" if self.window_size_combo.currentData() == self.CUSTOM_SIZE_VALUE else "static"
+        window_size = self.current_window_size if window_size_mode == "custom" else self.window_size_combo.currentText()
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
-            "window_size": self.window_size_combo.currentText(),
+            "window_size": window_size,
+            "window_size_mode": window_size_mode,
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
@@ -1284,9 +1314,22 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._window_size: str = self._settings.get('window_size', '800x600')
+        self._window_size_mode: str = str(
+            self._settings.get(
+                'window_size_mode',
+                'custom' if self._window_size not in SettingsDialog.COMMON_RESOLUTIONS else 'static',
+            )
+        ).strip().lower()
+        if self._window_size_mode not in {'static', 'custom'}:
+            self._window_size_mode = 'custom' if self._window_size not in SettingsDialog.COMMON_RESOLUTIONS else 'static'
         self._search_query: str = ""
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
+        self._window_resize_save_timer = QTimer(self)
+        self._window_resize_save_timer.setSingleShot(True)
+        self._window_resize_save_timer.setInterval(250)
+        self._window_resize_save_timer.timeout.connect(self._persist_window_size)
+        self._suppress_window_size_persistence = False
         self.init_ui()
         app = QApplication.instance()
         if app:
@@ -1297,8 +1340,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
         self.setMinimumSize(640, 480)
-        width, height = _parse_resolution(self._window_size, fallback=(660, 480))
-        self.resize(width, max(480, height))
+        self._apply_window_size(self._window_size)
 
         # Central widget
         central_widget = QWidget()
@@ -1398,6 +1440,35 @@ class MainWindow(QMainWindow):
         self._refresh_lol_path_label()
         
         central_widget.setLayout(layout)
+
+    def _apply_window_size(self, resolution: str):
+        """Resize the window without treating it as a user-initiated custom resize."""
+        width, height = _parse_resolution(resolution, fallback=(660, 480))
+        self._suppress_window_size_persistence = True
+        try:
+            self.resize(width, max(480, height))
+        finally:
+            self._suppress_window_size_persistence = False
+
+    def _persist_window_size(self):
+        """Persist the current window size as the custom startup size."""
+        if self.isMaximized() or self.isFullScreen():
+            return
+        current_resolution = f"{self.width()}x{self.height()}"
+        self._window_size = current_resolution
+        self._window_size_mode = 'custom'
+        self._settings['window_size'] = current_resolution
+        self._settings['window_size_mode'] = 'custom'
+        save_settings(self._settings)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._suppress_window_size_persistence:
+            return
+        if self.isMaximized() or self.isFullScreen():
+            return
+        self._window_size_mode = 'custom'
+        self._window_resize_save_timer.start()
     
     def toggle_theme(self):
         """Toggle between dark and light mode."""
@@ -1513,7 +1584,9 @@ class MainWindow(QMainWindow):
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
-        dialog = SettingsDialog(self, settings=self._settings)
+        dialog_settings = dict(self._settings)
+        dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
+        dialog = SettingsDialog(self, settings=dialog_settings)
         if dialog.exec_() != QDialog.Accepted:
             return
 
@@ -1526,9 +1599,15 @@ class MainWindow(QMainWindow):
         self._tag_size = str(values['tag_size'])
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._window_size = values['window_size']
+        self._window_size_mode = str(values.get('window_size_mode', 'custom')).strip().lower()
+        if self._window_size_mode not in {'static', 'custom'}:
+            self._window_size_mode = 'custom'
 
-        width, height = _parse_resolution(self._window_size, fallback=(660, 480))
-        self.resize(width, max(480, height))
+        self._settings['window_size_mode'] = self._window_size_mode
+        if self._window_size_mode == 'custom':
+            self._apply_window_size(self._window_size)
+        else:
+            self._apply_window_size(self._window_size)
 
         if sys.platform.startswith('win'):
             try:
