@@ -13,6 +13,7 @@ from typing import Optional
 import sys
 import ctypes
 import time
+import random
 
 if sys.platform.startswith("win"):
     import winreg
@@ -718,6 +719,8 @@ class SettingsDialog(QDialog):
 class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
 
+    _TAG_COLOR_SLOT_BY_TEXT: dict[str, int] = {}
+
     _TAG_PALETTE_DARK = [
         ("#0d2f40", "#1a556d", "#93dcff", "#27b5f7"),
         ("#33250c", "#5f4313", "#ffd38a", "#f5a623"),
@@ -867,7 +870,7 @@ class AccountListItem(QFrame):
             for tag in tags[:4]:
                 tag_label = QLabel(f"#{tag}")
                 tag_label.setMaximumHeight(size["max_height"])
-                tag_label.setStyleSheet(self._tag_chip_stylesheet(len(self._tag_chip_labels)))
+                tag_label.setStyleSheet(self._tag_chip_stylesheet(tag))
                 self._tag_chip_labels.append(tag_label)
                 tags_layout.addWidget(tag_label)
             if len(tags) > 4:
@@ -926,11 +929,36 @@ class AccountListItem(QFrame):
         self.setLayout(outer)
         self._update_visual_state()
 
-    def _tag_chip_stylesheet(self, chip_index: int) -> str:
-        """Return themed chip style using index-based unique color assignment."""
+    @classmethod
+    def _tag_color_slot_for_text(cls, tag_text: str, palette_size: int) -> int:
+        """Assign a random unused color slot for new tag text, then reuse it forever."""
+        key = (tag_text or "").strip().lower()
+        if not key:
+            return 0
+
+        existing = cls._TAG_COLOR_SLOT_BY_TEXT.get(key)
+        if existing is not None:
+            return existing
+
+        used_slots = {
+            slot
+            for slot in cls._TAG_COLOR_SLOT_BY_TEXT.values()
+            if 0 <= slot < palette_size
+        }
+        available_slots = [slot for slot in range(palette_size) if slot not in used_slots]
+        if available_slots:
+            slot = random.choice(available_slots)
+        else:
+            slot = random.randrange(palette_size)
+
+        cls._TAG_COLOR_SLOT_BY_TEXT[key] = slot
+        return slot
+
+    def _tag_chip_stylesheet(self, tag_text: str) -> str:
+        """Return themed chip style using text-based random color assignment."""
         palette = self._TAG_PALETTE_DARK if self._dark_mode else self._TAG_PALETTE_LIGHT
         size = self._tag_size_preset()
-        idx = chip_index % len(palette)
+        idx = self._tag_color_slot_for_text(tag_text, len(palette))
         bg, border, fg, accent = palette[idx]
         return (
             f"background-color: {bg};"
@@ -970,12 +998,12 @@ class AccountListItem(QFrame):
 
     def _refresh_tag_chip_styles(self):
         """Refresh chip colors when theme changes."""
-        for idx, label in enumerate(self._tag_chip_labels):
+        for label in self._tag_chip_labels:
             text = label.text().strip()
             if text.startswith("+"):
                 label.setStyleSheet(self._tag_more_chip_stylesheet())
             else:
-                label.setStyleSheet(self._tag_chip_stylesheet(idx))
+                label.setStyleSheet(self._tag_chip_stylesheet(text.lstrip("#")))
 
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
