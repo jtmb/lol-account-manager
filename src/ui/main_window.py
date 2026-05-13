@@ -1399,10 +1399,24 @@ class MainWindow(QMainWindow):
         cog_hover = "#45475a" if dark_mode else "#e5e7eb"
         cog_pressed = "#585b70" if dark_mode else "#d1d5db"
         cog_focus = "#6c7086" if dark_mode else "#9ca3af"
+        search_fg = "#dbe4ff" if dark_mode else "#1f2937"
+        search_bg = "#171a2a" if dark_mode else "#ffffff"
+        search_border = "#3f4b71" if dark_mode else "#cfcfcf"
+        search_placeholder = "#a8b4d6" if dark_mode else "#6b7280"
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
             + "\n"
+            + "QLineEdit#accountSearchInput {\n"
+            + f"    color: {search_fg};\n"
+            + f"    background-color: {search_bg};\n"
+            + f"    border: 1px solid {search_border};\n"
+            + "    border-radius: 4px;\n"
+            + "    padding: 4px 6px;\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput::placeholder {\n"
+            + f"    color: {search_placeholder};\n"
+            + "}\n"
             + "QPushButton#settingsCogButton {\n"
             + "    min-width: 30px;\n"
             + "    max-width: 30px;\n"
@@ -1444,33 +1458,9 @@ class MainWindow(QMainWindow):
         if self._dark_mode:
             self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
             self._theme_button.setText("Light Mode")
-            self.search_input.setStyleSheet(
-                "QLineEdit#accountSearchInput {"
-                "color: #dbe4ff;"
-                "background-color: #171a2a;"
-                "border: 1px solid #3f4b71;"
-                "border-radius: 4px;"
-                "padding: 4px 6px;"
-                "}"
-                "QLineEdit#accountSearchInput::placeholder {"
-                "color: #a8b4d6;"
-                "}"
-            )
         else:
             self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET, dark_mode=False))
             self._theme_button.setText("Dark Mode")
-            self.search_input.setStyleSheet(
-                "QLineEdit#accountSearchInput {"
-                "color: #1f2937;"
-                "background-color: #ffffff;"
-                "border: 1px solid #cfcfcf;"
-                "border-radius: 4px;"
-                "padding: 4px 6px;"
-                "}"
-                "QLineEdit#accountSearchInput::placeholder {"
-                "color: #6b7280;"
-                "}"
-            )
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
