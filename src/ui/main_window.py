@@ -115,6 +115,60 @@ def _set_startup_enabled(enabled: bool):
                 pass
 
 
+def _apply_windows11_chrome(widget, dark_mode: bool):
+    """Apply Windows 11 title bar/chrome colors to a top-level window."""
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        hwnd = int(widget.winId())
+        corner_preference = ctypes.c_int(2)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            ctypes.byref(corner_preference),
+            ctypes.sizeof(corner_preference),
+        )
+
+        value = ctypes.c_int(1 if dark_mode else 0)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+
+        if dark_mode:
+            caption_color = ctypes.c_int(0x302B2B)
+            text_color = ctypes.c_int(0xF4D6CD)
+        else:
+            caption_color = ctypes.c_int(0xF3F3F3)
+            text_color = ctypes.c_int(0x1E1E1E)
+
+        border_color = caption_color
+
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CAPTION_COLOR,
+            ctypes.byref(caption_color),
+            ctypes.sizeof(caption_color),
+        )
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TEXT_COLOR,
+            ctypes.byref(text_color),
+            ctypes.sizeof(text_color),
+        )
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            ctypes.byref(border_color),
+            ctypes.sizeof(border_color),
+        )
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -874,6 +928,9 @@ class MainWindow(QMainWindow):
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self.init_ui()
+        app = QApplication.instance()
+        if app:
+            app.installEventFilter(self)
         self._apply_theme()
         self.check_master_password()
     
@@ -894,10 +951,14 @@ class MainWindow(QMainWindow):
         top_row = QHBoxLayout()
         top_row.addStretch()
         self._theme_button = QPushButton()
+        self._theme_button.setObjectName("themeTopButton")
+        self._theme_button.setMinimumHeight(30)
         self._theme_button.setToolTip("Switch between dark and light mode")
         self._theme_button.clicked.connect(self.toggle_theme)
         top_row.addWidget(self._theme_button)
         self._settings_button = QPushButton("⚙")
+        self._settings_button.setObjectName("settingsCogButton")
+        self._settings_button.setFixedSize(30, 30)
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
         top_row.addWidget(self._settings_button)
@@ -984,7 +1045,22 @@ class MainWindow(QMainWindow):
     def _theme_with_text_zoom(self, base: str) -> str:
         """Merge base theme with text zoom scaling."""
         point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
-        return base + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
+        return (
+            base
+            + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
+            + "\n"
+            + "QPushButton#settingsCogButton {\n"
+            + "    min-width: 30px;\n"
+            + "    max-width: 30px;\n"
+            + "    min-height: 30px;\n"
+            + "    max-height: 30px;\n"
+            + "    padding: 0px;\n"
+            + "    font-size: 14px;\n"
+            + "}\n"
+            + "QPushButton#themeTopButton {\n"
+            + "    min-height: 30px;\n"
+            + "}\n"
+        )
 
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
@@ -1028,56 +1104,13 @@ class MainWindow(QMainWindow):
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
-        if not sys.platform.startswith("win"):
-            return
+        _apply_windows11_chrome(self, self._dark_mode)
 
-        try:
-            hwnd = int(self.winId())
-            corner_preference = ctypes.c_int(2)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_WINDOW_CORNER_PREFERENCE,
-                ctypes.byref(corner_preference),
-                ctypes.sizeof(corner_preference),
-            )
-
-            value = ctypes.c_int(1 if self._dark_mode else 0)
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_USE_IMMERSIVE_DARK_MODE,
-                ctypes.byref(value),
-                ctypes.sizeof(value),
-            )
-
-            if self._dark_mode:
-                caption_color = ctypes.c_int(0x302B2B)
-                text_color = ctypes.c_int(0xF4D6CD)
-            else:
-                caption_color = ctypes.c_int(0xF3F3F3)
-                text_color = ctypes.c_int(0x1E1E1E)
-
-            border_color = caption_color
-
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_CAPTION_COLOR,
-                ctypes.byref(caption_color),
-                ctypes.sizeof(caption_color),
-            )
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_TEXT_COLOR,
-                ctypes.byref(text_color),
-                ctypes.sizeof(text_color),
-            )
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_BORDER_COLOR,
-                ctypes.byref(border_color),
-                ctypes.sizeof(border_color),
-            )
-        except Exception:
-            pass
+    def eventFilter(self, obj, event):
+        """Apply consistent Windows 11 chrome to all shown dialogs/message boxes."""
+        if event.type() == QEvent.Show and isinstance(obj, QDialog):
+            _apply_windows11_chrome(obj, self._dark_mode)
+        return super().eventFilter(obj, event)
 
     def showEvent(self, event):
         super().showEvent(event)
