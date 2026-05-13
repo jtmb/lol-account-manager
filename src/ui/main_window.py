@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit, QGraphicsDropShadowEffect, QMenu
+    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap
@@ -12,6 +12,9 @@ from typing import Optional
 import sys
 import ctypes
 import time
+
+if sys.platform.startswith("win"):
+    import winreg
 
 from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
@@ -43,6 +46,59 @@ def _build_rank_pixmap(image_bytes: bytes) -> QPixmap:
     if image_bytes:
         pixmap.loadFromData(image_bytes)
     return pixmap
+
+
+def _parse_resolution(resolution: str, fallback: tuple[int, int] = (660, 480)) -> tuple[int, int]:
+    """Parse a WxH resolution string."""
+    try:
+        width_str, height_str = resolution.lower().split("x", 1)
+        return int(width_str), int(height_str)
+    except Exception:
+        return fallback
+
+
+def _startup_command() -> str:
+    """Build command line used for Windows startup registration."""
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}"'
+    entry_script = str(Path(sys.argv[0]).resolve())
+    return f'"{sys.executable}" "{entry_script}"'
+
+
+def _is_startup_enabled() -> bool:
+    """Return whether app startup is currently registered on Windows."""
+    if not sys.platform.startswith("win"):
+        return False
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "LoLAccountManager")
+            return bool(value)
+    except OSError:
+        return False
+
+
+def _set_startup_enabled(enabled: bool):
+    """Enable or disable app startup registration on Windows."""
+    if not sys.platform.startswith("win"):
+        return
+    with winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER,
+        r"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        0,
+        winreg.KEY_SET_VALUE,
+    ) as key:
+        if enabled:
+            winreg.SetValueEx(key, "LoLAccountManager", 0, winreg.REG_SZ, _startup_command())
+        else:
+            try:
+                winreg.DeleteValue(key, "LoLAccountManager")
+            except FileNotFoundError:
+                pass
 
 
 DARK_STYLESHEET = """
@@ -367,12 +423,109 @@ class AddAccountDialog(QDialog):
         }
 
 
+class SettingsDialog(QDialog):
+    """Dialog for global app settings."""
+
+    COMMON_RESOLUTIONS = [
+        "640x480",
+        "800x600",
+        "1024x768",
+        "1280x720",
+        "1366x768",
+        "1600x900",
+        "1920x1080",
+    ]
+
+    TEXT_ZOOM_OPTIONS = [
+        ("90%", 90),
+        ("100%", 100),
+        ("110%", 110),
+        ("125%", 125),
+        ("140%", 140),
+    ]
+
+    def __init__(self, parent=None, settings: Optional[dict] = None):
+        super().__init__(parent)
+        self._settings = settings or {}
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Settings")
+        self.setModal(True)
+        self.setMinimumWidth(360)
+
+        layout = QVBoxLayout()
+
+        startup_default = self._settings.get("start_on_windows_startup", _is_startup_enabled())
+        self.startup_checkbox = QCheckBox("Start Program at Windows startup")
+        self.startup_checkbox.setChecked(bool(startup_default))
+        self.startup_checkbox.setEnabled(sys.platform.startswith("win"))
+        if not sys.platform.startswith("win"):
+            self.startup_checkbox.setToolTip("Available on Windows only")
+        layout.addWidget(self.startup_checkbox)
+
+        layout.addWidget(QLabel("Window size:"))
+        self.window_size_combo = QComboBox()
+        self.window_size_combo.addItems(self.COMMON_RESOLUTIONS)
+        current_resolution = self._settings.get("window_size", "660x480")
+        if current_resolution not in self.COMMON_RESOLUTIONS:
+            self.window_size_combo.addItem(current_resolution)
+        self.window_size_combo.setCurrentText(current_resolution)
+        layout.addWidget(self.window_size_combo)
+
+        layout.addWidget(QLabel("Text Size:"))
+        self.text_zoom_combo = QComboBox()
+        for label, value in self.TEXT_ZOOM_OPTIONS:
+            self.text_zoom_combo.addItem(label, value)
+        current_zoom = int(self._settings.get("text_zoom_percent", 100))
+        zoom_index = self.text_zoom_combo.findData(current_zoom)
+        if zoom_index < 0:
+            self.text_zoom_combo.addItem(f"{current_zoom}%", current_zoom)
+            zoom_index = self.text_zoom_combo.findData(current_zoom)
+        self.text_zoom_combo.setCurrentIndex(max(0, zoom_index))
+        layout.addWidget(self.text_zoom_combo)
+
+        self.show_ranks_checkbox = QCheckBox("Show ranks")
+        self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
+        layout.addWidget(self.show_ranks_checkbox)
+
+        self.show_images_checkbox = QCheckBox("Show rank images")
+        self.show_images_checkbox.setChecked(bool(self._settings.get("show_rank_images", True)))
+        layout.addWidget(self.show_images_checkbox)
+        self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
+        self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        button_row.addWidget(cancel_btn)
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self.accept)
+        button_row.addWidget(save_btn)
+        layout.addLayout(button_row)
+
+        self.setLayout(layout)
+
+    def get_values(self) -> dict:
+        """Collect validated settings values."""
+        return {
+            "start_on_windows_startup": self.startup_checkbox.isChecked(),
+            "window_size": self.window_size_combo.currentText(),
+            "text_zoom_percent": int(self.text_zoom_combo.currentData()),
+            "show_ranks": self.show_ranks_checkbox.isChecked(),
+            "show_rank_images": self.show_images_checkbox.isChecked(),
+        }
+
+
 class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
     
-    def __init__(self, account: Account, parent=None):
+    def __init__(self, account: Account, parent=None, show_ranks: bool = True, show_rank_images: bool = True):
         super().__init__(parent)
         self.account = account
+        self._show_ranks = show_ranks
+        self._show_rank_images = show_rank_images
         self.init_ui()
     
     def init_ui(self):
@@ -489,6 +642,8 @@ class AccountListItem(QFrame):
         self.rank_label.setMinimumWidth(190)
         rank_layout.addWidget(self.rank_label)
 
+        self.rank_widget = rank_widget
+        self.rank_widget.setVisible(self._show_ranks)
         outer.addWidget(rank_widget)
 
         self.setLayout(outer)
@@ -496,6 +651,14 @@ class AccountListItem(QFrame):
 
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
+        if not self._show_ranks:
+            self.rank_widget.setVisible(False)
+            self.rank_label.setText("")
+            self.rank_icon_label.clear()
+            self.rank_icon_label.setVisible(False)
+            return
+
+        self.rank_widget.setVisible(True)
         status = rank_data.get("status", "error")
         color = rank_data.get("color", "#585b70")
         if status == "ok":
@@ -509,7 +672,7 @@ class AccountListItem(QFrame):
             if not pixmap.isNull():
                 pixmap = pixmap.scaled(34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.rank_icon_label.setPixmap(pixmap)
-            self.rank_icon_label.setVisible(not self.rank_icon_label.pixmap().isNull())
+            self.rank_icon_label.setVisible(self._show_rank_images and not self.rank_icon_label.pixmap().isNull())
             self.rank_label.setText(
                 f"<span style='color:{color}; font-weight:600;'>{tier}</span> "
                 f"<span style='color:{neutral_color};'>{lp}  {wins}  {win_rate}</span>"
@@ -528,6 +691,14 @@ class AccountListItem(QFrame):
                 "background: transparent; border: none; color: #585b70; font-size: 11px;"
             )
             self.rank_label.setText("")
+
+    def set_rank_display_options(self, show_ranks: bool, show_rank_images: bool):
+        """Update rank visibility options."""
+        self._show_ranks = show_ranks
+        self._show_rank_images = show_rank_images
+        self.rank_widget.setVisible(show_ranks)
+        if not show_ranks or not show_rank_images:
+            self.rank_icon_label.setVisible(False)
 
     def set_dark_mode(self, enabled: bool):
         self._dark_mode = enabled
@@ -582,11 +753,16 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self._settings = load_settings()
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.launch_progress: Optional[QProgressDialog] = None
         self.current_launch_username: Optional[str] = None
-        self._dark_mode: bool = load_settings().get('dark_mode', True)
+        self._dark_mode: bool = self._settings.get('dark_mode', True)
+        self._show_ranks: bool = self._settings.get('show_ranks', True)
+        self._show_rank_images: bool = self._settings.get('show_rank_images', True)
+        self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 100))
+        self._window_size: str = self._settings.get('window_size', '660x480')
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self.init_ui()
         self._apply_theme()
@@ -594,8 +770,9 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
-        self.setMinimumSize(660, 480)
-        self.resize(660, 480)
+        self.setMinimumSize(640, 480)
+        width, height = _parse_resolution(self._window_size, fallback=(660, 480))
+        self.resize(width, max(480, height))
 
         # Central widget
         central_widget = QWidget()
@@ -611,6 +788,10 @@ class MainWindow(QMainWindow):
         self._theme_button.setToolTip("Switch between dark and light mode")
         self._theme_button.clicked.connect(self.toggle_theme)
         top_row.addWidget(self._theme_button)
+        self._settings_button = QPushButton("⚙")
+        self._settings_button.setToolTip("Open Settings")
+        self._settings_button.clicked.connect(self.open_settings_dialog)
+        top_row.addWidget(self._settings_button)
         layout.addLayout(top_row)
         
         # Title
@@ -692,21 +873,53 @@ class MainWindow(QMainWindow):
         """Toggle between dark and light mode."""
         self._dark_mode = not self._dark_mode
         self._apply_theme()
-        settings = load_settings()
-        settings['dark_mode'] = self._dark_mode
-        save_settings(settings)
+        self._settings['dark_mode'] = self._dark_mode
+        save_settings(self._settings)
+
+    def _theme_with_text_zoom(self, base: str) -> str:
+        """Merge base theme with text zoom scaling."""
+        point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
+        return base + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
 
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
         if self._dark_mode:
-            self.setStyleSheet(DARK_STYLESHEET)
+            self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET))
             self._theme_button.setText("☀  Light Mode")
         else:
-            self.setStyleSheet(LIGHT_STYLESHEET)
+            self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET))
             self._theme_button.setText("🌙  Dark Mode")
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
+
+    def open_settings_dialog(self):
+        """Open the settings dialog and apply any changes."""
+        dialog = SettingsDialog(self, settings=self._settings)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        values = dialog.get_values()
+        self._settings.update(values)
+        self._show_ranks = bool(values['show_ranks'])
+        self._show_rank_images = bool(values['show_rank_images'])
+        self._text_zoom_percent = int(values['text_zoom_percent'])
+        self._window_size = values['window_size']
+
+        width, height = _parse_resolution(self._window_size, fallback=(660, 480))
+        self.resize(width, max(480, height))
+
+        if sys.platform.startswith('win'):
+            try:
+                _set_startup_enabled(bool(values['start_on_windows_startup']))
+            except Exception as exc:
+                QMessageBox.warning(self, "Settings", f"Could not update startup setting: {exc}")
+        else:
+            self._settings['start_on_windows_startup'] = False
+
+        save_settings(self._settings)
+        self._apply_theme()
+        self.refresh_account_list()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
@@ -834,14 +1047,22 @@ class MainWindow(QMainWindow):
                 self.account_list.addItem(item)
                 
                 # Create custom widget
-                widget = AccountListItem(account)
+                widget = AccountListItem(
+                    account,
+                    show_ranks=self._show_ranks,
+                    show_rank_images=self._show_rank_images,
+                )
                 self.account_list.setItemWidget(item, widget)
 
             self.update_account_item_states()
-            self._start_rank_fetches()
+            if self._show_ranks:
+                self._start_rank_fetches()
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
+        if not self._show_ranks:
+            return
+
         # Stop leftover threads from a previous refresh
         for t in self._rank_threads:
             t.quit()
