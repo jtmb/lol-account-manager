@@ -121,15 +121,20 @@ class RiotClientIntegration:
             return None
 
     @staticmethod
-    def is_riot_session_authenticated(timeout_seconds: float = 1.0) -> bool:
-        """Return True when Riot local auth/session endpoints report a signed-in session."""
+    def get_riot_session_identity(timeout_seconds: float = 1.0) -> Optional[dict]:
+        """Return authenticated Riot session identity data from local client APIs.
+
+        Returns None when no authenticated Riot session is available.
+        """
         lock_data = RiotClientIntegration._read_riot_lockfile()
         if not lock_data:
-            return False
+            return None
 
         port, password, protocol = lock_data
         base_url = f"{protocol}://127.0.0.1:{port}"
         auth = ('riot', password)
+
+        identity: dict = {}
         endpoints = [
             '/rso-auth/v1/session/credentials',
             '/chat/v1/session',
@@ -147,7 +152,7 @@ class RiotClientIntegration:
                 continue
 
             if response.status_code in (401, 403):
-                return False
+                return None
             if response.status_code in (404, 204):
                 continue
             if response.status_code != 200:
@@ -159,17 +164,40 @@ class RiotClientIntegration:
                 continue
 
             if endpoint == '/rso-auth/v1/session/credentials':
-                if data.get('subject') or data.get('username'):
-                    return True
+                username = data.get('username') or data.get('name')
+                subject = data.get('subject')
+                puuid = data.get('puuid') or data.get('sub')
+                if username:
+                    identity['username'] = str(username)
+                if subject:
+                    identity['subject'] = str(subject)
+                if puuid:
+                    identity['puuid'] = str(puuid)
                 continue
 
             if endpoint == '/chat/v1/session':
                 if data.get('connected') is False:
-                    return False
-                if data.get('puuid') or data.get('game_name') or data.get('name'):
-                    return True
+                    return None
 
-        return False
+                game_name = data.get('game_name') or data.get('name')
+                game_tag = data.get('game_tag') or data.get('tag_line') or data.get('tag')
+                puuid = data.get('puuid')
+
+                if game_name:
+                    identity['game_name'] = str(game_name)
+                if game_tag:
+                    identity['game_tag'] = str(game_tag)
+                if puuid:
+                    identity['puuid'] = str(puuid)
+
+        if identity.get('game_name') or identity.get('username') or identity.get('subject'):
+            return identity
+        return None
+
+    @staticmethod
+    def is_riot_session_authenticated(timeout_seconds: float = 1.0) -> bool:
+        """Return True when Riot local auth/session endpoints report a signed-in session."""
+        return RiotClientIntegration.get_riot_session_identity(timeout_seconds=timeout_seconds) is not None
 
     @staticmethod
     def _wait_for_lol_start(timeout_seconds: int = 20) -> bool:

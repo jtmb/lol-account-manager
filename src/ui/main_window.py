@@ -264,6 +264,29 @@ QProgressBar::chunk {
     border-radius: 5px;
     background-color: #7aa2f7;
 }
+QTabWidget::pane {
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    top: -1px;
+    background-color: #1e1e2e;
+}
+QTabBar::tab {
+    background-color: #2a2f45;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 6px 12px;
+    margin-right: 4px;
+}
+QTabBar::tab:selected {
+    background-color: #1e1e2e;
+    color: #ffffff;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #353b55;
+}
 """
 
 LIGHT_STYLESHEET = """
@@ -332,6 +355,29 @@ QLabel {
 }
 QLineEdit::placeholder {
     color: #6b7280;
+}
+QTabWidget::pane {
+    border: 1px solid #cfcfcf;
+    border-radius: 8px;
+    top: -1px;
+    background-color: #f5f6f8;
+}
+QTabBar::tab {
+    background-color: #eef1f5;
+    color: #374151;
+    border: 1px solid #cfcfcf;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 6px 12px;
+    margin-right: 4px;
+}
+QTabBar::tab:selected {
+    background-color: #f5f6f8;
+    color: #111827;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #e5e7eb;
 }
 """
 
@@ -794,6 +840,9 @@ class SettingsDialog(QDialog):
     ]
 
     LOGGED_IN_INTENSITY_OPTIONS = [
+        ("Ultra Subtle (5%)", 5),
+        ("Very Soft (10%)", 10),
+        ("Soft (15%)", 15),
         ("Very Subtle (20%)", 20),
         ("Subtle (35%)", 35),
         ("Balanced (50%)", 50),
@@ -929,7 +978,7 @@ class SettingsDialog(QDialog):
         self.logged_in_gradient_intensity_combo.setToolTip(
             "Controls how subtle or strong the logged-in row gradient appears."
         )
-        current_intensity = int(self._settings.get("logged_in_gradient_intensity", 35))
+        current_intensity = int(self._settings.get("logged_in_gradient_intensity", 20))
         intensity_index = self.logged_in_gradient_intensity_combo.findData(current_intensity)
         if intensity_index < 0:
             nearest = min(
@@ -1109,7 +1158,7 @@ class AccountListItem(QFrame):
         show_tags: bool = True,
         tag_size: str = "small",
         logged_in_gradient_color: str = "#4f7cff",
-        logged_in_gradient_intensity: int = 35,
+        logged_in_gradient_intensity: int = 20,
     ):
         super().__init__(parent)
         self.account = account
@@ -1118,7 +1167,7 @@ class AccountListItem(QFrame):
         self._show_tags = show_tags
         self._tag_size = tag_size
         self._logged_in_gradient_color = logged_in_gradient_color or "#4f7cff"
-        self._logged_in_gradient_intensity = max(10, min(100, int(logged_in_gradient_intensity)))
+        self._logged_in_gradient_intensity = max(5, min(100, int(logged_in_gradient_intensity)))
         self.init_ui()
 
     def _tag_size_preset(self) -> dict:
@@ -1382,7 +1431,7 @@ class AccountListItem(QFrame):
 
     def _refresh_logged_in_badge_style(self):
         """Refresh the logged-in badge style for the active theme."""
-        t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+        t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         badge_bg_alpha = int(30 + (90 * t))
         badge_border_alpha = int(70 + (130 * t))
         badge_fg = "#eef5ff" if self._dark_mode else "#1e3a8a"
@@ -1503,7 +1552,7 @@ class AccountListItem(QFrame):
         active = self._selected or self._hovered
 
         if self._dark_mode:
-            t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+            t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
             left_active = self._rgba(self._logged_in_gradient_color, int(70 + 120 * t))
             mid_active = self._rgba(self._logged_in_gradient_color, int(38 + 90 * t))
             left_idle = self._rgba(self._logged_in_gradient_color, int(48 + 90 * t))
@@ -1561,7 +1610,7 @@ class AccountListItem(QFrame):
                 self._shadow.setColor(QColor(0, 0, 0, 0))
             return
 
-        t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+        t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         left_active = self._rgba(self._logged_in_gradient_color, int(58 + 110 * t))
         mid_active = self._rgba(self._logged_in_gradient_color, int(36 + 80 * t))
         left_idle = self._rgba(self._logged_in_gradient_color, int(44 + 85 * t))
@@ -1638,7 +1687,7 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#4f7cff'))
-        self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 35))
+        self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._window_size_mode: str = str(
             self._settings.get(
@@ -2172,12 +2221,53 @@ class MainWindow(QMainWindow):
                     and item.data(Qt.UserRole) == self._logged_in_username
                 )
 
+    @staticmethod
+    def _normalize_identity_value(value: str) -> str:
+        return " ".join(str(value or "").strip().casefold().split())
+
+    def _match_account_from_riot_identity(self, identity: Optional[dict]) -> Optional[str]:
+        """Return the saved account username that best matches Riot session identity."""
+        if not identity or not self.account_manager:
+            return None
+
+        accounts = self.account_manager.get_all_accounts()
+        if not accounts:
+            return None
+
+        riot_username = self._normalize_identity_value(identity.get('username', ''))
+        riot_game_name = self._normalize_identity_value(identity.get('game_name', ''))
+        riot_game_tag = self._normalize_identity_value(identity.get('game_tag', ''))
+        riot_riot_id = ""
+        if riot_game_name and riot_game_tag:
+            riot_riot_id = f"{riot_game_name}#{riot_game_tag}"
+
+        # Most reliable: Riot ID (display name + tag line)
+        if riot_riot_id:
+            for account in accounts:
+                acc_name = self._normalize_identity_value(getattr(account, 'display_name', '') or account.username)
+                acc_tag = self._normalize_identity_value(getattr(account, 'tag_line', '') or 'NA1')
+                if f"{acc_name}#{acc_tag}" == riot_riot_id:
+                    return account.username
+
+        # Next: login username/email match
+        if riot_username:
+            for account in accounts:
+                if self._normalize_identity_value(account.username) == riot_username:
+                    return account.username
+
+        # Last: unique display-name fallback when tag is unavailable
+        if riot_game_name:
+            name_matches = [
+                acc for acc in accounts
+                if self._normalize_identity_value(getattr(acc, 'display_name', '') or acc.username) == riot_game_name
+            ]
+            if len(name_matches) == 1:
+                return name_matches[0].username
+
+        return None
+
     def _sync_logged_in_session_state(self):
         """Reconcile sticky logged-in indicator with the actual Riot session state."""
-        if not self._logged_in_username:
-            self._session_miss_count = 0
-            return
-
         if self.login_thread and self.login_thread.isRunning():
             # During launch retries Riot may briefly stop/start; avoid false logout clears.
             return
@@ -2185,10 +2275,21 @@ class MainWindow(QMainWindow):
         if not sys.platform.startswith("win"):
             return
 
-        riot_running = RiotClientIntegration.is_riot_client_running()
-        session_authenticated = riot_running and RiotClientIntegration.is_riot_session_authenticated()
+        if not self.account_manager:
+            return
 
-        if session_authenticated:
+        riot_running = RiotClientIntegration.is_riot_client_running()
+        identity = RiotClientIntegration.get_riot_session_identity() if riot_running else None
+
+        if identity:
+            matched_username = self._match_account_from_riot_identity(identity)
+            self._session_miss_count = 0
+            if matched_username != self._logged_in_username:
+                self._logged_in_username = matched_username
+                self.update_account_item_states()
+            return
+
+        if not self._logged_in_username:
             self._session_miss_count = 0
             return
 
