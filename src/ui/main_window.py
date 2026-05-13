@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar,
+    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox
 )
@@ -784,6 +784,23 @@ class SettingsDialog(QDialog):
         ("Large", "large"),
     ]
 
+    LOGGED_IN_COLOR_OPTIONS = [
+        ("Blue", "#4f7cff"),
+        ("Cyan", "#27b5f7"),
+        ("Green", "#32c46d"),
+        ("Purple", "#8b5cf6"),
+        ("Rose", "#e85d8a"),
+        ("Amber", "#f5a623"),
+    ]
+
+    LOGGED_IN_INTENSITY_OPTIONS = [
+        ("Very Subtle (20%)", 20),
+        ("Subtle (35%)", 35),
+        ("Balanced (50%)", 50),
+        ("Strong (70%)", 70),
+        ("Bold (90%)", 90),
+    ]
+
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
     def __init__(self, parent=None, settings: Optional[dict] = None):
@@ -794,9 +811,17 @@ class SettingsDialog(QDialog):
     def init_ui(self):
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(400)
 
         layout = QVBoxLayout()
+
+        tabs = QTabWidget()
+        general_tab = QWidget()
+        appearance_tab = QWidget()
+        general_layout = QVBoxLayout(general_tab)
+        appearance_layout = QVBoxLayout(appearance_tab)
+        general_layout.setSpacing(8)
+        appearance_layout.setSpacing(8)
 
         startup_default = self._settings.get("start_on_windows_startup", _is_startup_enabled())
         self.startup_checkbox = QCheckBox("Start Program at Windows startup")
@@ -805,9 +830,9 @@ class SettingsDialog(QDialog):
         self.startup_checkbox.setToolTip("Launch the app automatically when you sign in to Windows.")
         if not sys.platform.startswith("win"):
             self.startup_checkbox.setToolTip("Available on Windows only")
-        layout.addWidget(self.startup_checkbox)
+        general_layout.addWidget(self.startup_checkbox)
 
-        layout.addWidget(QLabel("Window size:"))
+        general_layout.addWidget(QLabel("Window size:"))
         self.window_size_combo = QComboBox()
         self.current_window_size = str(self._settings.get("current_window_size", self._settings.get("window_size", "800x600")))
         custom_label = f"Remember current size ({self.current_window_size})"
@@ -827,9 +852,9 @@ class SettingsDialog(QDialog):
             if index < 0:
                 index = 0
             self.window_size_combo.setCurrentIndex(index)
-        layout.addWidget(self.window_size_combo)
+        general_layout.addWidget(self.window_size_combo)
 
-        layout.addWidget(QLabel("Text Size:"))
+        appearance_layout.addWidget(QLabel("Text Size:"))
         self.text_zoom_combo = QComboBox()
         for label, value in self.TEXT_ZOOM_OPTIONS:
             self.text_zoom_combo.addItem(label, value)
@@ -840,31 +865,31 @@ class SettingsDialog(QDialog):
             self.text_zoom_combo.addItem(f"{current_zoom}%", current_zoom)
             zoom_index = self.text_zoom_combo.findData(current_zoom)
         self.text_zoom_combo.setCurrentIndex(max(0, zoom_index))
-        layout.addWidget(self.text_zoom_combo)
+        appearance_layout.addWidget(self.text_zoom_combo)
 
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
         self.show_ranks_checkbox.setToolTip("Show or hide op.gg rank information on each account row.")
-        layout.addWidget(self.show_ranks_checkbox)
+        appearance_layout.addWidget(self.show_ranks_checkbox)
 
         self.show_images_checkbox = QCheckBox("Show rank images")
         self.show_images_checkbox.setChecked(bool(self._settings.get("show_rank_images", True)))
         self.show_images_checkbox.setToolTip("Show or hide the rank medal image next to each account.")
-        layout.addWidget(self.show_images_checkbox)
+        appearance_layout.addWidget(self.show_images_checkbox)
         self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
 
         self.show_tags_checkbox = QCheckBox("Show tags")
         self.show_tags_checkbox.setChecked(bool(self._settings.get("show_tags", True)))
         self.show_tags_checkbox.setToolTip("Show or hide account tags under each account entry.")
-        layout.addWidget(self.show_tags_checkbox)
+        appearance_layout.addWidget(self.show_tags_checkbox)
 
         self.auto_open_ingame_checkbox = QCheckBox("Auto-open op.gg live game page")
         self.auto_open_ingame_checkbox.setChecked(bool(self._settings.get("auto_open_ingame_page", True)))
         self.auto_open_ingame_checkbox.setToolTip(
             "Automatically open the op.gg in-game page when a live match is detected."
         )
-        layout.addWidget(self.auto_open_ingame_checkbox)
+        general_layout.addWidget(self.auto_open_ingame_checkbox)
 
         tag_size_row = QHBoxLayout()
         tag_size_row.addWidget(QLabel("Tag size:"))
@@ -877,16 +902,52 @@ class SettingsDialog(QDialog):
         self.tag_size_combo.setCurrentIndex(max(0, tag_size_index))
         tag_size_row.addWidget(self.tag_size_combo)
         tag_size_row.addStretch()
-        layout.addLayout(tag_size_row)
+        appearance_layout.addLayout(tag_size_row)
         self.show_tags_checkbox.toggled.connect(self.tag_size_combo.setEnabled)
         self.tag_size_combo.setEnabled(self.show_tags_checkbox.isChecked())
+
+        gradient_color_row = QHBoxLayout()
+        gradient_color_row.addWidget(QLabel("Logged-in gradient color:"))
+        self.logged_in_gradient_color_combo = QComboBox()
+        for label, value in self.LOGGED_IN_COLOR_OPTIONS:
+            self.logged_in_gradient_color_combo.addItem(label, value)
+        self.logged_in_gradient_color_combo.setToolTip(
+            "Choose the accent color used for the logged-in row highlight."
+        )
+        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#4f7cff"))
+        gradient_color_index = self.logged_in_gradient_color_combo.findData(current_gradient_color)
+        self.logged_in_gradient_color_combo.setCurrentIndex(max(0, gradient_color_index))
+        gradient_color_row.addWidget(self.logged_in_gradient_color_combo)
+        gradient_color_row.addStretch()
+        appearance_layout.addLayout(gradient_color_row)
+
+        gradient_intensity_row = QHBoxLayout()
+        gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
+        self.logged_in_gradient_intensity_combo = QComboBox()
+        for label, value in self.LOGGED_IN_INTENSITY_OPTIONS:
+            self.logged_in_gradient_intensity_combo.addItem(label, value)
+        self.logged_in_gradient_intensity_combo.setToolTip(
+            "Controls how subtle or strong the logged-in row gradient appears."
+        )
+        current_intensity = int(self._settings.get("logged_in_gradient_intensity", 35))
+        intensity_index = self.logged_in_gradient_intensity_combo.findData(current_intensity)
+        if intensity_index < 0:
+            nearest = min(
+                [value for _, value in self.LOGGED_IN_INTENSITY_OPTIONS],
+                key=lambda option: abs(option - current_intensity),
+            )
+            intensity_index = self.logged_in_gradient_intensity_combo.findData(nearest)
+        self.logged_in_gradient_intensity_combo.setCurrentIndex(max(0, intensity_index))
+        gradient_intensity_row.addWidget(self.logged_in_gradient_intensity_combo)
+        gradient_intensity_row.addStretch()
+        appearance_layout.addLayout(gradient_intensity_row)
 
         self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
         self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
         self.auto_backup_checkbox.setToolTip(
             "Create an encrypted backup each time account data is saved."
         )
-        layout.addWidget(self.auto_backup_checkbox)
+        general_layout.addWidget(self.auto_backup_checkbox)
 
         backup_keep_row = QHBoxLayout()
         keep_backups_tip = (
@@ -911,9 +972,15 @@ class SettingsDialog(QDialog):
         self.auto_backup_keep_combo.setCurrentIndex(max(0, keep_index))
         backup_keep_row.addWidget(self.auto_backup_keep_combo)
         backup_keep_row.addStretch()
-        layout.addLayout(backup_keep_row)
+        general_layout.addLayout(backup_keep_row)
         self.auto_backup_checkbox.toggled.connect(self.auto_backup_keep_combo.setEnabled)
         self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
+
+        general_layout.addStretch()
+        appearance_layout.addStretch()
+        tabs.addTab(general_tab, "General")
+        tabs.addTab(appearance_tab, "Appearance")
+        layout.addWidget(tabs)
 
         # ── Actions section ────────────────────────────────────────────
         sep = QFrame()
@@ -1003,6 +1070,8 @@ class SettingsDialog(QDialog):
             "show_tags": self.show_tags_checkbox.isChecked(),
             "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
+            "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
+            "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
         }
@@ -1039,6 +1108,8 @@ class AccountListItem(QFrame):
         show_rank_images: bool = True,
         show_tags: bool = True,
         tag_size: str = "small",
+        logged_in_gradient_color: str = "#4f7cff",
+        logged_in_gradient_intensity: int = 35,
     ):
         super().__init__(parent)
         self.account = account
@@ -1046,6 +1117,8 @@ class AccountListItem(QFrame):
         self._show_rank_images = show_rank_images
         self._show_tags = show_tags
         self._tag_size = tag_size
+        self._logged_in_gradient_color = logged_in_gradient_color or "#4f7cff"
+        self._logged_in_gradient_intensity = max(10, min(100, int(logged_in_gradient_intensity)))
         self.init_ui()
 
     def _tag_size_preset(self) -> dict:
@@ -1309,26 +1382,46 @@ class AccountListItem(QFrame):
 
     def _refresh_logged_in_badge_style(self):
         """Refresh the logged-in badge style for the active theme."""
+        t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+        badge_bg_alpha = int(30 + (90 * t))
+        badge_border_alpha = int(70 + (130 * t))
+        badge_fg = "#eef5ff" if self._dark_mode else "#1e3a8a"
         if self._dark_mode:
             self.logged_in_label.setStyleSheet(
-                "background-color: rgba(91, 141, 239, 0.22);"
-                "border: 1px solid rgba(129, 170, 255, 0.55);"
+                f"background-color: {self._rgba(self._logged_in_gradient_color, badge_bg_alpha)};"
+                f"border: 1px solid {self._rgba(self._logged_in_gradient_color, badge_border_alpha)};"
                 "border-radius: 10px;"
-                "color: #e6f0ff;"
+                f"color: {badge_fg};"
                 "font-size: 9.5px;"
                 "font-weight: 700;"
                 "padding: 0px 9px;"
             )
         else:
             self.logged_in_label.setStyleSheet(
-                "background-color: rgba(79, 124, 255, 0.16);"
-                "border: 1px solid rgba(79, 124, 255, 0.35);"
+                f"background-color: {self._rgba(self._logged_in_gradient_color, max(20, badge_bg_alpha - 20))};"
+                f"border: 1px solid {self._rgba(self._logged_in_gradient_color, max(45, badge_border_alpha - 25))};"
                 "border-radius: 10px;"
-                "color: #1e40af;"
+                f"color: {badge_fg};"
                 "font-size: 9.5px;"
                 "font-weight: 700;"
                 "padding: 0px 9px;"
             )
+
+    def _hex_to_rgb(self, color: str) -> tuple[int, int, int]:
+        raw = (color or "#4f7cff").strip().lstrip('#')
+        if len(raw) == 3:
+            raw = ''.join(ch * 2 for ch in raw)
+        if len(raw) != 6:
+            return (79, 124, 255)
+        try:
+            return int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16)
+        except ValueError:
+            return (79, 124, 255)
+
+    def _rgba(self, color: str, alpha: int) -> str:
+        r, g, b = self._hex_to_rgb(color)
+        a = max(0, min(255, int(alpha)))
+        return f"rgba({r}, {g}, {b}, {a})"
 
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
@@ -1410,15 +1503,23 @@ class AccountListItem(QFrame):
         active = self._selected or self._hovered
 
         if self._dark_mode:
+            t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+            left_active = self._rgba(self._logged_in_gradient_color, int(70 + 120 * t))
+            mid_active = self._rgba(self._logged_in_gradient_color, int(38 + 90 * t))
+            left_idle = self._rgba(self._logged_in_gradient_color, int(48 + 90 * t))
+            mid_idle = self._rgba(self._logged_in_gradient_color, int(22 + 65 * t))
+            border_active = self._rgba(self._logged_in_gradient_color, int(135 + 100 * t))
+            border_idle = self._rgba(self._logged_in_gradient_color, int(95 + 95 * t))
+
             if self._logged_in and active:
                 self.setStyleSheet(
                     "#accountListItem {"
                     "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    "stop:0 rgba(76, 111, 188, 110),"
-                    "stop:0.28 rgba(58, 78, 130, 95),"
+                    f"stop:0 {left_active},"
+                    f"stop:0.28 {mid_active},"
                     "stop:1 rgba(37, 41, 61, 170));"
-                    "border: 1px solid rgba(122, 162, 247, 205);"
-                    "border-left: 4px solid rgba(122, 162, 247, 230);"
+                    f"border: 1px solid {border_active};"
+                    f"border-left: 4px solid {border_active};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -1428,11 +1529,11 @@ class AccountListItem(QFrame):
                 self.setStyleSheet(
                     "#accountListItem {"
                     "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    "stop:0 rgba(76, 111, 188, 78),"
-                    "stop:0.24 rgba(55, 75, 124, 58),"
+                    f"stop:0 {left_idle},"
+                    f"stop:0.24 {mid_idle},"
                     "stop:1 rgba(25, 30, 47, 95));"
-                    "border: 1px solid rgba(122, 162, 247, 145);"
-                    "border-left: 4px solid rgba(122, 162, 247, 220);"
+                    f"border: 1px solid {border_idle};"
+                    f"border-left: 4px solid {border_idle};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -1460,15 +1561,23 @@ class AccountListItem(QFrame):
                 self._shadow.setColor(QColor(0, 0, 0, 0))
             return
 
+        t = max(0.1, min(1.0, self._logged_in_gradient_intensity / 100.0))
+        left_active = self._rgba(self._logged_in_gradient_color, int(58 + 110 * t))
+        mid_active = self._rgba(self._logged_in_gradient_color, int(36 + 80 * t))
+        left_idle = self._rgba(self._logged_in_gradient_color, int(44 + 85 * t))
+        mid_idle = self._rgba(self._logged_in_gradient_color, int(24 + 65 * t))
+        border_active = self._rgba(self._logged_in_gradient_color, int(120 + 110 * t))
+        border_idle = self._rgba(self._logged_in_gradient_color, int(95 + 90 * t))
+
         if self._logged_in and active:
             self.setStyleSheet(
                 "#accountListItem {"
                 "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                "stop:0 rgba(100, 148, 255, 95),"
-                "stop:0.30 rgba(180, 208, 255, 70),"
+                f"stop:0 {left_active},"
+                f"stop:0.30 {mid_active},"
                 "stop:1 rgba(244, 248, 255, 95));"
-                "border: 1px solid #97b4ff;"
-                "border-left: 4px solid #4f7cff;"
+                f"border: 1px solid {border_active};"
+                f"border-left: 4px solid {border_active};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -1478,11 +1587,11 @@ class AccountListItem(QFrame):
             self.setStyleSheet(
                 "#accountListItem {"
                 "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                "stop:0 rgba(100, 148, 255, 72),"
-                "stop:0.30 rgba(197, 217, 255, 45),"
+                f"stop:0 {left_idle},"
+                f"stop:0.30 {mid_idle},"
                 "stop:1 rgba(248, 250, 255, 65));"
-                "border: 1px solid #c1cffb;"
-                "border-left: 4px solid #4f7cff;"
+                f"border: 1px solid {border_idle};"
+                f"border-left: 4px solid {border_idle};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -1528,6 +1637,8 @@ class MainWindow(QMainWindow):
         self._auto_open_ingame_page: bool = bool(self._settings.get('auto_open_ingame_page', True))
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
+        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#4f7cff'))
+        self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 35))
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._window_size_mode: str = str(
             self._settings.get(
@@ -1541,16 +1652,22 @@ class MainWindow(QMainWindow):
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self._logged_in_username: Optional[str] = None
+        self._session_miss_count: int = 0
+        self._manual_logout_grace_misses: int = 2
         self._window_resize_save_timer = QTimer(self)
         self._window_resize_save_timer.setSingleShot(True)
         self._window_resize_save_timer.setInterval(250)
         self._window_resize_save_timer.timeout.connect(self._persist_window_size)
+        self._session_sync_timer = QTimer(self)
+        self._session_sync_timer.setInterval(5000)
+        self._session_sync_timer.timeout.connect(self._sync_logged_in_session_state)
         self._suppress_window_size_persistence = False
         self.init_ui()
         app = QApplication.instance()
         if app:
             app.installEventFilter(self)
         self._apply_theme()
+        self._session_sync_timer.start()
         self.check_master_password()
     
     def init_ui(self):
@@ -1814,6 +1931,8 @@ class MainWindow(QMainWindow):
         self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
         self._tag_size = str(values['tag_size'])
         self._text_zoom_percent = int(values['text_zoom_percent'])
+        self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
+        self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
         self._window_size = values['window_size']
         self._window_size_mode = str(values.get('window_size_mode', 'custom')).strip().lower()
         if self._window_size_mode not in {'static', 'custom'}:
@@ -1983,6 +2102,8 @@ class MainWindow(QMainWindow):
                     show_rank_images=self._show_rank_images,
                     show_tags=self._show_tags,
                     tag_size=self._tag_size,
+                    logged_in_gradient_color=self._logged_in_gradient_color,
+                    logged_in_gradient_intensity=self._logged_in_gradient_intensity,
                 )
                 self.account_list.setItemWidget(item, widget)
 
@@ -2050,6 +2171,35 @@ class MainWindow(QMainWindow):
                     bool(self._logged_in_username)
                     and item.data(Qt.UserRole) == self._logged_in_username
                 )
+
+    def _sync_logged_in_session_state(self):
+        """Reconcile sticky logged-in indicator with the actual Riot session state."""
+        if not self._logged_in_username:
+            self._session_miss_count = 0
+            return
+
+        if self.login_thread and self.login_thread.isRunning():
+            # During launch retries Riot may briefly stop/start; avoid false logout clears.
+            return
+
+        if not sys.platform.startswith("win"):
+            return
+
+        riot_running = RiotClientIntegration.is_riot_client_running()
+        session_authenticated = riot_running and RiotClientIntegration.is_riot_session_authenticated()
+
+        if session_authenticated:
+            self._session_miss_count = 0
+            return
+
+        self._session_miss_count += 1
+        if self._session_miss_count < self._manual_logout_grace_misses:
+            return
+
+        self._logged_in_username = None
+        self._session_miss_count = 0
+        self._stop_ingame_watcher()
+        self.update_account_item_states()
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
@@ -2308,6 +2458,7 @@ QMenu::separator {
             account = self.account_manager.get_account(username) if self.account_manager else None
             if account:
                 self._logged_in_username = account.username
+                self._session_miss_count = 0
                 self.update_account_item_states()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)

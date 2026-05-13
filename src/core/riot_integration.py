@@ -1,6 +1,7 @@
 """Riot Client integration for automatic login"""
 import subprocess
 import time
+import os
 import psutil
 import requests
 from pathlib import Path
@@ -83,6 +84,92 @@ class RiotClientIntegration:
             return response.status_code == 200 and bool(response.text.strip())
         except requests.RequestException:
             return False
+
+    @staticmethod
+    def _get_riot_lockfile_path() -> Optional[Path]:
+        """Return Riot Client lockfile path when available."""
+        candidates = [
+            Path(os.getenv('LOCALAPPDATA', '')) / 'Riot Games' / 'Riot Client' / 'Config' / 'lockfile',
+            Path(os.getenv('APPDATA', '')) / 'Riot Games' / 'Riot Client' / 'Config' / 'lockfile',
+        ]
+        for candidate in candidates:
+            try:
+                if candidate and candidate.exists():
+                    return candidate
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _read_riot_lockfile() -> Optional[Tuple[int, str, str]]:
+        """Parse Riot lockfile and return (port, password, protocol)."""
+        lockfile = RiotClientIntegration._get_riot_lockfile_path()
+        if not lockfile:
+            return None
+
+        try:
+            raw = lockfile.read_text(encoding='utf-8').strip()
+            # Format: <name>:<pid>:<port>:<password>:<protocol>
+            parts = raw.split(':')
+            if len(parts) < 5:
+                return None
+            port = int(parts[2])
+            password = parts[3]
+            protocol = parts[4] or 'https'
+            return port, password, protocol
+        except Exception:
+            return None
+
+    @staticmethod
+    def is_riot_session_authenticated(timeout_seconds: float = 1.0) -> bool:
+        """Return True when Riot local auth/session endpoints report a signed-in session."""
+        lock_data = RiotClientIntegration._read_riot_lockfile()
+        if not lock_data:
+            return False
+
+        port, password, protocol = lock_data
+        base_url = f"{protocol}://127.0.0.1:{port}"
+        auth = ('riot', password)
+        endpoints = [
+            '/rso-auth/v1/session/credentials',
+            '/chat/v1/session',
+        ]
+
+        for endpoint in endpoints:
+            try:
+                response = requests.get(
+                    f"{base_url}{endpoint}",
+                    auth=auth,
+                    timeout=timeout_seconds,
+                    verify=False,
+                )
+            except requests.RequestException:
+                continue
+
+            if response.status_code in (401, 403):
+                return False
+            if response.status_code in (404, 204):
+                continue
+            if response.status_code != 200:
+                continue
+
+            try:
+                data = response.json()
+            except ValueError:
+                continue
+
+            if endpoint == '/rso-auth/v1/session/credentials':
+                if data.get('subject') or data.get('username'):
+                    return True
+                continue
+
+            if endpoint == '/chat/v1/session':
+                if data.get('connected') is False:
+                    return False
+                if data.get('puuid') or data.get('game_name') or data.get('name'):
+                    return True
+
+        return False
 
     @staticmethod
     def _wait_for_lol_start(timeout_seconds: int = 20) -> bool:
