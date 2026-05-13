@@ -211,6 +211,9 @@ QLineEdit, QComboBox, QDateEdit {
     border-radius: 4px;
     padding: 4px;
 }
+QLineEdit::placeholder {
+    color: #9aa4bf;
+}
 QComboBox QAbstractItemView {
     background-color: #181825;
     color: #cdd6f4;
@@ -230,6 +233,9 @@ QListWidget {
     background-color: #ffffff;
     border: 1px solid #cfcfcf;
     border-radius: 6px;
+}
+QLineEdit::placeholder {
+    color: #6b7280;
 }
 """
 
@@ -617,20 +623,28 @@ class SettingsDialog(QDialog):
 
         pw_btn = QPushButton("🔑  Change Master Password")
         pw_btn.setToolTip("Update the master encryption password")
+        pw_btn.setAutoDefault(False)
+        pw_btn.setDefault(False)
         pw_btn.clicked.connect(lambda: mw.change_master_password() if mw else None)
         actions_grid.addWidget(pw_btn, 0, 0)
 
         about_btn = QPushButton("ℹ  About")
+        about_btn.setAutoDefault(False)
+        about_btn.setDefault(False)
         about_btn.clicked.connect(lambda: mw.show_about() if mw else None)
         actions_grid.addWidget(about_btn, 0, 1)
 
         lol_btn = QPushButton("📁  Set LoL Path…")
         lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
+        lol_btn.setAutoDefault(False)
+        lol_btn.setDefault(False)
         lol_btn.clicked.connect(lambda: mw.browse_for_lol() if mw else None)
         actions_grid.addWidget(lol_btn, 1, 0)
 
         backup_btn = QPushButton("💾  Backup / Restore…")
         backup_btn.setToolTip("Export or import an encrypted account backup")
+        backup_btn.setAutoDefault(False)
+        backup_btn.setDefault(False)
         backup_btn.clicked.connect(lambda: mw.open_backup_dialog() if mw else None)
         actions_grid.addWidget(backup_btn, 1, 1)
 
@@ -1248,7 +1262,7 @@ class MainWindow(QMainWindow):
             for account in filtered_accounts:
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, 72))
+                item.setSizeHint(QSize(0, 84))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
