@@ -607,6 +607,141 @@ class LaunchProgressDialog(QDialog):
 
     def set_message(self, message: str):
         self._message_label.setText(message)
+
+
+class ToastNotificationDialog(QDialog):
+    """Small transient toast-style notification."""
+
+    def __init__(self, title: str, message: str, parent=None, timeout_ms: int = 2400):
+        super().__init__(parent)
+        self._timeout_ms = timeout_ms
+        self.setWindowFlags(
+            Qt.Tool |
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setModal(False)
+
+        self._card = QFrame(self)
+        self._card.setObjectName("toastCard")
+        self._card.setAttribute(Qt.WA_StyledBackground, True)
+
+        parent_dark = bool(getattr(parent, "_dark_mode", True))
+        if parent_dark:
+            self._card.setStyleSheet(
+                "QFrame#toastCard {"
+                "background-color: #232334;"
+                "border: 1px solid #45475a;"
+                "border-radius: 14px;"
+                "}"
+                "QLabel#toastTitle { color: #e2e8f0; font-weight: 700; font-size: 10.5pt; }"
+                "QLabel#toastMessage { color: #cdd6f4; font-size: 10pt; }"
+                "QPushButton#toastClose {"
+                "background: transparent;"
+                "border: none;"
+                "color: #aab3c8;"
+                "font-size: 14pt;"
+                "padding: 0px;"
+                "min-width: 20px;"
+                "max-width: 20px;"
+                "}"
+                "QPushButton#toastClose:hover { color: #ffffff; }"
+            )
+            accent_bg = "#1f6feb"
+        else:
+            self._card.setStyleSheet(
+                "QFrame#toastCard {"
+                "background-color: #ffffff;"
+                "border: 1px solid #d1d5db;"
+                "border-radius: 14px;"
+                "}"
+                "QLabel#toastTitle { color: #111827; font-weight: 700; font-size: 10.5pt; }"
+                "QLabel#toastMessage { color: #374151; font-size: 10pt; }"
+                "QPushButton#toastClose {"
+                "background: transparent;"
+                "border: none;"
+                "color: #6b7280;"
+                "font-size: 14pt;"
+                "padding: 0px;"
+                "min-width: 20px;"
+                "max-width: 20px;"
+                "}"
+                "QPushButton#toastClose:hover { color: #111827; }"
+            )
+            accent_bg = "#2563eb"
+
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._shadow.setBlurRadius(28)
+        self._shadow.setOffset(0, 6)
+        self._shadow.setColor(QColor(0, 0, 0, 120 if parent_dark else 60))
+        self._card.setGraphicsEffect(self._shadow)
+
+        accent = QLabel()
+        accent.setFixedSize(10, 10)
+        accent.setStyleSheet(
+            f"background-color: {accent_bg}; border-radius: 5px;"
+        )
+
+        title_label = QLabel(title)
+        title_label.setObjectName("toastTitle")
+
+        message_label = QLabel(message)
+        message_label.setObjectName("toastMessage")
+        message_label.setWordWrap(True)
+
+        close_btn = QPushButton("\u00d7")
+        close_btn.setObjectName("toastClose")
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.clicked.connect(self.close)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.addWidget(title_label)
+        text_layout.addWidget(message_label)
+
+        top_row = QHBoxLayout()
+        top_row.setSpacing(10)
+        top_row.setContentsMargins(18, 16, 14, 16)
+        top_row.addWidget(accent, 0, Qt.AlignTop)
+        top_row.addLayout(text_layout, 1)
+        top_row.addWidget(close_btn, 0, Qt.AlignTop)
+
+        card_layout = QVBoxLayout(self._card)
+        card_layout.setContentsMargins(0, 0, 0, 0)
+        card_layout.addLayout(top_row)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self._card)
+
+        self._close_timer = QTimer(self)
+        self._close_timer.setSingleShot(True)
+        self._close_timer.timeout.connect(self.close)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.adjustSize()
+        self._position_toast()
+        self._close_timer.start(self._timeout_ms)
+
+    def _position_toast(self):
+        parent = self.parentWidget()
+        if parent:
+            ref = parent.geometry()
+            global_top_left = parent.mapToGlobal(ref.topLeft())
+            x = global_top_left.x() + ref.width() - self.width() - 20
+            y = global_top_left.y() + 20
+            self.move(max(x, 20), max(y, 20))
+        else:
+            screen = QApplication.primaryScreen()
+            if screen:
+                geo = screen.availableGeometry()
+                x = geo.x() + geo.width() - self.width() - 20
+                y = geo.y() + 20
+                self.move(max(x, 20), max(y, 20))
     
     def get_password(self):
         if self.is_setup:
@@ -1455,6 +1590,7 @@ class MainWindow(QMainWindow):
         self._search_query: str = ""
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
+        self._toast_notifications: list[ToastNotificationDialog] = []
         self._window_resize_save_timer = QTimer(self)
         self._window_resize_save_timer.setSingleShot(True)
         self._window_resize_save_timer.setInterval(250)
@@ -1711,6 +1847,23 @@ class MainWindow(QMainWindow):
 
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
+
+    def _show_toast(self, title: str, message: str, timeout_ms: int = 2400):
+        """Show a transient toast notification."""
+        toast = ToastNotificationDialog(title, message, self, timeout_ms=timeout_ms)
+        self._toast_notifications.append(toast)
+
+        def _cleanup(*_):
+            try:
+                self._toast_notifications.remove(toast)
+            except ValueError:
+                pass
+
+        toast.destroyed.connect(_cleanup)
+        toast.show()
+        toast.raise_()
+        toast.activateWindow()
+        return toast
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
@@ -2213,11 +2366,7 @@ QMenu::separator {
             account = self.account_manager.get_account(username) if self.account_manager else None
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
-            QMessageBox.information(
-                self,
-                "Success",
-                f"{username} login successful!"
-            )
+            self._show_toast("Success", f"{username} login successful!")
         else:
             self._show_error("Error", "Failed to launch. Make sure League of Legends is installed.")
 
