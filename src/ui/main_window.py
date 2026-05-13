@@ -1203,15 +1203,15 @@ class AccountListItem(QFrame):
         self.rank_icon_label.setScaledContents(False)
         self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
-        rank_layout.addWidget(self.rank_icon_label)
 
         self.logged_in_label = QLabel("Logged in")
         self.logged_in_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.logged_in_label.setVisible(False)
         self.logged_in_label.setAlignment(Qt.AlignCenter)
         self.logged_in_label.setFixedHeight(20)
-        self.logged_in_label.setMinimumWidth(70)
+        self.logged_in_label.setMinimumWidth(78)
         rank_layout.addWidget(self.logged_in_label)
+        rank_layout.addWidget(self.rank_icon_label)
 
         self.rank_label = QLabel("...")
         self.rank_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
@@ -1311,23 +1311,23 @@ class AccountListItem(QFrame):
         """Refresh the logged-in badge style for the active theme."""
         if self._dark_mode:
             self.logged_in_label.setStyleSheet(
-                "background-color: rgba(91, 141, 239, 0.18);"
-                "border: 1px solid rgba(91, 141, 239, 0.45);"
+                "background-color: rgba(91, 141, 239, 0.22);"
+                "border: 1px solid rgba(129, 170, 255, 0.55);"
                 "border-radius: 10px;"
-                "color: #dbeafe;"
-                "font-size: 9px;"
+                "color: #e6f0ff;"
+                "font-size: 9.5px;"
                 "font-weight: 700;"
-                "padding: 0px 8px;"
+                "padding: 0px 9px;"
             )
         else:
             self.logged_in_label.setStyleSheet(
-                "background-color: rgba(79, 124, 255, 0.12);"
-                "border: 1px solid rgba(79, 124, 255, 0.28);"
+                "background-color: rgba(79, 124, 255, 0.16);"
+                "border: 1px solid rgba(79, 124, 255, 0.35);"
                 "border-radius: 10px;"
-                "color: #1d4ed8;"
-                "font-size: 9px;"
+                "color: #1e40af;"
+                "font-size: 9.5px;"
                 "font-weight: 700;"
-                "padding: 0px 8px;"
+                "padding: 0px 9px;"
             )
 
     def set_rank(self, rank_data: dict):
@@ -1413,8 +1413,11 @@ class AccountListItem(QFrame):
             if self._logged_in and active:
                 self.setStyleSheet(
                     "#accountListItem {"
-                    "background-color: rgba(69, 71, 90, 205);"
-                    "border: 1px solid rgba(122, 162, 247, 190);"
+                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                    "stop:0 rgba(76, 111, 188, 110),"
+                    "stop:0.28 rgba(58, 78, 130, 95),"
+                    "stop:1 rgba(37, 41, 61, 170));"
+                    "border: 1px solid rgba(122, 162, 247, 205);"
                     "border-left: 4px solid rgba(122, 162, 247, 230);"
                     "border-radius: 10px;"
                     "}"
@@ -1424,8 +1427,11 @@ class AccountListItem(QFrame):
             elif self._logged_in:
                 self.setStyleSheet(
                     "#accountListItem {"
-                    "background-color: rgba(30, 41, 70, 120);"
-                    "border: 1px solid rgba(122, 162, 247, 130);"
+                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                    "stop:0 rgba(76, 111, 188, 78),"
+                    "stop:0.24 rgba(55, 75, 124, 58),"
+                    "stop:1 rgba(25, 30, 47, 95));"
+                    "border: 1px solid rgba(122, 162, 247, 145);"
                     "border-left: 4px solid rgba(122, 162, 247, 220);"
                     "border-radius: 10px;"
                     "}"
@@ -1457,8 +1463,11 @@ class AccountListItem(QFrame):
         if self._logged_in and active:
             self.setStyleSheet(
                 "#accountListItem {"
-                "background-color: #e7efff;"
-                "border: 1px solid #9db8ff;"
+                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                "stop:0 rgba(100, 148, 255, 95),"
+                "stop:0.30 rgba(180, 208, 255, 70),"
+                "stop:1 rgba(244, 248, 255, 95));"
+                "border: 1px solid #97b4ff;"
                 "border-left: 4px solid #4f7cff;"
                 "border-radius: 10px;"
                 "}"
@@ -1468,8 +1477,11 @@ class AccountListItem(QFrame):
         elif self._logged_in:
             self.setStyleSheet(
                 "#accountListItem {"
-                "background-color: #f1f5ff;"
-                "border: 1px solid #c7d2fe;"
+                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                "stop:0 rgba(100, 148, 255, 72),"
+                "stop:0.30 rgba(197, 217, 255, 45),"
+                "stop:1 rgba(248, 250, 255, 65));"
+                "border: 1px solid #c1cffb;"
                 "border-left: 4px solid #4f7cff;"
                 "border-radius: 10px;"
                 "}"
