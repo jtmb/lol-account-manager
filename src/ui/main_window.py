@@ -945,11 +945,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         
         layout = QVBoxLayout()
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
+        layout.setContentsMargins(12, 10, 12, 12)
 
         top_row = QHBoxLayout()
         top_row.setSpacing(8)
+
+        title = QLabel("LOL Account Manager")
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        top_row.addWidget(title)
+
         top_row.addStretch()
         self._theme_button = QPushButton()
         self._theme_button.setObjectName("themeTopButton")
@@ -964,14 +972,6 @@ class MainWindow(QMainWindow):
         self._settings_button.clicked.connect(self.open_settings_dialog)
         top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
         layout.addLayout(top_row)
-        
-        # Title
-        title = QLabel("LOL Account Manager")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        layout.addWidget(title)
 
         filter_row = QHBoxLayout()
         filter_row.addWidget(QLabel("Filters:"))
