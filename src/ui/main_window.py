@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QDateEdit, QGraphicsDropShadowEffect, QMenu
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QPixmap
 from pathlib import Path
 from typing import Optional
 import sys
@@ -35,6 +35,14 @@ def _escape_html(text: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+def _build_rank_pixmap(image_bytes: bytes) -> QPixmap:
+    """Convert fetched medal bytes into a small row icon."""
+    pixmap = QPixmap()
+    if image_bytes:
+        pixmap.loadFromData(image_bytes)
+    return pixmap
 
 
 DARK_STYLESHEET = """
@@ -456,7 +464,19 @@ class AccountListItem(QFrame):
         outer.addLayout(text_layout)
         outer.addStretch()
 
-        # Rank label (right side)
+        # Rank block (right side)
+        rank_widget = QWidget()
+        rank_layout = QHBoxLayout(rank_widget)
+        rank_layout.setContentsMargins(0, 0, 0, 0)
+        rank_layout.setSpacing(6)
+
+        self.rank_icon_label = QLabel()
+        self.rank_icon_label.setFixedSize(18, 18)
+        self.rank_icon_label.setScaledContents(True)
+        self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
+        rank_layout.addWidget(self.rank_icon_label)
+
         self.rank_label = QLabel("...")
         self.rank_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.rank_label.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -465,7 +485,9 @@ class AccountListItem(QFrame):
             "background: transparent; border: none; color: #8b93a8; font-size: 10px;"
         )
         self.rank_label.setMinimumWidth(150)
-        outer.addWidget(self.rank_label)
+        rank_layout.addWidget(self.rank_label)
+
+        outer.addWidget(rank_widget)
 
         self.setLayout(outer)
         self._update_visual_state()
@@ -481,16 +503,22 @@ class AccountListItem(QFrame):
             win_rate = _escape_html(f"{rank_data.get('win_rate', '')}% WR")
             neutral_color = "#8b93a8" if self._dark_mode else "#4b5563"
             self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 10px;")
+            self.rank_icon_label.setPixmap(_build_rank_pixmap(rank_data.get("medal_bytes", b"")))
+            self.rank_icon_label.setVisible(not self.rank_icon_label.pixmap().isNull())
             self.rank_label.setText(
                 f"<span style='color:{color}; font-weight:600;'>{tier}</span> "
                 f"<span style='color:{neutral_color};'>{lp}  {wins}  {win_rate}</span>"
             )
         elif status == "unranked":
+            self.rank_icon_label.clear()
+            self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
                 "background: transparent; border: none; color: #585b70; font-size: 10px;"
             )
             self.rank_label.setText("Unranked")
         else:
+            self.rank_icon_label.clear()
+            self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
                 "background: transparent; border: none; color: #585b70; font-size: 10px;"
             )

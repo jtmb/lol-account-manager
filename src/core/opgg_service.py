@@ -40,6 +40,21 @@ TIER_COLORS = {
     "Challenger":  "#f1c40f",
 }
 
+TIER_MEDAL_NAMES = {
+    "Iron": "iron",
+    "Bronze": "bronze",
+    "Silver": "silver",
+    "Gold": "gold",
+    "Platinum": "platinum",
+    "Emerald": "emerald",
+    "Diamond": "diamond",
+    "Master": "master",
+    "Grandmaster": "grandmaster",
+    "Challenger": "challenger",
+}
+
+MEDAL_QUERY = "image=q_auto:good,f_webp,w_144&v=1778326962"
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -115,6 +130,7 @@ def _parse_meta_description(html: str):
         "losses": losses,
         "win_rate": win_rate,
         "color": TIER_COLORS.get(tier, "#8b93a8"),
+        "medal_url": f"https://opgg-static.akamaized.net/images/medals_new/{TIER_MEDAL_NAMES.get(tier, tier.lower())}.png?{MEDAL_QUERY}",
     }
 
 
@@ -146,6 +162,12 @@ def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 12)
 
     result = _parse_meta_description(response.text)
     if result:
+        try:
+            medal_response = requests.get(result["medal_url"], headers={"User-Agent": _HEADERS["User-Agent"]}, timeout=timeout)
+            medal_response.raise_for_status()
+            result["medal_bytes"] = medal_response.content
+        except requests.exceptions.RequestException:
+            result["medal_bytes"] = b""
         return result
 
     return {"status": "unranked", "text": "Unranked", "color": "#585b70"}
