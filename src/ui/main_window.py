@@ -601,7 +601,7 @@ class SettingsDialog(QDialog):
         self.tag_size_combo = QComboBox()
         for label, value in self.TAG_SIZE_OPTIONS:
             self.tag_size_combo.addItem(label, value)
-        current_tag_size = str(self._settings.get("tag_size", "small"))
+        current_tag_size = str(self._settings.get("tag_size", "medium"))
         tag_size_index = self.tag_size_combo.findData(current_tag_size)
         self.tag_size_combo.setCurrentIndex(max(0, tag_size_index))
         tag_size_row.addWidget(self.tag_size_combo)
@@ -1091,7 +1091,7 @@ class MainWindow(QMainWindow):
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._show_tags: bool = self._settings.get('show_tags', True)
-        self._tag_size: str = str(self._settings.get('tag_size', 'small'))
+        self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._search_query: str = ""
