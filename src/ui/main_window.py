@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout
+    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
+    QTextEdit, QSpinBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap
@@ -55,6 +56,19 @@ def _parse_resolution(resolution: str, fallback: tuple[int, int] = (660, 480)) -
         return int(width_str), int(height_str)
     except Exception:
         return fallback
+
+
+def _parse_tags(raw: str) -> list[str]:
+    """Parse comma-separated tags into a normalized unique list."""
+    seen = set()
+    tags = []
+    for part in raw.split(','):
+        tag = part.strip().lower()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        tags.append(tag)
+    return tags
 
 
 def _startup_command() -> str:
@@ -341,6 +355,19 @@ class AddAccountDialog(QDialog):
             self.region_combo.addItem(label, code)
         self.region_combo.setCurrentIndex(self.region_combo.findData("NA"))
         layout.addWidget(self.region_combo)
+
+        # Tags
+        layout.addWidget(QLabel("Tags (comma-separated):"))
+        self.tags_input = QLineEdit()
+        self.tags_input.setPlaceholderText("main, ranked, smurf")
+        layout.addWidget(self.tags_input)
+
+        # Notes
+        layout.addWidget(QLabel("Private Notes (encrypted):"))
+        self.notes_input = QTextEdit()
+        self.notes_input.setPlaceholderText("Optional notes for this account")
+        self.notes_input.setFixedHeight(90)
+        layout.addWidget(self.notes_input)
         
         # Ban Status
         layout.addWidget(QLabel("Ban Status:"))
@@ -377,6 +404,8 @@ class AddAccountDialog(QDialog):
             self.tag_line_input.setText(getattr(self.editing_account, "tag_line", "NA1"))
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
+            self.tags_input.setText(", ".join(getattr(self.editing_account, "tags", []) or []))
+            self.notes_input.setPlainText(getattr(self.editing_account, "notes", "") or "")
             region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
             idx = self.region_combo.findData(region)
             if idx < 0:
@@ -418,6 +447,8 @@ class AddAccountDialog(QDialog):
             'password': self.password_input.text(),
             'display_name': self.display_name_input.text().strip() or self.username_input.text().strip(),
             'region': self.region_combo.currentData(),
+            'tags': _parse_tags(self.tags_input.text()),
+            'notes': self.notes_input.toPlainText().strip(),
             'ban_status': ban_status,
             'ban_end_date': ban_end_date,
         }
@@ -467,7 +498,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(QLabel("Window size:"))
         self.window_size_combo = QComboBox()
         self.window_size_combo.addItems(self.COMMON_RESOLUTIONS)
-        current_resolution = self._settings.get("window_size", "1024x768")
+        current_resolution = self._settings.get("window_size", "800x600")
         if current_resolution not in self.COMMON_RESOLUTIONS:
             self.window_size_combo.addItem(current_resolution)
         self.window_size_combo.setCurrentText(current_resolution)
@@ -494,6 +525,22 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.show_images_checkbox)
         self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+
+        self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
+        self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
+        layout.addWidget(self.auto_backup_checkbox)
+
+        backup_keep_row = QHBoxLayout()
+        backup_keep_row.addWidget(QLabel("Keep auto backups:"))
+        self.auto_backup_keep_spin = QSpinBox()
+        self.auto_backup_keep_spin.setRange(1, 200)
+        self.auto_backup_keep_spin.setValue(int(self._settings.get("auto_backup_keep_count", 20)))
+        self.auto_backup_keep_spin.setSuffix(" files")
+        backup_keep_row.addWidget(self.auto_backup_keep_spin)
+        backup_keep_row.addStretch()
+        layout.addLayout(backup_keep_row)
+        self.auto_backup_checkbox.toggled.connect(self.auto_backup_keep_spin.setEnabled)
+        self.auto_backup_keep_spin.setEnabled(self.auto_backup_checkbox.isChecked())
 
         # ── Actions section ────────────────────────────────────────────
         sep = QFrame()
@@ -563,6 +610,8 @@ class SettingsDialog(QDialog):
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
+            "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
+            "auto_backup_keep_count": int(self.auto_backup_keep_spin.value()),
         }
 
 
@@ -648,6 +697,16 @@ class AccountListItem(QFrame):
         region_label.setAttribute(Qt.WA_TranslucentBackground, True)
         region_label.setStyleSheet("background: transparent; border: none; color: #8b93a8; font-size: 10px;")
         user_row.addWidget(region_label)
+
+        tags = getattr(self.account, "tags", []) or []
+        if tags:
+            preview = " ".join(f"#{t}" for t in tags[:3])
+            if len(tags) > 3:
+                preview += " +"
+            tags_label = QLabel(preview)
+            tags_label.setAttribute(Qt.WA_TranslucentBackground, True)
+            tags_label.setStyleSheet("background: transparent; border: none; color: #7c87a6; font-size: 10px;")
+            user_row.addWidget(tags_label)
 
         if self.account.ban_status == "permanent":
             ban_label = QLabel("⛔ Permanently Banned")
@@ -810,7 +869,9 @@ class MainWindow(QMainWindow):
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
-        self._window_size: str = self._settings.get('window_size', '1024x768')
+        self._window_size: str = self._settings.get('window_size', '800x600')
+        self._search_query: str = ""
+        self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self.init_ui()
         self._apply_theme()
@@ -849,6 +910,25 @@ class MainWindow(QMainWindow):
         title_font.setBold(True)
         title.setFont(title_font)
         layout.addWidget(title)
+
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filters:"))
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search by display name, username, or tag")
+        self.search_input.textChanged.connect(self._on_filters_changed)
+        filter_row.addWidget(self.search_input, 1)
+
+        self.tag_filter_combo = QComboBox()
+        self.tag_filter_combo.setMinimumWidth(150)
+        self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
+        filter_row.addWidget(self.tag_filter_combo)
+
+        clear_filters_btn = QPushButton("Clear")
+        clear_filters_btn.clicked.connect(self._clear_filters)
+        filter_row.addWidget(clear_filters_btn)
+
+        layout.addLayout(filter_row)
         
         # Account list
         layout.addWidget(QLabel("Saved Accounts:"))
@@ -1046,6 +1126,53 @@ class MainWindow(QMainWindow):
         """Initialize account manager with master password"""
         self.account_manager = AccountManager(password)
         self.refresh_account_list()
+
+    def _on_filters_changed(self, *_):
+        self._search_query = self.search_input.text().strip().lower()
+        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
+        self.refresh_account_list()
+
+    def _clear_filters(self):
+        self.search_input.clear()
+        idx = self.tag_filter_combo.findData("__all__")
+        if idx >= 0:
+            self.tag_filter_combo.setCurrentIndex(idx)
+        self._on_filters_changed()
+
+    def _rebuild_tag_filter_options(self, accounts: list[Account]):
+        selected = str(self.tag_filter_combo.currentData() or "__all__")
+        tags = sorted({t for acc in accounts for t in (getattr(acc, 'tags', []) or [])})
+
+        self.tag_filter_combo.blockSignals(True)
+        self.tag_filter_combo.clear()
+        self.tag_filter_combo.addItem("All tags", "__all__")
+        for tag in tags:
+            self.tag_filter_combo.addItem(f"#{tag}", tag)
+
+        idx = self.tag_filter_combo.findData(selected)
+        if idx < 0:
+            idx = 0
+        self.tag_filter_combo.setCurrentIndex(idx)
+        self.tag_filter_combo.blockSignals(False)
+        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
+
+    def _account_matches_filters(self, account: Account) -> bool:
+        if self._tag_filter_value != "__all__":
+            tags = set(getattr(account, 'tags', []) or [])
+            if self._tag_filter_value not in tags:
+                return False
+
+        if self._search_query:
+            haystack = " ".join([
+                str(getattr(account, 'display_name', '') or ''),
+                str(getattr(account, 'username', '') or ''),
+                str(getattr(account, 'tag_line', '') or ''),
+                " ".join(getattr(account, 'tags', []) or []),
+            ]).lower()
+            if self._search_query not in haystack:
+                return False
+
+        return True
     
     def refresh_account_list(self):
         """Refresh the account list display"""
@@ -1055,6 +1182,8 @@ class MainWindow(QMainWindow):
             return
         
         accounts = self.account_manager.get_all_accounts()
+        self._rebuild_tag_filter_options(accounts)
+        filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
         
         if not accounts:
             item = QListWidgetItem()
@@ -1064,8 +1193,16 @@ class MainWindow(QMainWindow):
             self.launch_btn.setEnabled(False)
             self.edit_btn.setEnabled(False)
             self.delete_btn.setEnabled(False)
+        elif not filtered_accounts:
+            item = QListWidgetItem()
+            item.setText("No accounts match current filters.")
+            item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+            self.account_list.addItem(item)
+            self.launch_btn.setEnabled(False)
+            self.edit_btn.setEnabled(False)
+            self.delete_btn.setEnabled(False)
         else:
-            for account in accounts:
+            for account in filtered_accounts:
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
                 item.setSizeHint(QSize(0, 72))
@@ -1258,6 +1395,8 @@ QMenu::separator {
                     display_name=data['display_name'],
                     region=data['region'],
                     tag_line=data['tag_line'],
+                    tags=data['tags'],
+                    notes=data['notes'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -1284,6 +1423,8 @@ QMenu::separator {
                     data['display_name'],
                     region=data['region'],
                     tag_line=data['tag_line'],
+                    tags=data['tags'],
+                    notes=data['notes'],
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
@@ -1461,6 +1602,8 @@ QMenu::separator {
                                     account.display_name,
                                     region=account.region,
                                     tag_line=account.tag_line,
+                                    tags=getattr(account, 'tags', []) or [],
+                                    notes=getattr(account, 'notes', '') or "",
                                     ban_status=account.ban_status,
                                     ban_end_date=account.ban_end_date,
                                 )

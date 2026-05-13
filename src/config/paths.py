@@ -10,6 +10,7 @@ APP_DATA_DIR = APPDATA / 'LoLAccountManager'
 ACCOUNTS_FILE = APP_DATA_DIR / 'accounts.json'
 MASTER_PASSWORD_FILE = APP_DATA_DIR / 'master.key'
 SETTINGS_FILE = APP_DATA_DIR / 'settings.json'
+BACKUPS_DIR = APP_DATA_DIR / 'backups'
 
 
 def load_settings() -> dict:
@@ -73,6 +74,7 @@ RIOT_CONFIG_PATHS = [
 def ensure_app_data_dir():
     """Ensure app data directory exists"""
     APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_riot_client_path() -> Optional[Path]:

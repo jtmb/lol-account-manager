@@ -1,11 +1,18 @@
 """Account management and storage"""
 import json
 import os
+from datetime import datetime
 from datetime import date
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass, asdict, fields, field
 from typing import List, Dict, Optional
 from pathlib import Path
-from src.config.paths import ACCOUNTS_FILE, MASTER_PASSWORD_FILE, ensure_app_data_dir
+from src.config.paths import (
+    ACCOUNTS_FILE,
+    MASTER_PASSWORD_FILE,
+    BACKUPS_DIR,
+    ensure_app_data_dir,
+    load_settings,
+)
 from src.security.encryption import PasswordEncryption
 
 
@@ -18,6 +25,8 @@ class Account:
     is_encrypted: bool = True
     region: str = "NA"
     tag_line: str = "NA1"
+    tags: List[str] = field(default_factory=list)
+    notes: str = ""
     ban_status: str = "none"   # "none", "temporary", "permanent"
     ban_end_date: str = ""     # ISO date "YYYY-MM-DD", only for temporary bans
 
@@ -70,7 +79,12 @@ class AccountManager:
         for account in self.accounts:
             account_dict = account.to_dict()
             account_dict['password'] = self.encryption.encrypt_password(account.password)
+            notes_value = str(account_dict.get('notes', '') or '')
+            account_dict['notes'] = self.encryption.encrypt_password(notes_value)
+            account_dict['notes_encrypted'] = True
             encrypted_accounts.append(account_dict)
+
+        self._create_auto_backup(encrypted_accounts)
         
         # Write to file
         with open(ACCOUNTS_FILE, 'w') as f:
@@ -92,11 +106,25 @@ class AccountManager:
             self.accounts = []
             for account_dict in account_dicts:
                 try:
+                    d = dict(account_dict)
                     # Decrypt password
-                    encrypted_password = account_dict['password']
+                    encrypted_password = d['password']
                     decrypted_password = self.encryption.decrypt_password(encrypted_password)
-                    account_dict['password'] = decrypted_password
-                    account = Account(**account_dict)
+                    d['password'] = decrypted_password
+
+                    # Support both encrypted and legacy plaintext notes.
+                    notes_value = str(d.get('notes', '') or '')
+                    if d.get('notes_encrypted') and notes_value:
+                        try:
+                            notes_value = self.encryption.decrypt_password(notes_value)
+                        except Exception:
+                            notes_value = ""
+                    d['notes'] = notes_value
+
+                    # Strip unknown keys so schema changes remain backward compatible.
+                    valid_fields = {f.name for f in fields(Account)}
+                    d = {k: v for k, v in d.items() if k in valid_fields}
+                    account = Account(**d)
                     self.accounts.append(account)
                 except Exception as e:
                     print(f"Error loading account {account_dict.get('username', 'unknown')}: {e}")
@@ -130,6 +158,8 @@ class AccountManager:
         display_name: str = "",
         region: str = "NA",
         tag_line: str = "NA1",
+        tags: Optional[List[str]] = None,
+        notes: str = "",
         ban_status: str = "none",
         ban_end_date: str = "",
     ) -> Account:
@@ -147,6 +177,8 @@ class AccountManager:
             display_name=display_name,
             region=region,
             tag_line=tag_line,
+            tags=list(tags or []),
+            notes=notes or "",
             ban_status=ban_status,
             ban_end_date=ban_end_date,
         )
@@ -167,6 +199,8 @@ class AccountManager:
         display_name: Optional[str] = None,
         region: Optional[str] = None,
         tag_line: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        notes: Optional[str] = None,
         ban_status: Optional[str] = None,
         ban_end_date: Optional[str] = None,
     ):
@@ -185,6 +219,10 @@ class AccountManager:
                     account.region = region
                 if tag_line is not None:
                     account.tag_line = tag_line
+                if tags is not None:
+                    account.tags = list(tags)
+                if notes is not None:
+                    account.notes = notes
                 if ban_status is not None:
                     account.ban_status = ban_status
                 if ban_end_date is not None:
@@ -221,6 +259,9 @@ class AccountManager:
         for account in self.accounts:
             account_dict = account.to_dict()
             account_dict['password'] = self.encryption.encrypt_password(account.password)
+            notes_value = str(account_dict.get('notes', '') or '')
+            account_dict['notes'] = self.encryption.encrypt_password(notes_value)
+            account_dict['notes_encrypted'] = True
             encrypted_accounts.append(account_dict)
 
         backup = {
@@ -261,6 +302,15 @@ class AccountManager:
             try:
                 d = dict(account_dict)
                 d['password'] = source_encryption.decrypt_password(d['password'])
+
+                notes_value = str(d.get('notes', '') or '')
+                if d.get('notes_encrypted') and notes_value:
+                    try:
+                        notes_value = source_encryption.decrypt_password(notes_value)
+                    except Exception:
+                        notes_value = ""
+                d['notes'] = notes_value
+
                 # Strip unknown keys so Account(**d) doesn't fail on future schema changes
                 valid_fields = {f.name for f in fields(Account)}
                 d = {k: v for k, v in d.items() if k in valid_fields}
@@ -279,6 +329,38 @@ class AccountManager:
 
         self.save_accounts()
         return count
+
+    def _create_auto_backup(self, encrypted_accounts: List[Dict]):
+        """Write a versioned automatic backup if enabled in settings."""
+        settings = load_settings()
+        if not bool(settings.get('auto_backup_enabled', True)):
+            return
+
+        keep_count = int(settings.get('auto_backup_keep_count', 20) or 20)
+        keep_count = max(1, min(200, keep_count))
+
+        ensure_app_data_dir()
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        backup_file = BACKUPS_DIR / f"auto_backup_{ts}.lolbak"
+
+        payload = {
+            "version": 1,
+            "app": "LoLAccountManager",
+            "kind": "auto",
+            "created_at": datetime.now().isoformat(timespec='seconds'),
+            "accounts": encrypted_accounts,
+        }
+
+        with open(backup_file, 'w') as f:
+            json.dump(payload, f, indent=2)
+
+        backup_files = sorted(BACKUPS_DIR.glob('auto_backup_*.lolbak'))
+        while len(backup_files) > keep_count:
+            oldest = backup_files.pop(0)
+            try:
+                oldest.unlink()
+            except OSError:
+                pass
 
     @staticmethod
     def master_password_set() -> bool:
