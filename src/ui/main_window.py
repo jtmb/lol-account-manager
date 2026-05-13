@@ -208,12 +208,21 @@ QPushButton:disabled {
     color: #585b70;
     border: 1px solid #313244;
 }
-QLineEdit, QComboBox, QDateEdit {
+QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
     background-color: #181825;
     color: #cdd6f4;
     border: 1px solid #45475a;
     border-radius: 4px;
     padding: 4px;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #313244;
+    border-left: 1px solid #45475a;
+    width: 16px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #45475a;
 }
 QLineEdit::placeholder {
     color: #9aa4bf;
@@ -233,10 +242,56 @@ QProgressDialog {
 """
 
 LIGHT_STYLESHEET = """
+QMainWindow, QDialog, QWidget {
+    background-color: #f5f6f8;
+    color: #111827;
+}
 QListWidget {
     background-color: #ffffff;
     border: 1px solid #cfcfcf;
     border-radius: 6px;
+}
+QPushButton {
+    background-color: #f3f4f6;
+    color: #111827;
+    border: 1px solid #cfcfcf;
+    border-radius: 5px;
+    padding: 5px 10px;
+}
+QPushButton:hover {
+    background-color: #e5e7eb;
+}
+QPushButton:pressed {
+    background-color: #d1d5db;
+}
+QPushButton:disabled {
+    background-color: #f9fafb;
+    color: #9ca3af;
+    border: 1px solid #d1d5db;
+}
+QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
+    background-color: #ffffff;
+    color: #111827;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    padding: 4px;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #f3f4f6;
+    border-left: 1px solid #cfcfcf;
+    width: 16px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #e5e7eb;
+}
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #111827;
+    selection-background-color: #dbeafe;
+}
+QLabel {
+    color: #111827;
 }
 QLineEdit::placeholder {
     color: #6b7280;
