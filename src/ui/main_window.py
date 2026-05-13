@@ -199,6 +199,54 @@ QListWidget::item:hover {
     background: transparent;
     border: none;
 }
+QScrollBar:vertical {
+    background: #161a2a;
+    width: 12px;
+    margin: 2px;
+    border: 1px solid #313244;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #5b6384;
+    min-height: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #7a85ad;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: transparent;
+    height: 0px;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+QScrollBar:horizontal {
+    background: #161a2a;
+    height: 12px;
+    margin: 2px;
+    border: 1px solid #313244;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #5b6384;
+    min-width: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #7a85ad;
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: transparent;
+    width: 0px;
+}
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+}
 QPushButton {
     background-color: #313244;
     color: #cdd6f4;
@@ -320,6 +368,54 @@ QListWidget::item:selected {
 QListWidget::item:hover {
     background: transparent;
     border: none;
+}
+QScrollBar:vertical {
+    background: #f3f4f6;
+    width: 12px;
+    margin: 2px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #9ca3af;
+    min-height: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #6b7280;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: transparent;
+    height: 0px;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+QScrollBar:horizontal {
+    background: #f3f4f6;
+    height: 12px;
+    margin: 2px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #9ca3af;
+    min-width: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #6b7280;
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: transparent;
+    width: 0px;
+}
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
 }
 QPushButton {
     background-color: #f3f4f6;
