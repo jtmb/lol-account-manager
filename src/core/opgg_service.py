@@ -84,23 +84,35 @@ _DESC_RE = re.compile(
     re.IGNORECASE,
 )
 
-_LEVEL_PATTERNS = [
-    re.compile(r'"summonerLevel"\s*:\s*(\d{1,4})', re.IGNORECASE),
-    re.compile(r'"profileIconId"\s*:\s*\d+\s*,\s*"level"\s*:\s*(\d{1,4})', re.IGNORECASE),
-    re.compile(r'"level"\s*:\s*(\d{1,4})\s*,\s*"profileIconId"', re.IGNORECASE),
-]
+_LV_RE = re.compile(r'\bLv\.?\s*(\d{1,4})\b', re.IGNORECASE)
+
+
+def _extract_meta_description(html: str) -> str:
+    """Extract <meta name='description' content='...'> text."""
+    meta_match = re.search(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=(["\'])(.*?)\1',
+        html,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if not meta_match:
+        meta_match = re.search(
+            r'<meta[^>]+content=(["\'])(.*?)\1[^>]+name=["\']description["\']',
+            html,
+            re.DOTALL | re.IGNORECASE,
+        )
+    return meta_match.group(2) if meta_match else ""
 
 
 def _extract_summoner_level(html: str):
-    """Best-effort extraction of account level from op.gg HTML payload."""
-    for pattern in _LEVEL_PATTERNS:
-        match = pattern.search(html)
-        if not match:
-            continue
-        try:
-            return int(match.group(1))
-        except (TypeError, ValueError):
-            continue
+    """Extract account level from op.gg metadata (e.g., 'Lv. 7')."""
+    description = _extract_meta_description(html)
+    if description:
+        match = _LV_RE.search(description)
+        if match:
+            try:
+                return int(match.group(1))
+            except (TypeError, ValueError):
+                pass
     return None
 
 
@@ -109,20 +121,7 @@ def _parse_meta_description(html: str):
     Extract rank info from the og:description / meta description tag.
     Returns a dict or None.
     """
-    # Try <meta name="description" content="...">
-    meta_match = re.search(
-        r'<meta[^>]+name=["\']description["\'][^>]+content=(["\'])(.*?)\1',
-        html,
-        re.DOTALL | re.IGNORECASE,
-    )
-    if not meta_match:
-        # Also try content-first attribute ordering
-        meta_match = re.search(
-            r'<meta[^>]+content=(["\'])(.*?)\1[^>]+name=["\']description["\']',
-            html,
-            re.DOTALL | re.IGNORECASE,
-        )
-    description = meta_match.group(2) if meta_match else ""
+    description = _extract_meta_description(html)
 
     m = _DESC_RE.search(description)
     if not m:
