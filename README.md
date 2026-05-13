@@ -1,20 +1,67 @@
-# League of Legends Account Manager
+<h1 align="center">
+	<a href="https://github.com/brajam/lol-account-manager">
+		<img src="assets/icon.ico" alt="LoL Account Manager Logo" width="220" height="auto">
+	</a>
+</h1>
 
-A Windows desktop app for saving, organizing, and launching multiple League of Legends accounts from one place.
+<div align="center">
+	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
+	<br />
+	<br />
+	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=bug&title=bug%3A+">Report a Bug</a>
+	·
+	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=enhancement&title=feat%3A+">Request a Feature</a>
+</div>
 
-## Features
+<br>
+
+<details open="open">
+<summary>Table of Contents</summary>
+
+- [About](#about)
+	- [Highlighted Features](#highlighted-features)
+- [Installation](#installation)
+- [First Launch](#first-launch)
+- [Backup and Restore](#backup-and-restore)
+- [Security](#security)
+- [Requirements](#requirements)
+- [Running From Source](#running-from-source)
+- [Building the EXE](#building-the-exe)
+- [Documentation](#documentation)
+- [Notes](#notes)
+
+</details>
+
+## About
+
+Windows desktop app for saving, organizing, and launching multiple League of Legends accounts from one place.
+
+## Highlighted Features
+
+## Full Feature List
 
 - Secure local credential storage protected by a master password
 - Add, edit, and delete saved League accounts
 - One-click Riot Client login and League launch flow
 - Automatic cleanup of existing Riot / League processes before switching accounts
 - Custom display names for easier account management
+- Display name + tagline support for modern Riot IDs
+- Region-aware account handling
 - Ban status tracking per account
 - Temporary ban end date support
 - Red / green account indicators based on current ban state
+- Optional op.gg rank fetching and rank badge display
+- Optional account card images
+- Account tags with color-coded badges
+- Tag-based filtering and quick search
+- Encrypted per-account notes
 - Encrypted backup export and import
 - Merge or replace restore modes when importing a backup
+- Automatic versioned backups with retention controls
 - Custom League install path override if auto-detection fails
+- In-app settings dialog for launcher and display preferences
+- Optional auto-open op.gg in-game page after launch
+- Launch progress UI with cancellation support
 - Dark mode and light mode toggle
 - Native Windows title bar theming support
 - Standalone executable build support with app icon support
