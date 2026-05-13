@@ -793,18 +793,22 @@ class AccountListItem(QFrame):
 
         tags = getattr(self.account, "tags", []) or []
         if tags:
+            tags_wrap = QWidget()
+            tags_wrap.setAttribute(Qt.WA_TranslucentBackground, True)
+            tags_layout = QHBoxLayout(tags_wrap)
+            tags_layout.setContentsMargins(0, 0, 0, 0)
+            tags_layout.setSpacing(3)
             for tag in tags[:4]:
                 tag_label = QLabel(f"#{tag}")
-                tag_label.setAttribute(Qt.WA_TranslucentBackground, True)
                 tag_label.setStyleSheet(self._tag_chip_stylesheet(tag))
                 self._tag_chip_labels.append(tag_label)
-                user_row.addWidget(tag_label)
+                tags_layout.addWidget(tag_label)
             if len(tags) > 4:
                 more_label = QLabel(f"+{len(tags) - 4}")
-                more_label.setAttribute(Qt.WA_TranslucentBackground, True)
                 more_label.setStyleSheet(self._tag_more_chip_stylesheet())
                 self._tag_chip_labels.append(more_label)
-                user_row.addWidget(more_label)
+                tags_layout.addWidget(more_label)
+            user_row.addWidget(tags_wrap)
 
         if self.account.ban_status == "permanent":
             ban_label = QLabel("⛔ Permanently Banned")
@@ -862,11 +866,11 @@ class AccountListItem(QFrame):
         return (
             f"background-color: {bg};"
             f"border: 1px solid {border};"
-            "border-radius: 8px;"
+            "border-radius: 7px;"
             f"color: {fg};"
             "font-size: 9px;"
             "font-weight: 600;"
-            "padding: 1px 6px;"
+            "padding: 1px 5px;"
         )
 
     def _tag_more_chip_stylesheet(self) -> str:
@@ -875,20 +879,20 @@ class AccountListItem(QFrame):
             return (
                 "background-color: #2e3448;"
                 "border: 1px solid #566080;"
-                "border-radius: 8px;"
+                "border-radius: 7px;"
                 "color: #cfd7f2;"
                 "font-size: 9px;"
                 "font-weight: 600;"
-                "padding: 1px 6px;"
+                "padding: 1px 5px;"
             )
         return (
             "background-color: #eef1f7;"
             "border: 1px solid #b7bfd3;"
-            "border-radius: 8px;"
+            "border-radius: 7px;"
             "color: #44506d;"
             "font-size: 9px;"
             "font-weight: 600;"
-            "padding: 1px 6px;"
+            "padding: 1px 5px;"
         )
 
     def _refresh_tag_chip_styles(self):
@@ -1068,6 +1072,7 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(QLabel("Filters:"))
 
         self.search_input = QLineEdit()
+        self.search_input.setObjectName("accountSearchInput")
         self.search_input.setPlaceholderText("Search by display name, username, or tag")
         self.search_input.textChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.search_input, 1)
@@ -1168,9 +1173,33 @@ class MainWindow(QMainWindow):
         if self._dark_mode:
             self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET))
             self._theme_button.setText("Light Mode")
+            self.search_input.setStyleSheet(
+                "QLineEdit#accountSearchInput {"
+                "color: #dbe4ff;"
+                "background-color: #171a2a;"
+                "border: 1px solid #3f4b71;"
+                "border-radius: 4px;"
+                "padding: 4px 6px;"
+                "}"
+                "QLineEdit#accountSearchInput::placeholder {"
+                "color: #a8b4d6;"
+                "}"
+            )
         else:
             self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET))
             self._theme_button.setText("Dark Mode")
+            self.search_input.setStyleSheet(
+                "QLineEdit#accountSearchInput {"
+                "color: #1f2937;"
+                "background-color: #ffffff;"
+                "border: 1px solid #cfcfcf;"
+                "border-radius: 4px;"
+                "padding: 4px 6px;"
+                "}"
+                "QLineEdit#accountSearchInput::placeholder {"
+                "color: #6b7280;"
+                "}"
+            )
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
