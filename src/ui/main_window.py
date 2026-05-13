@@ -850,6 +850,45 @@ class SettingsDialog(QDialog):
         ("Bold (90%)", 90),
     ]
 
+    LOGGED_IN_BORDER_WIDTH_OPTIONS = [
+        ("Thin (2px)", 2),
+        ("Balanced (3px)", 3),
+        ("Bold (4px)", 4),
+        ("Heavy (5px)", 5),
+    ]
+
+    LOGGED_IN_BORDER_OPACITY_OPTIONS = [
+        ("Subtle (60%)", 60),
+        ("Balanced (80%)", 80),
+        ("Full (100%)", 100),
+        ("Boosted (120%)", 120),
+    ]
+
+    ROW_DENSITY_OPTIONS = [
+        ("Compact", "compact"),
+        ("Comfortable", "comfortable"),
+        ("Spacious", "spacious"),
+    ]
+
+    RANK_ICON_SIZE_OPTIONS = [
+        ("Small (28px)", 28),
+        ("Medium (34px)", 34),
+        ("Large (40px)", 40),
+    ]
+
+    RANK_TEXT_BRIGHTNESS_OPTIONS = [
+        ("Subdued (85%)", 85),
+        ("Normal (100%)", 100),
+        ("Bright (115%)", 115),
+        ("High Contrast (130%)", 130),
+    ]
+
+    TAG_STYLE_OPTIONS = [
+        ("Muted", "muted"),
+        ("Vibrant", "vibrant"),
+        ("Monochrome", "monochrome"),
+    ]
+
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
     def __init__(self, parent=None, settings: Optional[dict] = None):
@@ -955,6 +994,21 @@ class SettingsDialog(QDialog):
         self.show_tags_checkbox.toggled.connect(self.tag_size_combo.setEnabled)
         self.tag_size_combo.setEnabled(self.show_tags_checkbox.isChecked())
 
+        tag_style_row = QHBoxLayout()
+        tag_style_row.addWidget(QLabel("Tag chip style:"))
+        self.tag_style_combo = QComboBox()
+        for label, value in self.TAG_STYLE_OPTIONS:
+            self.tag_style_combo.addItem(label, value)
+        self.tag_style_combo.setToolTip("Choose muted, vibrant, or monochrome tag palettes.")
+        current_tag_style = str(self._settings.get("tag_chip_style", "vibrant"))
+        tag_style_index = self.tag_style_combo.findData(current_tag_style)
+        self.tag_style_combo.setCurrentIndex(max(0, tag_style_index))
+        tag_style_row.addWidget(self.tag_style_combo)
+        tag_style_row.addStretch()
+        appearance_layout.addLayout(tag_style_row)
+        self.show_tags_checkbox.toggled.connect(self.tag_style_combo.setEnabled)
+        self.tag_style_combo.setEnabled(self.show_tags_checkbox.isChecked())
+
         gradient_color_row = QHBoxLayout()
         gradient_color_row.addWidget(QLabel("Logged-in gradient color:"))
         self.logged_in_gradient_color_combo = QComboBox()
@@ -990,6 +1044,80 @@ class SettingsDialog(QDialog):
         gradient_intensity_row.addWidget(self.logged_in_gradient_intensity_combo)
         gradient_intensity_row.addStretch()
         appearance_layout.addLayout(gradient_intensity_row)
+
+        border_width_row = QHBoxLayout()
+        border_width_row.addWidget(QLabel("Logged-in border thickness:"))
+        self.logged_in_border_width_combo = QComboBox()
+        for label, value in self.LOGGED_IN_BORDER_WIDTH_OPTIONS:
+            self.logged_in_border_width_combo.addItem(label, value)
+        self.logged_in_border_width_combo.setToolTip(
+            "Controls the thickness of the logged-in accent border independently from fill intensity."
+        )
+        current_border_width = int(self._settings.get("logged_in_border_width", 4))
+        border_width_index = self.logged_in_border_width_combo.findData(current_border_width)
+        self.logged_in_border_width_combo.setCurrentIndex(max(0, border_width_index))
+        border_width_row.addWidget(self.logged_in_border_width_combo)
+        border_width_row.addStretch()
+        appearance_layout.addLayout(border_width_row)
+
+        border_opacity_row = QHBoxLayout()
+        border_opacity_row.addWidget(QLabel("Logged-in border opacity:"))
+        self.logged_in_border_opacity_combo = QComboBox()
+        for label, value in self.LOGGED_IN_BORDER_OPACITY_OPTIONS:
+            self.logged_in_border_opacity_combo.addItem(label, value)
+        self.logged_in_border_opacity_combo.setToolTip(
+            "Controls border opacity independently from the row fill intensity."
+        )
+        current_border_opacity = int(self._settings.get("logged_in_border_opacity", 100))
+        border_opacity_index = self.logged_in_border_opacity_combo.findData(current_border_opacity)
+        self.logged_in_border_opacity_combo.setCurrentIndex(max(0, border_opacity_index))
+        border_opacity_row.addWidget(self.logged_in_border_opacity_combo)
+        border_opacity_row.addStretch()
+        appearance_layout.addLayout(border_opacity_row)
+
+        density_row = QHBoxLayout()
+        density_row.addWidget(QLabel("Row density:"))
+        self.row_density_combo = QComboBox()
+        for label, value in self.ROW_DENSITY_OPTIONS:
+            self.row_density_combo.addItem(label, value)
+        self.row_density_combo.setToolTip("Adjust account row spacing and height.")
+        current_density = str(self._settings.get("row_density", "comfortable"))
+        density_index = self.row_density_combo.findData(current_density)
+        self.row_density_combo.setCurrentIndex(max(0, density_index))
+        density_row.addWidget(self.row_density_combo)
+        density_row.addStretch()
+        appearance_layout.addLayout(density_row)
+
+        rank_icon_row = QHBoxLayout()
+        rank_icon_row.addWidget(QLabel("Rank icon size:"))
+        self.rank_icon_size_combo = QComboBox()
+        for label, value in self.RANK_ICON_SIZE_OPTIONS:
+            self.rank_icon_size_combo.addItem(label, value)
+        self.rank_icon_size_combo.setToolTip("Control medal icon size independently from text zoom.")
+        current_rank_icon_size = int(self._settings.get("rank_icon_size", 34))
+        rank_icon_index = self.rank_icon_size_combo.findData(current_rank_icon_size)
+        self.rank_icon_size_combo.setCurrentIndex(max(0, rank_icon_index))
+        rank_icon_row.addWidget(self.rank_icon_size_combo)
+        rank_icon_row.addStretch()
+        appearance_layout.addLayout(rank_icon_row)
+
+        rank_text_row = QHBoxLayout()
+        rank_text_row.addWidget(QLabel("Rank text brightness:"))
+        self.rank_text_brightness_combo = QComboBox()
+        for label, value in self.RANK_TEXT_BRIGHTNESS_OPTIONS:
+            self.rank_text_brightness_combo.addItem(label, value)
+        self.rank_text_brightness_combo.setToolTip("Control rank text brightness independently from text zoom.")
+        current_rank_text_brightness = int(self._settings.get("rank_text_brightness", 100))
+        rank_text_index = self.rank_text_brightness_combo.findData(current_rank_text_brightness)
+        self.rank_text_brightness_combo.setCurrentIndex(max(0, rank_text_index))
+        rank_text_row.addWidget(self.rank_text_brightness_combo)
+        rank_text_row.addStretch()
+        appearance_layout.addLayout(rank_text_row)
+
+        self.show_ranks_checkbox.toggled.connect(self.rank_icon_size_combo.setEnabled)
+        self.show_ranks_checkbox.toggled.connect(self.rank_text_brightness_combo.setEnabled)
+        self.rank_icon_size_combo.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.rank_text_brightness_combo.setEnabled(self.show_ranks_checkbox.isChecked())
 
         self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
         self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
@@ -1119,8 +1247,14 @@ class SettingsDialog(QDialog):
             "show_tags": self.show_tags_checkbox.isChecked(),
             "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
+            "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
             "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
+            "logged_in_border_width": int(self.logged_in_border_width_combo.currentData()),
+            "logged_in_border_opacity": int(self.logged_in_border_opacity_combo.currentData()),
+            "row_density": str(self.row_density_combo.currentData()),
+            "rank_icon_size": int(self.rank_icon_size_combo.currentData()),
+            "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
         }
@@ -1131,23 +1265,77 @@ class AccountListItem(QFrame):
 
     _TAG_COLOR_SLOT_BY_TEXT: dict[str, int] = {}
 
-    _TAG_PALETTE_DARK = [
-        ("#0d2f40", "#1a556d", "#93dcff", "#27b5f7"),
-        ("#33250c", "#5f4313", "#ffd38a", "#f5a623"),
-        ("#133321", "#24613d", "#9de8bd", "#32c46d"),
-        ("#35152b", "#662a57", "#f4b5e5", "#de4db5"),
-        ("#3a171d", "#6f2d38", "#ffb8c2", "#ff5c7a"),
-        ("#202d46", "#374c72", "#b9d2ff", "#5f9cff"),
-    ]
+    _TAG_STYLE_PALETTES = {
+        "vibrant": {
+            "dark": [
+                ("#0d2f40", "#1a556d", "#93dcff", "#27b5f7"),
+                ("#33250c", "#5f4313", "#ffd38a", "#f5a623"),
+                ("#133321", "#24613d", "#9de8bd", "#32c46d"),
+                ("#35152b", "#662a57", "#f4b5e5", "#de4db5"),
+                ("#3a171d", "#6f2d38", "#ffb8c2", "#ff5c7a"),
+                ("#202d46", "#374c72", "#b9d2ff", "#5f9cff"),
+            ],
+            "light": [
+                ("#e8f7ff", "#badff2", "#0f4c6a", "#1f9ed6"),
+                ("#fff5e6", "#f0d3a3", "#6d4a13", "#d18908"),
+                ("#ebfaef", "#bde7c8", "#1d6339", "#2fa35d"),
+                ("#fff0fb", "#e6c0da", "#7d2f6d", "#c24ea1"),
+                ("#fff0f2", "#efc1ca", "#7f3040", "#d75b72"),
+                ("#edf2ff", "#c3d0ef", "#27467a", "#4d78db"),
+            ],
+        },
+        "muted": {
+            "dark": [
+                ("#1a2530", "#344659", "#9db0c3", "#5f7895"),
+                ("#2b2620", "#4a4034", "#cdb79a", "#9a7f61"),
+                ("#1d2a24", "#385044", "#9fc1af", "#5e8a74"),
+                ("#2d2430", "#4c3c53", "#c5b2c8", "#8d6f95"),
+                ("#2f2224", "#53393e", "#d0b0b4", "#9a6970"),
+                ("#222737", "#3f4a6a", "#b5bfdc", "#6f83b9"),
+            ],
+            "light": [
+                ("#edf2f6", "#c4d1db", "#405161", "#6b859f"),
+                ("#f5f1eb", "#d8ccbe", "#5e5040", "#8f775c"),
+                ("#edf4ef", "#c8d9ce", "#405a4c", "#6a8c79"),
+                ("#f3eef5", "#d5c7d9", "#5b4f60", "#876d8f"),
+                ("#f6eff0", "#dcc9cc", "#664b51", "#9a6e76"),
+                ("#eef1f8", "#cad1e3", "#455173", "#7083b3"),
+            ],
+        },
+        "monochrome": {
+            "dark": [
+                ("#232633", "#3b4156", "#d2d8ea", "#909ab6"),
+                ("#242835", "#3f465d", "#cfd6e9", "#8f99b7"),
+                ("#222633", "#3a4257", "#d3d9ea", "#8d97b6"),
+                ("#242734", "#3d4559", "#d0d7e8", "#8d98b4"),
+                ("#232632", "#3c4358", "#d1d8e9", "#8c97b5"),
+                ("#242734", "#3d445a", "#d2d8ea", "#8d99b5"),
+            ],
+            "light": [
+                ("#f3f5fa", "#ccd3e2", "#48526a", "#7d88a8"),
+                ("#f3f5fa", "#cdd3e2", "#475169", "#7e89a8"),
+                ("#f3f6fb", "#cbd3e2", "#48526a", "#7c88a7"),
+                ("#f4f6fb", "#ccd4e2", "#475169", "#7d88a6"),
+                ("#f3f6fb", "#ccd4e3", "#48516a", "#7d89a7"),
+                ("#f4f6fb", "#ccd4e3", "#48526b", "#7d89a8"),
+            ],
+        },
+    }
 
-    _TAG_PALETTE_LIGHT = [
-        ("#e8f7ff", "#badff2", "#0f4c6a", "#1f9ed6"),
-        ("#fff5e6", "#f0d3a3", "#6d4a13", "#d18908"),
-        ("#ebfaef", "#bde7c8", "#1d6339", "#2fa35d"),
-        ("#fff0fb", "#e6c0da", "#7d2f6d", "#c24ea1"),
-        ("#fff0f2", "#efc1ca", "#7f3040", "#d75b72"),
-        ("#edf2ff", "#c3d0ef", "#27467a", "#4d78db"),
-    ]
+    _TAG_MORE_STYLE = {
+        "vibrant": {
+            "dark": ("#2e3448", "#566080", "#cfd7f2", "#9fb2e8"),
+            "light": ("#eef1f7", "#b7bfd3", "#44506d", "#93a4ce"),
+        },
+        "muted": {
+            "dark": ("#2a2f3f", "#4f596f", "#c4ccdf", "#8594b8"),
+            "light": ("#eff2f7", "#bec6d6", "#55627f", "#8ea0c7"),
+        },
+        "monochrome": {
+            "dark": ("#2b2f3c", "#525a6f", "#c9cfdf", "#8b95b2"),
+            "light": ("#f1f3f8", "#c2c9d8", "#596179", "#8b98b9"),
+        },
+    }
     
     def __init__(
         self,
@@ -1159,6 +1347,12 @@ class AccountListItem(QFrame):
         tag_size: str = "small",
         logged_in_gradient_color: str = "#4f7cff",
         logged_in_gradient_intensity: int = 20,
+        logged_in_border_width: int = 4,
+        logged_in_border_opacity: int = 100,
+        row_density: str = "comfortable",
+        rank_icon_size: int = 34,
+        rank_text_brightness: int = 100,
+        tag_chip_style: str = "vibrant",
     ):
         super().__init__(parent)
         self.account = account
@@ -1168,6 +1362,12 @@ class AccountListItem(QFrame):
         self._tag_size = tag_size
         self._logged_in_gradient_color = logged_in_gradient_color or "#4f7cff"
         self._logged_in_gradient_intensity = max(5, min(100, int(logged_in_gradient_intensity)))
+        self._logged_in_border_width = max(2, min(5, int(logged_in_border_width)))
+        self._logged_in_border_opacity = max(60, min(120, int(logged_in_border_opacity)))
+        self._row_density = row_density if row_density in {"compact", "comfortable", "spacious"} else "comfortable"
+        self._rank_icon_size = max(24, min(48, int(rank_icon_size)))
+        self._rank_text_brightness = max(70, min(140, int(rank_text_brightness)))
+        self._tag_chip_style = tag_chip_style if tag_chip_style in self._TAG_STYLE_PALETTES else "vibrant"
         self.init_ui()
 
     def _tag_size_preset(self) -> dict:
@@ -1198,11 +1398,44 @@ class AccountListItem(QFrame):
             },
         }
         return presets.get(self._tag_size, presets["small"])
+
+    def _row_density_preset(self) -> dict:
+        presets = {
+            "compact": {
+                "outer_margins": (10, 4, 10, 4),
+                "outer_spacing": 6,
+                "text_spacing": 1,
+                "user_row_spacing": 4,
+                "rank_spacing": 5,
+                "logged_in_height": 18,
+                "rank_min_width": 170,
+            },
+            "comfortable": {
+                "outer_margins": (10, 5, 10, 5),
+                "outer_spacing": 8,
+                "text_spacing": 2,
+                "user_row_spacing": 6,
+                "rank_spacing": 6,
+                "logged_in_height": 20,
+                "rank_min_width": 190,
+            },
+            "spacious": {
+                "outer_margins": (12, 7, 12, 7),
+                "outer_spacing": 10,
+                "text_spacing": 3,
+                "user_row_spacing": 8,
+                "rank_spacing": 8,
+                "logged_in_height": 22,
+                "rank_min_width": 205,
+            },
+        }
+        return presets.get(self._row_density, presets["comfortable"])
     
     def init_ui(self):
+        density = self._row_density_preset()
         outer = QHBoxLayout()
-        outer.setContentsMargins(10, 5, 10, 5)
-        outer.setSpacing(8)
+        outer.setContentsMargins(*density["outer_margins"])
+        outer.setSpacing(density["outer_spacing"])
         self.setObjectName("accountListItem")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setMouseTracking(True)
@@ -1229,7 +1462,7 @@ class AccountListItem(QFrame):
         outer.addWidget(circle)
 
         text_layout = QVBoxLayout()
-        text_layout.setSpacing(2)
+        text_layout.setSpacing(density["text_spacing"])
 
         name_font = QFont()
         name_font.setBold(True)
@@ -1247,32 +1480,32 @@ class AccountListItem(QFrame):
         name_row = QHBoxLayout()
         name_row.setSpacing(4)
 
-        name_label = QLabel(self.account.display_name)
-        name_label.setFont(name_font)
-        name_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        name_label.setStyleSheet("background: transparent; border: none;")
-        name_row.addWidget(name_label)
+        self.name_label = QLabel(self.account.display_name)
+        self.name_label.setFont(name_font)
+        self.name_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.name_label.setStyleSheet("background: transparent; border: none;")
+        name_row.addWidget(self.name_label)
 
-        tag_label = QLabel(f"#{tag_line}")
-        tag_label.setFont(tag_font)
-        tag_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        tag_label.setStyleSheet("background: transparent; border: none; color: #9aa1b2;")
-        name_row.addWidget(tag_label)
+        self.tag_line_label = QLabel(f"#{tag_line}")
+        self.tag_line_label.setFont(tag_font)
+        self.tag_line_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.tag_line_label.setStyleSheet("background: transparent; border: none; color: #9aa1b2;")
+        name_row.addWidget(self.tag_line_label)
 
         name_row.addStretch()
         text_layout.addLayout(name_row)
 
         user_row = QHBoxLayout()
-        user_row.setSpacing(6)
-        username_label = QLabel(f"@{self.account.username}")
-        username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
-        username_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        user_row.addWidget(username_label)
+        user_row.setSpacing(density["user_row_spacing"])
+        self.username_label = QLabel(f"@{self.account.username}")
+        self.username_label.setStyleSheet("background: transparent; border: none; color: #666666;")
+        self.username_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        user_row.addWidget(self.username_label)
 
-        region_label = QLabel(f"{region}")
-        region_label.setAttribute(Qt.WA_TranslucentBackground, True)
-        region_label.setStyleSheet("background: transparent; border: none; color: #8b93a8; font-size: 10px;")
-        user_row.addWidget(region_label)
+        self.region_label = QLabel(f"{region}")
+        self.region_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.region_label.setStyleSheet("background: transparent; border: none; color: #8b93a8; font-size: 10px;")
+        user_row.addWidget(self.region_label)
 
         tags = getattr(self.account, "tags", []) or []
         if self._show_tags and tags:
@@ -1318,10 +1551,10 @@ class AccountListItem(QFrame):
         rank_widget.setStyleSheet("background: transparent; border: none;")
         rank_layout = QHBoxLayout(rank_widget)
         rank_layout.setContentsMargins(0, 0, 0, 0)
-        rank_layout.setSpacing(6)
+        rank_layout.setSpacing(density["rank_spacing"])
 
         self.rank_icon_label = QLabel()
-        self.rank_icon_label.setFixedSize(34, 34)
+        self.rank_icon_label.setFixedSize(self._rank_icon_size, self._rank_icon_size)
         self.rank_icon_label.setScaledContents(False)
         self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
@@ -1330,7 +1563,7 @@ class AccountListItem(QFrame):
         self.logged_in_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.logged_in_label.setVisible(False)
         self.logged_in_label.setAlignment(Qt.AlignCenter)
-        self.logged_in_label.setFixedHeight(20)
+        self.logged_in_label.setFixedHeight(density["logged_in_height"])
         self.logged_in_label.setMinimumWidth(78)
         rank_layout.addWidget(self.logged_in_label)
         rank_layout.addWidget(self.rank_icon_label)
@@ -1342,7 +1575,7 @@ class AccountListItem(QFrame):
         self.rank_label.setStyleSheet(
             "background: transparent; border: none; color: #8b93a8; font-size: 11px;"
         )
-        self.rank_label.setMinimumWidth(190)
+        self.rank_label.setMinimumWidth(density["rank_min_width"])
         rank_layout.addWidget(self.rank_label)
 
         self.rank_widget = rank_widget
@@ -1350,8 +1583,32 @@ class AccountListItem(QFrame):
         outer.addWidget(rank_widget)
 
         self.setLayout(outer)
+        self._refresh_text_styles()
         self._refresh_logged_in_badge_style()
         self._update_visual_state()
+
+    def _refresh_text_styles(self):
+        """Keep row text readable across theme + logged-in highlight states."""
+        if self._dark_mode:
+            username_color = "#d2dbf5" if self._logged_in else "#b5bfdc"
+            region_color = "#c0cbea" if self._logged_in else "#9aa8cd"
+            tag_color = "#c7d3f0"
+            self.name_label.setStyleSheet("background: transparent; border: none; color: #e8edff;")
+        else:
+            username_color = "#6b7280"
+            region_color = "#6b7280"
+            tag_color = "#9aa1b2"
+            self.name_label.setStyleSheet("background: transparent; border: none; color: #111827;")
+
+        self.tag_line_label.setStyleSheet(
+            f"background: transparent; border: none; color: {tag_color};"
+        )
+        self.username_label.setStyleSheet(
+            f"background: transparent; border: none; color: {username_color};"
+        )
+        self.region_label.setStyleSheet(
+            f"background: transparent; border: none; color: {region_color}; font-size: 10px;"
+        )
 
     @classmethod
     def _tag_color_slot_for_text(cls, tag_text: str, palette_size: int) -> int:
@@ -1380,7 +1637,8 @@ class AccountListItem(QFrame):
 
     def _tag_chip_stylesheet(self, tag_text: str) -> str:
         """Return themed chip style using text-based random color assignment."""
-        palette = self._TAG_PALETTE_DARK if self._dark_mode else self._TAG_PALETTE_LIGHT
+        style = self._tag_chip_style if self._tag_chip_style in self._TAG_STYLE_PALETTES else "vibrant"
+        palette = self._TAG_STYLE_PALETTES[style]["dark" if self._dark_mode else "light"]
         size = self._tag_size_preset()
         idx = self._tag_color_slot_for_text(tag_text, len(palette))
         bg, border, fg, accent = palette[idx]
@@ -1398,23 +1656,14 @@ class AccountListItem(QFrame):
     def _tag_more_chip_stylesheet(self) -> str:
         """Return style for the overflow chip (+N)."""
         size = self._tag_size_preset()
-        if self._dark_mode:
-            return (
-                "background-color: #2e3448;"
-                "border: 1px solid #566080;"
-                f"border-left: {size['left_border']}px solid #9fb2e8;"
-                f"border-radius: {size['radius']}px;"
-                "color: #cfd7f2;"
-                f"font-size: {size['font_size']}px;"
-                "font-weight: 600;"
-                f"padding: {size['padding']};"
-            )
+        style = self._tag_chip_style if self._tag_chip_style in self._TAG_MORE_STYLE else "vibrant"
+        bg, border, fg, accent = self._TAG_MORE_STYLE[style]["dark" if self._dark_mode else "light"]
         return (
-            "background-color: #eef1f7;"
-            "border: 1px solid #b7bfd3;"
-            f"border-left: {size['left_border']}px solid #93a4ce;"
+            f"background-color: {bg};"
+            f"border: 1px solid {border};"
+            f"border-left: {size['left_border']}px solid {accent};"
             f"border-radius: {size['radius']}px;"
-            "color: #44506d;"
+            f"color: {fg};"
             f"font-size: {size['font_size']}px;"
             "font-weight: 600;"
             f"padding: {size['padding']};"
@@ -1472,6 +1721,14 @@ class AccountListItem(QFrame):
         a = max(0, min(255, int(alpha)))
         return f"rgba({r}, {g}, {b}, {a})"
 
+    def _adjust_hex_brightness(self, color: str, percent: int) -> str:
+        r, g, b = self._hex_to_rgb(color)
+        factor = max(0.5, min(1.8, percent / 100.0))
+        nr = max(0, min(255, int(r * factor)))
+        ng = max(0, min(255, int(g * factor)))
+        nb = max(0, min(255, int(b * factor)))
+        return f"#{nr:02x}{ng:02x}{nb:02x}"
+
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
         if not self._show_ranks:
@@ -1483,17 +1740,18 @@ class AccountListItem(QFrame):
 
         self.rank_widget.setVisible(True)
         status = rank_data.get("status", "error")
-        color = rank_data.get("color", "#585b70")
+        color = self._adjust_hex_brightness(str(rank_data.get("color", "#585b70")), self._rank_text_brightness)
         if status == "ok":
             tier = _escape_html(f"{rank_data.get('tier', '')}{(' ' + rank_data.get('division', '')) if rank_data.get('division') else ''}")
             lp = _escape_html(f"{rank_data.get('lp', '')} LP")
             wins = _escape_html(f"{rank_data.get('wins', '')}W / {rank_data.get('losses', '')}L")
             win_rate = _escape_html(f"{rank_data.get('win_rate', '')}% WR")
-            neutral_color = "#8b93a8" if self._dark_mode else "#4b5563"
+            neutral_base = "#8b93a8" if self._dark_mode else "#4b5563"
+            neutral_color = self._adjust_hex_brightness(neutral_base, self._rank_text_brightness)
             self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 11px;")
             pixmap = _build_rank_pixmap(rank_data.get("medal_bytes", b""))
             if not pixmap.isNull():
-                pixmap = pixmap.scaled(34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pixmap = pixmap.scaled(self._rank_icon_size, self._rank_icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.rank_icon_label.setPixmap(pixmap)
             self.rank_icon_label.setVisible(self._show_rank_images and not self.rank_icon_label.pixmap().isNull())
             self.rank_label.setText(
@@ -1504,14 +1762,14 @@ class AccountListItem(QFrame):
             self.rank_icon_label.clear()
             self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
-                "background: transparent; border: none; color: #585b70; font-size: 11px;"
+                f"background: transparent; border: none; color: {self._adjust_hex_brightness('#585b70', self._rank_text_brightness)}; font-size: 11px;"
             )
             self.rank_label.setText(str(rank_data.get("text") or "Unranked"))
         else:
             self.rank_icon_label.clear()
             self.rank_icon_label.setVisible(False)
             self.rank_label.setStyleSheet(
-                "background: transparent; border: none; color: #585b70; font-size: 11px;"
+                f"background: transparent; border: none; color: {self._adjust_hex_brightness('#585b70', self._rank_text_brightness)}; font-size: 11px;"
             )
             self.rank_label.setText("")
 
@@ -1526,12 +1784,14 @@ class AccountListItem(QFrame):
     def set_dark_mode(self, enabled: bool):
         self._dark_mode = enabled
         self._refresh_tag_chip_styles()
+        self._refresh_text_styles()
         self._refresh_logged_in_badge_style()
         self._update_visual_state()
 
     def set_logged_in(self, logged_in: bool):
         self._logged_in = logged_in
         self.logged_in_label.setVisible(logged_in)
+        self._refresh_text_styles()
         self._update_visual_state()
 
     def set_selected(self, selected: bool):
@@ -1553,22 +1813,25 @@ class AccountListItem(QFrame):
 
         if self._dark_mode:
             t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
-            left_active = self._rgba(self._logged_in_gradient_color, int(70 + 120 * t))
-            mid_active = self._rgba(self._logged_in_gradient_color, int(38 + 90 * t))
-            left_idle = self._rgba(self._logged_in_gradient_color, int(48 + 90 * t))
-            mid_idle = self._rgba(self._logged_in_gradient_color, int(22 + 65 * t))
-            border_active = self._rgba(self._logged_in_gradient_color, int(135 + 100 * t))
-            border_idle = self._rgba(self._logged_in_gradient_color, int(95 + 95 * t))
+            left_active = self._rgba(self._logged_in_gradient_color, int(26 + 74 * t))
+            mid_active = self._rgba(self._logged_in_gradient_color, int(14 + 50 * t))
+            left_idle = self._rgba(self._logged_in_gradient_color, int(18 + 56 * t))
+            mid_idle = self._rgba(self._logged_in_gradient_color, int(10 + 40 * t))
+            border_scale = self._logged_in_border_opacity / 100.0
+            border_active = self._rgba(self._logged_in_gradient_color, int((90 + 90 * t) * border_scale))
+            border_idle = self._rgba(self._logged_in_gradient_color, int((70 + 70 * t) * border_scale))
+            border_width = max(1, self._logged_in_border_width - 2)
+            left_border_width = self._logged_in_border_width
 
             if self._logged_in and active:
                 self.setStyleSheet(
                     "#accountListItem {"
                     "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
                     f"stop:0 {left_active},"
-                    f"stop:0.28 {mid_active},"
+                    f"stop:0.18 {mid_active},"
                     "stop:1 rgba(37, 41, 61, 170));"
-                    f"border: 1px solid {border_active};"
-                    f"border-left: 4px solid {border_active};"
+                    f"border: {border_width}px solid {border_active};"
+                    f"border-left: {left_border_width}px solid {border_active};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -1579,10 +1842,10 @@ class AccountListItem(QFrame):
                     "#accountListItem {"
                     "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
                     f"stop:0 {left_idle},"
-                    f"stop:0.24 {mid_idle},"
+                    f"stop:0.16 {mid_idle},"
                     "stop:1 rgba(25, 30, 47, 95));"
-                    f"border: 1px solid {border_idle};"
-                    f"border-left: 4px solid {border_idle};"
+                    f"border: {border_width}px solid {border_idle};"
+                    f"border-left: {left_border_width}px solid {border_idle};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -1611,12 +1874,15 @@ class AccountListItem(QFrame):
             return
 
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
-        left_active = self._rgba(self._logged_in_gradient_color, int(58 + 110 * t))
-        mid_active = self._rgba(self._logged_in_gradient_color, int(36 + 80 * t))
-        left_idle = self._rgba(self._logged_in_gradient_color, int(44 + 85 * t))
-        mid_idle = self._rgba(self._logged_in_gradient_color, int(24 + 65 * t))
-        border_active = self._rgba(self._logged_in_gradient_color, int(120 + 110 * t))
-        border_idle = self._rgba(self._logged_in_gradient_color, int(95 + 90 * t))
+        left_active = self._rgba(self._logged_in_gradient_color, int(36 + 72 * t))
+        mid_active = self._rgba(self._logged_in_gradient_color, int(24 + 56 * t))
+        left_idle = self._rgba(self._logged_in_gradient_color, int(28 + 58 * t))
+        mid_idle = self._rgba(self._logged_in_gradient_color, int(16 + 44 * t))
+        border_scale = self._logged_in_border_opacity / 100.0
+        border_active = self._rgba(self._logged_in_gradient_color, int((96 + 90 * t) * border_scale))
+        border_idle = self._rgba(self._logged_in_gradient_color, int((78 + 74 * t) * border_scale))
+        border_width = max(1, self._logged_in_border_width - 2)
+        left_border_width = self._logged_in_border_width
 
         if self._logged_in and active:
             self.setStyleSheet(
@@ -1625,8 +1891,8 @@ class AccountListItem(QFrame):
                 f"stop:0 {left_active},"
                 f"stop:0.30 {mid_active},"
                 "stop:1 rgba(244, 248, 255, 95));"
-                f"border: 1px solid {border_active};"
-                f"border-left: 4px solid {border_active};"
+                f"border: {border_width}px solid {border_active};"
+                f"border-left: {left_border_width}px solid {border_active};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -1639,8 +1905,8 @@ class AccountListItem(QFrame):
                 f"stop:0 {left_idle},"
                 f"stop:0.30 {mid_idle},"
                 "stop:1 rgba(248, 250, 255, 65));"
-                f"border: 1px solid {border_idle};"
-                f"border-left: 4px solid {border_idle};"
+                f"border: {border_width}px solid {border_idle};"
+                f"border-left: {left_border_width}px solid {border_idle};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -1685,9 +1951,15 @@ class MainWindow(QMainWindow):
         self._show_tags: bool = self._settings.get('show_tags', True)
         self._auto_open_ingame_page: bool = bool(self._settings.get('auto_open_ingame_page', True))
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
+        self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#4f7cff'))
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
+        self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 4))
+        self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 100))
+        self._row_density: str = str(self._settings.get('row_density', 'comfortable'))
+        self._rank_icon_size: int = int(self._settings.get('rank_icon_size', 34))
+        self._rank_text_brightness: int = int(self._settings.get('rank_text_brightness', 100))
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._window_size_mode: str = str(
             self._settings.get(
@@ -1979,9 +2251,15 @@ class MainWindow(QMainWindow):
         self._show_tags = bool(values['show_tags'])
         self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
         self._tag_size = str(values['tag_size'])
+        self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
         self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
+        self._logged_in_border_width = int(values.get('logged_in_border_width', self._logged_in_border_width))
+        self._logged_in_border_opacity = int(values.get('logged_in_border_opacity', self._logged_in_border_opacity))
+        self._row_density = str(values.get('row_density', self._row_density))
+        self._rank_icon_size = int(values.get('rank_icon_size', self._rank_icon_size))
+        self._rank_text_brightness = int(values.get('rank_text_brightness', self._rank_text_brightness))
         self._window_size = values['window_size']
         self._window_size_mode = str(values.get('window_size_mode', 'custom')).strip().lower()
         if self._window_size_mode not in {'static', 'custom'}:
@@ -2109,6 +2387,13 @@ class MainWindow(QMainWindow):
                 return False
 
         return True
+
+    def _account_row_height(self) -> int:
+        return {
+            "compact": 74,
+            "comfortable": 84,
+            "spacious": 96,
+        }.get(self._row_density, 84)
     
     def refresh_account_list(self):
         """Refresh the account list display"""
@@ -2141,7 +2426,7 @@ class MainWindow(QMainWindow):
             for account in filtered_accounts:
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, 84))
+                item.setSizeHint(QSize(0, self._account_row_height()))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
@@ -2151,8 +2436,14 @@ class MainWindow(QMainWindow):
                     show_rank_images=self._show_rank_images,
                     show_tags=self._show_tags,
                     tag_size=self._tag_size,
+                    tag_chip_style=self._tag_chip_style,
                     logged_in_gradient_color=self._logged_in_gradient_color,
                     logged_in_gradient_intensity=self._logged_in_gradient_intensity,
+                    logged_in_border_width=self._logged_in_border_width,
+                    logged_in_border_opacity=self._logged_in_border_opacity,
+                    row_density=self._row_density,
+                    rank_icon_size=self._rank_icon_size,
+                    rank_text_brightness=self._rank_text_brightness,
                 )
                 self.account_list.setItemWidget(item, widget)
 
