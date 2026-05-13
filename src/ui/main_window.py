@@ -1877,10 +1877,16 @@ QMenu::separator {
     def _stop_ingame_watcher(self):
         """Stop any existing in-game watcher thread."""
         watcher = self.ingame_watch_thread
-        if watcher and watcher.isRunning():
-            watcher.requestInterruption()
-            watcher.wait(1200)
-        self.ingame_watch_thread = None
+        self.ingame_watch_thread = None  # clear first so deferred finished signals don't clobber new watcher
+        if watcher:
+            try:
+                watcher.ingame_detected.disconnect()
+                watcher.finished.disconnect()
+            except Exception:
+                pass
+            if watcher.isRunning():
+                watcher.requestInterruption()
+                watcher.wait(1200)
 
     def _clear_ingame_watcher(self):
         """Clear completed watcher thread reference."""
