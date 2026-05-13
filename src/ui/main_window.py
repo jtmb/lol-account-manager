@@ -232,6 +232,18 @@ QComboBox QAbstractItemView {
     color: #cdd6f4;
     selection-background-color: #45475a;
 }
+QComboBox {
+    padding-right: 24px;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #45475a;
+    background-color: #22263a;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
 QLabel {
     color: #cdd6f4;
 }
@@ -275,6 +287,18 @@ QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
     border: 1px solid #cfcfcf;
     border-radius: 4px;
     padding: 4px;
+}
+QComboBox {
+    padding-right: 24px;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #cfcfcf;
+    background-color: #f3f4f6;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 QSpinBox::up-button, QSpinBox::down-button {
     subcontrol-origin: border;
@@ -1161,23 +1185,41 @@ class AccountListItem(QFrame):
         super().leaveEvent(event)
 
     def _update_visual_state(self):
-        if not self._dark_mode:
-            self.setStyleSheet("")
-            self._shadow.setBlurRadius(0)
-            self._shadow.setColor(QColor(0, 0, 0, 0))
+        active = self._selected or self._hovered
+
+        if self._dark_mode:
+            if active:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background-color: rgba(69, 71, 90, 180);"
+                    "border: 1px solid rgba(137, 180, 250, 140);"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(18)
+                self._shadow.setColor(QColor(0, 0, 0, 120))
+            else:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background-color: transparent;"
+                    "border: 1px solid transparent;"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
             return
 
-        active = self._selected or self._hovered
         if active:
             self.setStyleSheet(
                 "#accountListItem {"
-                "background-color: rgba(69, 71, 90, 180);"
-                "border: 1px solid rgba(137, 180, 250, 140);"
+                "background-color: #eef2ff;"
+                "border: 1px solid #c7d2fe;"
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(18)
-            self._shadow.setColor(QColor(0, 0, 0, 120))
+            self._shadow.setBlurRadius(10)
+            self._shadow.setColor(QColor(15, 23, 42, 28))
         else:
             self.setStyleSheet(
                 "#accountListItem {"
