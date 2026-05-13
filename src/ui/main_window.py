@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
-    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox
+    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap
@@ -467,7 +467,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(QLabel("Window size:"))
         self.window_size_combo = QComboBox()
         self.window_size_combo.addItems(self.COMMON_RESOLUTIONS)
-        current_resolution = self._settings.get("window_size", "660x480")
+        current_resolution = self._settings.get("window_size", "1024x768")
         if current_resolution not in self.COMMON_RESOLUTIONS:
             self.window_size_combo.addItem(current_resolution)
         self.window_size_combo.setCurrentText(current_resolution)
@@ -477,7 +477,7 @@ class SettingsDialog(QDialog):
         self.text_zoom_combo = QComboBox()
         for label, value in self.TEXT_ZOOM_OPTIONS:
             self.text_zoom_combo.addItem(label, value)
-        current_zoom = int(self._settings.get("text_zoom_percent", 100))
+        current_zoom = int(self._settings.get("text_zoom_percent", 110))
         zoom_index = self.text_zoom_combo.findData(current_zoom)
         if zoom_index < 0:
             self.text_zoom_combo.addItem(f"{current_zoom}%", current_zoom)
@@ -494,6 +494,52 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.show_images_checkbox)
         self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+
+        # ── Actions section ────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        layout.addSpacing(4)
+        layout.addWidget(sep)
+        layout.addSpacing(2)
+
+        actions_label = QLabel("Actions")
+        actions_label.setStyleSheet("font-weight: bold; font-size: 10pt; color: #888;")
+        layout.addWidget(actions_label)
+
+        actions_grid = QGridLayout()
+        actions_grid.setSpacing(8)
+
+        mw = self.parent()
+
+        pw_btn = QPushButton("🔑  Change Master Password")
+        pw_btn.setToolTip("Update the master encryption password")
+        pw_btn.clicked.connect(lambda: mw.change_master_password() if mw else None)
+        actions_grid.addWidget(pw_btn, 0, 0)
+
+        about_btn = QPushButton("ℹ  About")
+        about_btn.clicked.connect(lambda: mw.show_about() if mw else None)
+        actions_grid.addWidget(about_btn, 0, 1)
+
+        lol_btn = QPushButton("📁  Set LoL Path…")
+        lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
+        lol_btn.clicked.connect(lambda: mw.browse_for_lol() if mw else None)
+        actions_grid.addWidget(lol_btn, 1, 0)
+
+        backup_btn = QPushButton("💾  Backup / Restore…")
+        backup_btn.setToolTip("Export or import an encrypted account backup")
+        backup_btn.clicked.connect(lambda: mw.open_backup_dialog() if mw else None)
+        actions_grid.addWidget(backup_btn, 1, 1)
+
+        layout.addLayout(actions_grid)
+        layout.addSpacing(4)
+
+        # ── Dialog buttons ─────────────────────────────────────────────
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(sep2)
+        layout.addSpacing(2)
 
         button_row = QHBoxLayout()
         button_row.addStretch()
@@ -761,8 +807,8 @@ class MainWindow(QMainWindow):
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
-        self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 100))
-        self._window_size: str = self._settings.get('window_size', '660x480')
+        self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
+        self._window_size: str = self._settings.get('window_size', '1024x768')
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self.init_ui()
         self._apply_theme()
@@ -836,29 +882,6 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(button_layout)
         
-        # Settings
-        settings_layout = QHBoxLayout()
-        self.master_password_btn = QPushButton("Change Master Password")
-        self.master_password_btn.clicked.connect(self.change_master_password)
-        settings_layout.addWidget(self.master_password_btn)
-
-        self.browse_lol_btn = QPushButton("Set LoL Path...")
-        self.browse_lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
-        self.browse_lol_btn.clicked.connect(self.browse_for_lol)
-        settings_layout.addWidget(self.browse_lol_btn)
-
-        self.about_btn = QPushButton("About")
-        self.about_btn.clicked.connect(self.show_about)
-        settings_layout.addWidget(self.about_btn)
-
-        self.backup_btn = QPushButton("Backup / Restore...")
-        self.backup_btn.setToolTip("Export or import an encrypted account backup")
-        self.backup_btn.clicked.connect(self.open_backup_dialog)
-        settings_layout.addWidget(self.backup_btn)
-
-        settings_layout.addStretch()
-        layout.addLayout(settings_layout)
-
         self.lol_path_label = QLabel()
         self.lol_path_label.setStyleSheet("color: #666666;")
         self.lol_path_label.setTextInteractionFlags(
