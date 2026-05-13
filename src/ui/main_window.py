@@ -473,7 +473,7 @@ class AccountListItem(QFrame):
         rank_layout.setSpacing(6)
 
         self.rank_icon_label = QLabel()
-        self.rank_icon_label.setFixedSize(24, 24)
+        self.rank_icon_label.setFixedSize(34, 34)
         self.rank_icon_label.setScaledContents(False)
         self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
@@ -507,7 +507,7 @@ class AccountListItem(QFrame):
             self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 11px;")
             pixmap = _build_rank_pixmap(rank_data.get("medal_bytes", b""))
             if not pixmap.isNull():
-                pixmap = pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pixmap = pixmap.scaled(34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.rank_icon_label.setPixmap(pixmap)
             self.rank_icon_label.setVisible(not self.rank_icon_label.pixmap().isNull())
             self.rank_label.setText(
@@ -594,8 +594,8 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
-        self.setMinimumSize(560, 400)
-        self.resize(560, 400)
+        self.setMinimumSize(660, 480)
+        self.resize(660, 480)
 
         # Central widget
         central_widget = QWidget()
@@ -830,7 +830,7 @@ class MainWindow(QMainWindow):
             for account in accounts:
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, 60))
+                item.setSizeHint(QSize(0, 72))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
