@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 import sys
 import ctypes
 import time
@@ -185,11 +185,19 @@ QListWidget {
     border-radius: 6px;
     color: #cdd6f4;
 }
+QListWidget::item {
+    background: transparent;
+    border: none;
+    margin: 2px 4px;
+    padding: 0px;
+}
 QListWidget::item:selected {
-    background-color: #45475a;
+    background: transparent;
+    border: none;
 }
 QListWidget::item:hover {
-    background-color: #313244;
+    background: transparent;
+    border: none;
 }
 QPushButton {
     background-color: #313244;
@@ -298,6 +306,20 @@ QListWidget {
     background-color: #ffffff;
     border: 1px solid #cfcfcf;
     border-radius: 6px;
+}
+QListWidget::item {
+    background: transparent;
+    border: none;
+    margin: 2px 4px;
+    padding: 0px;
+}
+QListWidget::item:selected {
+    background: transparent;
+    border: none;
+}
+QListWidget::item:hover {
+    background: transparent;
+    border: none;
 }
 QPushButton {
     background-color: #f3f4f6;
@@ -891,9 +913,10 @@ class SettingsDialog(QDialog):
 
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
-    def __init__(self, parent=None, settings: Optional[dict] = None):
+    def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
         super().__init__(parent)
         self._settings = settings or {}
+        self._apply_callback = apply_callback
         self.init_ui()
 
     def init_ui(self):
@@ -1017,7 +1040,7 @@ class SettingsDialog(QDialog):
         self.logged_in_gradient_color_combo.setToolTip(
             "Choose the accent color used for the logged-in row highlight."
         )
-        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#4f7cff"))
+        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#32c46d"))
         gradient_color_index = self.logged_in_gradient_color_combo.findData(current_gradient_color)
         self.logged_in_gradient_color_combo.setCurrentIndex(max(0, gradient_color_index))
         gradient_color_row.addWidget(self.logged_in_gradient_color_combo)
@@ -1053,7 +1076,7 @@ class SettingsDialog(QDialog):
         self.logged_in_border_width_combo.setToolTip(
             "Controls the thickness of the logged-in accent border independently from fill intensity."
         )
-        current_border_width = int(self._settings.get("logged_in_border_width", 4))
+        current_border_width = int(self._settings.get("logged_in_border_width", 2))
         border_width_index = self.logged_in_border_width_combo.findData(current_border_width)
         self.logged_in_border_width_combo.setCurrentIndex(max(0, border_width_index))
         border_width_row.addWidget(self.logged_in_border_width_combo)
@@ -1068,7 +1091,7 @@ class SettingsDialog(QDialog):
         self.logged_in_border_opacity_combo.setToolTip(
             "Controls border opacity independently from the row fill intensity."
         )
-        current_border_opacity = int(self._settings.get("logged_in_border_opacity", 100))
+        current_border_opacity = int(self._settings.get("logged_in_border_opacity", 60))
         border_opacity_index = self.logged_in_border_opacity_combo.findData(current_border_opacity)
         self.logged_in_border_opacity_combo.setCurrentIndex(max(0, border_opacity_index))
         border_opacity_row.addWidget(self.logged_in_border_opacity_combo)
@@ -1081,7 +1104,7 @@ class SettingsDialog(QDialog):
         for label, value in self.ROW_DENSITY_OPTIONS:
             self.row_density_combo.addItem(label, value)
         self.row_density_combo.setToolTip("Adjust account row spacing and height.")
-        current_density = str(self._settings.get("row_density", "comfortable"))
+        current_density = str(self._settings.get("row_density", "compact"))
         density_index = self.row_density_combo.findData(current_density)
         self.row_density_combo.setCurrentIndex(max(0, density_index))
         density_row.addWidget(self.row_density_combo)
@@ -1223,6 +1246,12 @@ class SettingsDialog(QDialog):
         cancel_btn.setDefault(False)
         cancel_btn.clicked.connect(self.reject)
         button_row.addWidget(cancel_btn)
+        apply_btn = QPushButton("Apply")
+        apply_btn.setFixedWidth(100)
+        apply_btn.setAutoDefault(False)
+        apply_btn.setDefault(False)
+        apply_btn.clicked.connect(self.apply_settings)
+        button_row.addWidget(apply_btn)
         save_btn = QPushButton("Save")
         save_btn.setFixedWidth(100)
         save_btn.setAutoDefault(False)
@@ -1258,6 +1287,11 @@ class SettingsDialog(QDialog):
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
         }
+
+    def apply_settings(self):
+        """Apply settings without closing the dialog."""
+        if self._apply_callback:
+            self._apply_callback(self.get_values())
 
 
 class AccountListItem(QFrame):
@@ -1345,11 +1379,11 @@ class AccountListItem(QFrame):
         show_rank_images: bool = True,
         show_tags: bool = True,
         tag_size: str = "small",
-        logged_in_gradient_color: str = "#4f7cff",
+        logged_in_gradient_color: str = "#32c46d",
         logged_in_gradient_intensity: int = 20,
-        logged_in_border_width: int = 4,
-        logged_in_border_opacity: int = 100,
-        row_density: str = "comfortable",
+        logged_in_border_width: int = 2,
+        logged_in_border_opacity: int = 60,
+        row_density: str = "compact",
         rank_icon_size: int = 34,
         rank_text_brightness: int = 100,
         tag_chip_style: str = "vibrant",
@@ -1953,11 +1987,11 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
-        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#4f7cff'))
+        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#32c46d'))
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
-        self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 4))
-        self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 100))
-        self._row_density: str = str(self._settings.get('row_density', 'comfortable'))
+        self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
+        self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 60))
+        self._row_density: str = str(self._settings.get('row_density', 'compact'))
         self._rank_icon_size: int = int(self._settings.get('rank_icon_size', 34))
         self._rank_text_brightness: int = int(self._settings.get('rank_text_brightness', 100))
         self._window_size: str = self._settings.get('window_size', '800x600')
@@ -2240,11 +2274,15 @@ class MainWindow(QMainWindow):
         """Open the settings dialog and apply any changes."""
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
-        dialog = SettingsDialog(self, settings=dialog_settings)
+        dialog = SettingsDialog(self, settings=dialog_settings, apply_callback=self._apply_settings_values)
         if dialog.exec_() != QDialog.Accepted:
             return
 
         values = dialog.get_values()
+        self._apply_settings_values(values)
+
+    def _apply_settings_values(self, values: dict):
+        """Apply settings values to runtime state and persist them."""
         self._settings.update(values)
         self._show_ranks = bool(values['show_ranks'])
         self._show_rank_images = bool(values['show_rank_images'])
