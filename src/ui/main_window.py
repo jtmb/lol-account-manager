@@ -188,7 +188,7 @@ QListWidget {
 QListWidget::item {
     background: transparent;
     border: none;
-    margin: 2px 4px;
+    margin: 1px 1px;
     padding: 0px;
 }
 QListWidget::item:selected {
@@ -358,7 +358,7 @@ QListWidget {
 QListWidget::item {
     background: transparent;
     border: none;
-    margin: 2px 4px;
+    margin: 1px 1px;
     padding: 0px;
 }
 QListWidget::item:selected {
@@ -1136,7 +1136,7 @@ class SettingsDialog(QDialog):
         self.logged_in_gradient_color_combo.setToolTip(
             "Choose the accent color used for the logged-in row highlight."
         )
-        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#32c46d"))
+        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#27b5f7"))
         gradient_color_index = self.logged_in_gradient_color_combo.findData(current_gradient_color)
         self.logged_in_gradient_color_combo.setCurrentIndex(max(0, gradient_color_index))
         gradient_color_row.addWidget(self.logged_in_gradient_color_combo)
@@ -1475,7 +1475,7 @@ class AccountListItem(QFrame):
         show_rank_images: bool = True,
         show_tags: bool = True,
         tag_size: str = "small",
-        logged_in_gradient_color: str = "#32c46d",
+        logged_in_gradient_color: str = "#27b5f7",
         logged_in_gradient_intensity: int = 20,
         logged_in_border_width: int = 2,
         logged_in_border_opacity: int = 60,
@@ -1532,7 +1532,7 @@ class AccountListItem(QFrame):
     def _row_density_preset(self) -> dict:
         presets = {
             "compact": {
-                "outer_margins": (10, 4, 10, 4),
+                "outer_margins": (6, 3, 6, 3),
                 "outer_spacing": 6,
                 "text_spacing": 1,
                 "user_row_spacing": 4,
@@ -2083,7 +2083,7 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
-        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#32c46d'))
+        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#27b5f7'))
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
         self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 60))
