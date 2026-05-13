@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
@@ -15,6 +15,10 @@ import ctypes
 import time
 import random
 import webbrowser
+import logging
+import json
+import os
+from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 if sys.platform.startswith("win"):
@@ -34,6 +38,10 @@ from src.config.paths import (
     load_settings,
     save_settings,
 )
+
+LOGS_DIR = BACKUPS_DIR.parent / "logs"
+LOG_FILE = LOGS_DIR / "app.log"
+GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 
 
 def _escape_html(text: str) -> str:
@@ -184,11 +192,12 @@ QListWidget {
     border: 1px solid #313244;
     border-radius: 6px;
     color: #cdd6f4;
+    padding: 0px;
 }
 QListWidget::item {
     background: transparent;
     border: none;
-    margin: 1px 1px;
+    margin: 0px;
     padding: 0px;
 }
 QListWidget::item:selected {
@@ -354,11 +363,12 @@ QListWidget {
     background-color: #ffffff;
     border: 1px solid #cfcfcf;
     border-radius: 6px;
+    padding: 0px;
 }
 QListWidget::item {
     background: transparent;
     border: none;
-    margin: 1px 1px;
+    margin: 0px;
     padding: 0px;
 }
 QListWidget::item:selected {
@@ -1007,6 +1017,40 @@ class SettingsDialog(QDialog):
         ("Monochrome", "monochrome"),
     ]
 
+    CLOSE_BEHAVIOR_OPTIONS = [
+        ("Exit app", "exit"),
+        ("Minimize to tray", "tray"),
+    ]
+
+    AUTO_LOCK_OPTIONS = [
+        ("Disabled", 0),
+        ("5 minutes", 5),
+        ("15 minutes", 15),
+        ("30 minutes", 30),
+        ("60 minutes", 60),
+    ]
+
+    CLIPBOARD_CLEAR_OPTIONS = [
+        ("Never", 0),
+        ("15 seconds", 15),
+        ("30 seconds", 30),
+        ("60 seconds", 60),
+    ]
+
+    RANK_REFRESH_OPTIONS = [
+        ("Manual", "manual"),
+        ("Auto (30s)", "30"),
+        ("Auto (60s)", "60"),
+        ("Auto (120s)", "120"),
+    ]
+
+    LOG_LEVEL_OPTIONS = [
+        ("Error", "ERROR"),
+        ("Warning", "WARNING"),
+        ("Info", "INFO"),
+        ("Debug", "DEBUG"),
+    ]
+
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
     def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
@@ -1097,6 +1141,99 @@ class SettingsDialog(QDialog):
             "Automatically open the op.gg in-game page when a live match is detected."
         )
         general_layout.addWidget(self.auto_open_ingame_checkbox)
+
+        self.start_minimized_checkbox = QCheckBox("Start minimized to tray")
+        self.start_minimized_checkbox.setChecked(bool(self._settings.get("start_minimized_to_tray", False)))
+        self.start_minimized_checkbox.setToolTip("Start hidden in system tray instead of opening the full window.")
+        general_layout.addWidget(self.start_minimized_checkbox)
+
+        close_behavior_row = QHBoxLayout()
+        close_behavior_row.addWidget(QLabel("Close button behavior:"))
+        self.close_behavior_combo = QComboBox()
+        for label, value in self.CLOSE_BEHAVIOR_OPTIONS:
+            self.close_behavior_combo.addItem(label, value)
+        current_close_behavior = str(self._settings.get("close_behavior", "exit"))
+        close_behavior_index = self.close_behavior_combo.findData(current_close_behavior)
+        self.close_behavior_combo.setCurrentIndex(max(0, close_behavior_index))
+        self.close_behavior_combo.setToolTip("Choose whether window close exits app or minimizes to tray.")
+        close_behavior_row.addWidget(self.close_behavior_combo)
+        close_behavior_row.addStretch()
+        general_layout.addLayout(close_behavior_row)
+
+        auto_lock_row = QHBoxLayout()
+        auto_lock_row.addWidget(QLabel("Auto-lock timeout:"))
+        self.auto_lock_combo = QComboBox()
+        for label, value in self.AUTO_LOCK_OPTIONS:
+            self.auto_lock_combo.addItem(label, value)
+        current_auto_lock = int(self._settings.get("auto_lock_minutes", 0))
+        auto_lock_index = self.auto_lock_combo.findData(current_auto_lock)
+        self.auto_lock_combo.setCurrentIndex(max(0, auto_lock_index))
+        self.auto_lock_combo.setToolTip("Require master password again after inactivity.")
+        auto_lock_row.addWidget(self.auto_lock_combo)
+        auto_lock_row.addStretch()
+        general_layout.addLayout(auto_lock_row)
+
+        self.remember_password_24h_checkbox = QCheckBox("Remember master password for 24 hours")
+        self.remember_password_24h_checkbox.setChecked(bool(self._settings.get("remember_password_24h", False)))
+        self.remember_password_24h_checkbox.setToolTip(
+            "Skip password prompts on startup and auto-lock events for 24 hours after successful unlock."
+        )
+        general_layout.addWidget(self.remember_password_24h_checkbox)
+
+        clipboard_row = QHBoxLayout()
+        clipboard_row.addWidget(QLabel("Clipboard auto-clear:"))
+        self.clipboard_clear_combo = QComboBox()
+        for label, value in self.CLIPBOARD_CLEAR_OPTIONS:
+            self.clipboard_clear_combo.addItem(label, value)
+        current_clipboard_clear = int(self._settings.get("clipboard_auto_clear_seconds", 0))
+        clipboard_index = self.clipboard_clear_combo.findData(current_clipboard_clear)
+        self.clipboard_clear_combo.setCurrentIndex(max(0, clipboard_index))
+        self.clipboard_clear_combo.setToolTip("Automatically clear copied credentials after a delay.")
+        clipboard_row.addWidget(self.clipboard_clear_combo)
+        clipboard_row.addStretch()
+        general_layout.addLayout(clipboard_row)
+
+        self.confirm_launch_checkbox = QCheckBox("Ask confirmation before launch")
+        self.confirm_launch_checkbox.setChecked(bool(self._settings.get("confirm_before_launch", False)))
+        general_layout.addWidget(self.confirm_launch_checkbox)
+
+        self.confirm_delete_checkbox = QCheckBox("Ask confirmation before delete")
+        self.confirm_delete_checkbox.setChecked(bool(self._settings.get("confirm_before_delete", True)))
+        general_layout.addWidget(self.confirm_delete_checkbox)
+
+        rank_refresh_row = QHBoxLayout()
+        rank_refresh_row.addWidget(QLabel("Rank refresh cadence:"))
+        self.rank_refresh_combo = QComboBox()
+        for label, value in self.RANK_REFRESH_OPTIONS:
+            self.rank_refresh_combo.addItem(label, value)
+        current_rank_refresh = str(self._settings.get("rank_refresh_mode", "manual"))
+        rank_refresh_index = self.rank_refresh_combo.findData(current_rank_refresh)
+        self.rank_refresh_combo.setCurrentIndex(max(0, rank_refresh_index))
+        rank_refresh_row.addWidget(self.rank_refresh_combo)
+        rank_refresh_row.addStretch()
+        general_layout.addLayout(rank_refresh_row)
+
+        self.auto_check_updates_checkbox = QCheckBox("Auto-check updates on startup")
+        self.auto_check_updates_checkbox.setChecked(bool(self._settings.get("auto_check_updates", True)))
+        general_layout.addWidget(self.auto_check_updates_checkbox)
+
+        diagnostics_row = QHBoxLayout()
+        diagnostics_row.addWidget(QLabel("Diagnostics log level:"))
+        self.log_level_combo = QComboBox()
+        for label, value in self.LOG_LEVEL_OPTIONS:
+            self.log_level_combo.addItem(label, value)
+        current_log_level = str(self._settings.get("diagnostics_log_level", "INFO")).upper()
+        log_level_index = self.log_level_combo.findData(current_log_level)
+        self.log_level_combo.setCurrentIndex(max(0, log_level_index))
+        diagnostics_row.addWidget(self.log_level_combo)
+        open_logs_btn = QPushButton("Open logs folder")
+        open_logs_btn.setAutoDefault(False)
+        open_logs_btn.setDefault(False)
+        mw = self.parent()
+        open_logs_btn.clicked.connect(lambda: mw.open_logs_folder() if mw else None)
+        diagnostics_row.addWidget(open_logs_btn)
+        diagnostics_row.addStretch()
+        general_layout.addLayout(diagnostics_row)
 
         tag_size_row = QHBoxLayout()
         tag_size_row.addWidget(QLabel("Tag size:"))
@@ -1364,6 +1501,16 @@ class SettingsDialog(QDialog):
         window_size = self.current_window_size if window_size_mode == "custom" else self.window_size_combo.currentText()
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
+            "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
+            "close_behavior": str(self.close_behavior_combo.currentData()),
+            "auto_lock_minutes": int(self.auto_lock_combo.currentData()),
+            "remember_password_24h": self.remember_password_24h_checkbox.isChecked(),
+            "clipboard_auto_clear_seconds": int(self.clipboard_clear_combo.currentData()),
+            "confirm_before_launch": self.confirm_launch_checkbox.isChecked(),
+            "confirm_before_delete": self.confirm_delete_checkbox.isChecked(),
+            "rank_refresh_mode": str(self.rank_refresh_combo.currentData()),
+            "auto_check_updates": self.auto_check_updates_checkbox.isChecked(),
+            "diagnostics_log_level": str(self.log_level_combo.currentData()),
             "window_size": window_size,
             "window_size_mode": window_size_mode,
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
@@ -2076,6 +2223,16 @@ class MainWindow(QMainWindow):
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._dark_mode: bool = self._settings.get('dark_mode', True)
+        self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
+        self._close_behavior: str = str(self._settings.get('close_behavior', 'exit'))
+        self._auto_lock_minutes: int = int(self._settings.get('auto_lock_minutes', 0))
+        self._remember_password_24h: bool = bool(self._settings.get('remember_password_24h', False))
+        self._clipboard_auto_clear_seconds: int = int(self._settings.get('clipboard_auto_clear_seconds', 0))
+        self._confirm_before_launch: bool = bool(self._settings.get('confirm_before_launch', False))
+        self._confirm_before_delete: bool = bool(self._settings.get('confirm_before_delete', True))
+        self._rank_refresh_mode: str = str(self._settings.get('rank_refresh_mode', 'manual'))
+        self._auto_check_updates: bool = bool(self._settings.get('auto_check_updates', True))
+        self._diagnostics_log_level: str = str(self._settings.get('diagnostics_log_level', 'INFO')).upper()
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._show_tags: bool = self._settings.get('show_tags', True)
@@ -2112,14 +2269,34 @@ class MainWindow(QMainWindow):
         self._session_sync_timer = QTimer(self)
         self._session_sync_timer.setInterval(5000)
         self._session_sync_timer.timeout.connect(self._sync_logged_in_session_state)
+        self._rank_refresh_timer = QTimer(self)
+        self._rank_refresh_timer.timeout.connect(self._refresh_visible_ranks)
+        self._clipboard_clear_timer = QTimer(self)
+        self._clipboard_clear_timer.setSingleShot(True)
+        self._clipboard_clear_timer.timeout.connect(self._clear_clipboard_if_needed)
+        self._clipboard_last_text: str = ""
+        self._auto_lock_timer = QTimer(self)
+        self._auto_lock_timer.setSingleShot(True)
+        self._auto_lock_timer.timeout.connect(self._handle_auto_lock_timeout)
+        self._unlock_prompt_active = False
+        self._quitting_to_exit = False
+        self._tray_icon: Optional[QSystemTrayIcon] = None
         self._suppress_window_size_persistence = False
         self.init_ui()
         app = QApplication.instance()
         if app:
             app.installEventFilter(self)
+        self._configure_diagnostics_logging()
+        self._create_tray_icon()
         self._apply_theme()
         self._session_sync_timer.start()
+        self._update_rank_refresh_timer()
+        self._reset_auto_lock_timer()
         self.check_master_password()
+        if self._auto_check_updates:
+            QTimer.singleShot(4000, self._check_for_updates)
+        if self._start_minimized_to_tray and self._tray_icon and self._tray_icon.isVisible():
+            QTimer.singleShot(0, self.hide)
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
@@ -2184,6 +2361,8 @@ class MainWindow(QMainWindow):
         # Account list
         layout.addWidget(QLabel("Saved Accounts:"))
         self.account_list = QListWidget()
+        self.account_list.setSpacing(0)
+        self.account_list.setViewportMargins(0, 0, 0, 0)
         self.account_list.itemClicked.connect(self.on_account_selected)
         self.account_list.itemDoubleClicked.connect(lambda _: self.launch_account())
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
@@ -2380,6 +2559,16 @@ class MainWindow(QMainWindow):
     def _apply_settings_values(self, values: dict):
         """Apply settings values to runtime state and persist them."""
         self._settings.update(values)
+        self._start_minimized_to_tray = bool(values.get('start_minimized_to_tray', self._start_minimized_to_tray))
+        self._close_behavior = str(values.get('close_behavior', self._close_behavior))
+        self._auto_lock_minutes = int(values.get('auto_lock_minutes', self._auto_lock_minutes))
+        self._remember_password_24h = bool(values.get('remember_password_24h', self._remember_password_24h))
+        self._clipboard_auto_clear_seconds = int(values.get('clipboard_auto_clear_seconds', self._clipboard_auto_clear_seconds))
+        self._confirm_before_launch = bool(values.get('confirm_before_launch', self._confirm_before_launch))
+        self._confirm_before_delete = bool(values.get('confirm_before_delete', self._confirm_before_delete))
+        self._rank_refresh_mode = str(values.get('rank_refresh_mode', self._rank_refresh_mode))
+        self._auto_check_updates = bool(values.get('auto_check_updates', self._auto_check_updates))
+        self._diagnostics_log_level = str(values.get('diagnostics_log_level', self._diagnostics_log_level)).upper()
         self._show_ranks = bool(values['show_ranks'])
         self._show_rank_images = bool(values['show_rank_images'])
         self._show_tags = bool(values['show_tags'])
@@ -2413,7 +2602,13 @@ class MainWindow(QMainWindow):
         else:
             self._settings['start_on_windows_startup'] = False
 
+        if not self._remember_password_24h:
+            self._clear_password_grace()
+
         save_settings(self._settings)
+        self._configure_diagnostics_logging()
+        self._update_rank_refresh_timer()
+        self._reset_auto_lock_timer()
         self._apply_theme()
         self.refresh_account_list()
 
@@ -2421,10 +2616,199 @@ class MainWindow(QMainWindow):
         """Update the native Windows title bar to match the active theme."""
         _apply_windows11_chrome(self, self._dark_mode)
 
+    def _configure_diagnostics_logging(self):
+        """Configure lightweight file logging based on user-selected level."""
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        level = getattr(logging, self._diagnostics_log_level, logging.INFO)
+        root = logging.getLogger()
+        if not root.handlers:
+            logging.basicConfig(
+                filename=str(LOG_FILE),
+                level=level,
+                format="%(asctime)s [%(levelname)s] %(message)s",
+            )
+        else:
+            root.setLevel(level)
+
+    def open_logs_folder(self):
+        """Open diagnostics logs folder in file manager."""
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(str(LOGS_DIR))
+            else:
+                webbrowser.open(LOGS_DIR.resolve().as_uri())
+        except Exception as exc:
+            self._show_error("Logs", f"Could not open logs folder: {exc}")
+
+    def _create_tray_icon(self):
+        """Create system tray icon and menu for minimize-to-tray behavior."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self._tray_icon = None
+            return
+
+        self._tray_icon = QSystemTrayIcon(self)
+        icon = self.windowIcon() or QApplication.windowIcon()
+        if not icon.isNull():
+            self._tray_icon.setIcon(icon)
+        self._tray_icon.setToolTip("League of Legends Account Manager")
+
+        tray_menu = QMenu(self)
+        show_action = QAction("Show", self)
+        show_action.triggered.connect(self._show_from_tray)
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(self._quit_from_tray)
+        tray_menu.addAction(show_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(quit_action)
+        self._tray_icon.setContextMenu(tray_menu)
+        self._tray_icon.activated.connect(self._on_tray_activated)
+        self._tray_icon.show()
+
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self._show_from_tray()
+
+    def _show_from_tray(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self):
+        self._quitting_to_exit = True
+        self.close()
+
+    def closeEvent(self, event):
+        if (
+            not self._quitting_to_exit
+            and self._close_behavior == "tray"
+            and self._tray_icon
+            and self._tray_icon.isVisible()
+        ):
+            self.hide()
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def _check_for_updates(self):
+        """Check latest GitHub release tag and notify if changed."""
+        if not self._auto_check_updates:
+            return
+        try:
+            req = Request(GITHUB_RELEASES_API, headers={"User-Agent": "lol-account-manager"})
+            with urlopen(req, timeout=3) as resp:
+                payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            latest_tag = str(payload.get("tag_name") or "").strip()
+            if not latest_tag:
+                return
+            seen_tag = str(self._settings.get("last_seen_release_tag", "")).strip()
+            if latest_tag != seen_tag:
+                self._settings["last_seen_release_tag"] = latest_tag
+                save_settings(self._settings)
+                QMessageBox.information(
+                    self,
+                    "Update Check",
+                    f"Latest release: {latest_tag}\n\nOpen the project page to download updates.",
+                )
+        except Exception:
+            logging.debug("Update check failed", exc_info=True)
+
+    def _update_rank_refresh_timer(self):
+        mode = str(self._rank_refresh_mode or "manual")
+        if mode == "manual":
+            self._rank_refresh_timer.stop()
+            return
+        try:
+            seconds = max(15, int(mode))
+        except ValueError:
+            self._rank_refresh_timer.stop()
+            return
+        self._rank_refresh_timer.setInterval(seconds * 1000)
+        self._rank_refresh_timer.start()
+
+    def _refresh_visible_ranks(self):
+        if self._show_ranks and self.account_manager:
+            self._start_rank_fetches()
+
+    def _clear_clipboard_if_needed(self):
+        if self._clipboard_auto_clear_seconds <= 0:
+            return
+        clipboard = QApplication.clipboard()
+        if clipboard.text() == self._clipboard_last_text:
+            clipboard.clear()
+
+    def _has_valid_password_grace(self) -> bool:
+        if not self._remember_password_24h:
+            return False
+        expires_at = float(self._settings.get("password_grace_expires_at", 0) or 0)
+        return expires_at > time.time()
+
+    def _clear_password_grace(self):
+        self._settings.pop("password_grace_expires_at", None)
+        self._settings.pop("password_grace_blob", None)
+        save_settings(self._settings)
+
+    def _store_password_grace(self, password: str):
+        if not self._remember_password_24h:
+            self._clear_password_grace()
+            return
+        if not sys.platform.startswith("win"):
+            return
+        try:
+            import win32crypt
+            protected = win32crypt.CryptProtectData(password.encode("utf-8"), None, None, None, None, 0)
+            self._settings["password_grace_blob"] = protected.hex()
+            self._settings["password_grace_expires_at"] = time.time() + 86400
+            save_settings(self._settings)
+        except Exception:
+            logging.debug("Password grace storage failed", exc_info=True)
+
+    def _try_unlock_with_password_grace(self) -> bool:
+        if not self._remember_password_24h or not sys.platform.startswith("win"):
+            return False
+        if not self._has_valid_password_grace():
+            return False
+        blob_hex = str(self._settings.get("password_grace_blob", "") or "")
+        if not blob_hex:
+            return False
+        try:
+            import win32crypt
+            raw = bytes.fromhex(blob_hex)
+            _, unprotected = win32crypt.CryptUnprotectData(raw, None, None, None, 0)
+            password = unprotected.decode("utf-8")
+            if AccountManager.verify_master_password(password):
+                self.initialize_account_manager(password)
+                return True
+        except Exception:
+            logging.debug("Password grace unlock failed", exc_info=True)
+        self._clear_password_grace()
+        return False
+
+    def _reset_auto_lock_timer(self):
+        if self._auto_lock_minutes <= 0 or not self.account_manager:
+            self._auto_lock_timer.stop()
+            return
+        self._auto_lock_timer.start(self._auto_lock_minutes * 60 * 1000)
+
+    def _handle_auto_lock_timeout(self):
+        if self._unlock_prompt_active:
+            return
+        if self._has_valid_password_grace():
+            self._reset_auto_lock_timer()
+            return
+        self._unlock_prompt_active = True
+        try:
+            self.request_master_password(fatal_on_fail=False)
+        finally:
+            self._unlock_prompt_active = False
+            self._reset_auto_lock_timer()
+
     def eventFilter(self, obj, event):
         """Apply consistent Windows 11 chrome to all shown dialogs/message boxes."""
         if event.type() == QEvent.Show and isinstance(obj, QDialog):
             _apply_windows11_chrome(obj, self._dark_mode)
+        if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.KeyPress):
+            self._reset_auto_lock_timer()
         return super().eventFilter(obj, event)
 
     def showEvent(self, event):
@@ -2444,10 +2828,12 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", "Master password is required to use this application.")
                 sys.exit(1)
         else:
+            if self._try_unlock_with_password_grace():
+                return
             # Ask for master password
-            self.request_master_password()
+            self.request_master_password(fatal_on_fail=True)
     
-    def request_master_password(self):
+    def request_master_password(self, fatal_on_fail: bool = True):
         """Request master password from user"""
         for attempt in range(3):
             dialog = MasterPasswordDialog(self, is_setup=False)
@@ -2455,7 +2841,8 @@ class MainWindow(QMainWindow):
                 password = dialog.password_input.text()
                 if AccountManager.verify_master_password(password):
                     self.initialize_account_manager(password)
-                    return
+                    self._store_password_grace(password)
+                    return True
                 else:
                     remaining = 3 - attempt - 1
                     if remaining > 0:
@@ -2464,16 +2851,23 @@ class MainWindow(QMainWindow):
                             "Error", 
                             f"Incorrect password. {remaining} attempts remaining."
                         )
-                    else:
+                    elif fatal_on_fail:
                         QMessageBox.critical(self, "Error", "Too many failed attempts.")
                         sys.exit(1)
+                    else:
+                        QMessageBox.warning(self, "Locked", "Incorrect password.")
+                        return False
             else:
-                sys.exit(1)
+                if fatal_on_fail:
+                    sys.exit(1)
+                return False
+        return False
     
     def initialize_account_manager(self, password: str):
         """Initialize account manager with master password"""
         self.account_manager = AccountManager(password)
         self.refresh_account_list()
+        self._reset_auto_lock_timer()
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
@@ -2769,6 +3163,10 @@ class MainWindow(QMainWindow):
     def copy_to_clipboard(self, text: str):
         """Copy text to the system clipboard."""
         QApplication.clipboard().setText(text)
+        self._clipboard_last_text = text
+        self._clipboard_clear_timer.stop()
+        if self._clipboard_auto_clear_seconds > 0:
+            self._clipboard_clear_timer.start(self._clipboard_auto_clear_seconds * 1000)
 
     def _account_context_menu_stylesheet(self):
         """Return a theme-matched stylesheet for the account context menu."""
@@ -2910,14 +3308,17 @@ QMenu::separator {
         if not account:
             return
         
-        reply = QMessageBox.question(
-            self,
-            "Confirm Delete",
-            f"Are you sure you want to delete '{account.display_name}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
+        should_delete = True
+        if self._confirm_before_delete:
+            reply = QMessageBox.question(
+                self,
+                "Confirm Delete",
+                f"Are you sure you want to delete '{account.display_name}'?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            should_delete = reply == QMessageBox.Yes
+
+        if should_delete:
             try:
                 self.account_manager.delete_account(username)
                 if self._logged_in_username == username:
@@ -2945,6 +3346,16 @@ QMenu::separator {
         
         if not account:
             return
+
+        if self._confirm_before_launch:
+            reply = QMessageBox.question(
+                self,
+                "Confirm Launch",
+                f"Launch '{account.display_name}' now?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
 
         self._stop_ingame_watcher()
 

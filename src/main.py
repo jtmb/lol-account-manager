@@ -4,6 +4,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon
 from src.ui.main_window import MainWindow
+from src.config.paths import load_settings
 
 
 def _resource_path(relative_path: str) -> Path:
@@ -22,7 +23,10 @@ def main():
         app.setWindowIcon(QIcon(str(icon_path)))
     
     window = MainWindow()
-    window.show()
+    if bool(load_settings().get("start_minimized_to_tray", False)):
+        window.hide()
+    else:
+        window.show()
     
     sys.exit(app.exec_())
 
