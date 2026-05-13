@@ -120,6 +120,60 @@ def _set_startup_enabled(enabled: bool):
                 pass
 
 
+def _apply_windows11_chrome(widget, dark_mode: bool):
+    """Apply Windows 11 title bar/chrome colors to a top-level window."""
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        hwnd = int(widget.winId())
+        corner_preference = ctypes.c_int(2)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            ctypes.byref(corner_preference),
+            ctypes.sizeof(corner_preference),
+        )
+
+        value = ctypes.c_int(1 if dark_mode else 0)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+
+        if dark_mode:
+            caption_color = ctypes.c_int(0x302B2B)
+            text_color = ctypes.c_int(0xF4D6CD)
+        else:
+            caption_color = ctypes.c_int(0xF3F3F3)
+            text_color = ctypes.c_int(0x1E1E1E)
+
+        border_color = caption_color
+
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_CAPTION_COLOR,
+            ctypes.byref(caption_color),
+            ctypes.sizeof(caption_color),
+        )
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TEXT_COLOR,
+            ctypes.byref(text_color),
+            ctypes.sizeof(text_color),
+        )
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            ctypes.byref(border_color),
+            ctypes.sizeof(border_color),
+        )
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
