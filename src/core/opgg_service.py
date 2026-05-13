@@ -84,6 +84,25 @@ _DESC_RE = re.compile(
     re.IGNORECASE,
 )
 
+_LEVEL_PATTERNS = [
+    re.compile(r'"summonerLevel"\s*:\s*(\d{1,4})', re.IGNORECASE),
+    re.compile(r'"profileIconId"\s*:\s*\d+\s*,\s*"level"\s*:\s*(\d{1,4})', re.IGNORECASE),
+    re.compile(r'"level"\s*:\s*(\d{1,4})\s*,\s*"profileIconId"', re.IGNORECASE),
+]
+
+
+def _extract_summoner_level(html: str):
+    """Best-effort extraction of account level from op.gg HTML payload."""
+    for pattern in _LEVEL_PATTERNS:
+        match = pattern.search(html)
+        if not match:
+            continue
+        try:
+            return int(match.group(1))
+        except (TypeError, ValueError):
+            continue
+    return None
+
 
 def _parse_meta_description(html: str):
     """
@@ -160,8 +179,11 @@ def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 12)
     except requests.exceptions.RequestException as exc:
         return {"status": "error", "message": str(exc), "color": "#585b70"}
 
+    level = _extract_summoner_level(response.text)
     result = _parse_meta_description(response.text)
     if result:
+        if level is not None:
+            result["level"] = level
         try:
             medal_response = requests.get(result["medal_url"], headers={"User-Agent": _HEADERS["User-Agent"]}, timeout=timeout)
             medal_response.raise_for_status()
@@ -170,7 +192,8 @@ def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 12)
             result["medal_bytes"] = b""
         return result
 
-    return {"status": "unranked", "text": "Unranked", "color": "#585b70"}
+    text = f"Unranked - Level {level}" if level is not None else "Unranked"
+    return {"status": "unranked", "text": text, "color": "#585b70", "level": level}
 
 
 

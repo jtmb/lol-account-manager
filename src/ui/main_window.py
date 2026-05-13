@@ -1180,7 +1180,7 @@ class AccountListItem(QFrame):
             self.rank_label.setStyleSheet(
                 "background: transparent; border: none; color: #585b70; font-size: 11px;"
             )
-            self.rank_label.setText("Unranked")
+            self.rank_label.setText(str(rank_data.get("text") or "Unranked"))
         else:
             self.rank_icon_label.clear()
             self.rank_icon_label.setVisible(False)
@@ -1770,12 +1770,19 @@ class MainWindow(QMainWindow):
         menu.setAttribute(Qt.WA_TranslucentBackground, True)
         menu.setContentsMargins(0, 0, 0, 0)
         menu.setStyleSheet(self._account_context_menu_stylesheet())
+        open_opgg_profile_action = menu.addAction("Open op.gg Profile")
+        open_opgg_ingame_action = menu.addAction("Open op.gg In-Game Page")
+        menu.addSeparator()
         copy_username_action = menu.addAction("Copy Username")
         copy_password_action = menu.addAction("Copy Password")
         copy_friend_code_action = menu.addAction("Copy Friend Code")
 
         chosen_action = menu.exec_(self.account_list.viewport().mapToGlobal(position))
-        if chosen_action == copy_username_action:
+        if chosen_action == open_opgg_profile_action:
+            self._open_opgg_profile(account)
+        elif chosen_action == open_opgg_ingame_action:
+            self._open_ingame_webpage(self._build_opgg_ingame_url(account))
+        elif chosen_action == copy_username_action:
             self.copy_to_clipboard(account.username)
         elif chosen_action == copy_password_action:
             self.copy_to_clipboard(account.password)
@@ -2028,6 +2035,24 @@ QMenu::separator {
         encoded_name = quote(display_name, safe="")
         encoded_tag = quote(tag_line, safe="")
         return f"https://op.gg/lol/summoners/{region_slug}/{encoded_name}-{encoded_tag}/ingame"
+
+    def _build_opgg_profile_url(self, account: Account) -> str:
+        """Build op.gg summoner profile URL for an account."""
+        region_code = (getattr(account, "region", "NA") or "NA").upper()
+        region_slug = OPGG_REGION_MAP.get(region_code, region_code.lower())
+        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
+        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
+        encoded_name = quote(display_name, safe="")
+        encoded_tag = quote(tag_line, safe="")
+        return f"https://op.gg/lol/summoners/{region_slug}/{encoded_name}-{encoded_tag}"
+
+    def _open_opgg_profile(self, account: Account):
+        """Open an account's op.gg profile in the system browser."""
+        url = self._build_opgg_profile_url(account)
+        try:
+            webbrowser.open_new_tab(url)
+        except Exception:
+            webbrowser.open(url)
 
     def _start_ingame_watcher(self, account: Account):
         """Start watching for active-game state and open op.gg once detected."""
