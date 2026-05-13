@@ -949,19 +949,20 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(15, 15, 15, 15)
 
         top_row = QHBoxLayout()
+        top_row.setSpacing(8)
         top_row.addStretch()
         self._theme_button = QPushButton()
         self._theme_button.setObjectName("themeTopButton")
-        self._theme_button.setFixedSize(130, 30)
+        self._theme_button.setFixedSize(132, 30)
         self._theme_button.setToolTip("Switch between dark and light mode")
         self._theme_button.clicked.connect(self.toggle_theme)
-        top_row.addWidget(self._theme_button)
+        top_row.addWidget(self._theme_button, 0, Qt.AlignVCenter)
         self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
         self._settings_button.setFixedSize(30, 30)
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
-        top_row.addWidget(self._settings_button)
+        top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
         layout.addLayout(top_row)
         
         # Title
@@ -1056,8 +1057,17 @@ class MainWindow(QMainWindow):
             + "    max-height: 30px;\n"
             + "    padding: 0px;\n"
             + "    font-size: 14px;\n"
+            + "    margin: 0px;\n"
+            + "    text-align: center;\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
+            + "    min-width: 132px;\n"
+            + "    max-width: 132px;\n"
+            + "    min-height: 30px;\n"
+            + "    max-height: 30px;\n"
+            + "    padding: 0px 10px;\n"
+            + "    margin: 0px;\n"
+            + "    text-align: center;\n"
             + "    min-height: 30px;\n"
             + "}\n"
         )
@@ -1066,10 +1076,10 @@ class MainWindow(QMainWindow):
         """Apply the current theme stylesheet."""
         if self._dark_mode:
             self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET))
-            self._theme_button.setText("☀  Light Mode")
+            self._theme_button.setText("Light Mode")
         else:
             self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET))
-            self._theme_button.setText("🌙  Dark Mode")
+            self._theme_button.setText("Dark Mode")
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
