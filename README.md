@@ -8,9 +8,9 @@
 	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
 	<br />
 	<br />
-	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=bug&title=bug%3A+">Report a Bug</a>
+	<a href="https://github.com/jtmb/lol-account-manager/issues/new?assignees=&labels=bug&title=bug%3A+">Report a Bug</a>
 	·
-	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=enhancement&title=feat%3A+">Request a Feature</a>
+	<a href="https://github.com/jtmb/lol-account-manager/issues/new?assignees=&labels=enhancement&title=feat%3A+">Request a Feature</a>
 </div>
 
 <br>
