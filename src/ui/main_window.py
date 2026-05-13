@@ -535,6 +535,12 @@ class SettingsDialog(QDialog):
         ("140%", 140),
     ]
 
+    TAG_SIZE_OPTIONS = [
+        ("Small", "small"),
+        ("Medium", "medium"),
+        ("Large", "large"),
+    ]
+
     def __init__(self, parent=None, settings: Optional[dict] = None):
         super().__init__(parent)
         self._settings = settings or {}
@@ -585,6 +591,24 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.show_images_checkbox)
         self.show_ranks_checkbox.toggled.connect(self.show_images_checkbox.setEnabled)
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+
+        self.show_tags_checkbox = QCheckBox("Show tags")
+        self.show_tags_checkbox.setChecked(bool(self._settings.get("show_tags", True)))
+        layout.addWidget(self.show_tags_checkbox)
+
+        tag_size_row = QHBoxLayout()
+        tag_size_row.addWidget(QLabel("Tag size:"))
+        self.tag_size_combo = QComboBox()
+        for label, value in self.TAG_SIZE_OPTIONS:
+            self.tag_size_combo.addItem(label, value)
+        current_tag_size = str(self._settings.get("tag_size", "small"))
+        tag_size_index = self.tag_size_combo.findData(current_tag_size)
+        self.tag_size_combo.setCurrentIndex(max(0, tag_size_index))
+        tag_size_row.addWidget(self.tag_size_combo)
+        tag_size_row.addStretch()
+        layout.addLayout(tag_size_row)
+        self.show_tags_checkbox.toggled.connect(self.tag_size_combo.setEnabled)
+        self.tag_size_combo.setEnabled(self.show_tags_checkbox.isChecked())
 
         self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
         self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
@@ -684,6 +708,8 @@ class SettingsDialog(QDialog):
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
+            "show_tags": self.show_tags_checkbox.isChecked(),
+            "tag_size": str(self.tag_size_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_spin.value()),
         }
@@ -710,12 +736,51 @@ class AccountListItem(QFrame):
         ("#edf2ff", "#c3d0ef", "#27467a", "#4d78db"),
     ]
     
-    def __init__(self, account: Account, parent=None, show_ranks: bool = True, show_rank_images: bool = True):
+    def __init__(
+        self,
+        account: Account,
+        parent=None,
+        show_ranks: bool = True,
+        show_rank_images: bool = True,
+        show_tags: bool = True,
+        tag_size: str = "small",
+    ):
         super().__init__(parent)
         self.account = account
         self._show_ranks = show_ranks
         self._show_rank_images = show_rank_images
+        self._show_tags = show_tags
+        self._tag_size = tag_size
         self.init_ui()
+
+    def _tag_size_preset(self) -> dict:
+        presets = {
+            "small": {
+                "max_height": 14,
+                "font_size": 8,
+                "padding": "0px 4px 0px 3px",
+                "left_border": 2,
+                "radius": 3,
+                "spacing": 2,
+            },
+            "medium": {
+                "max_height": 16,
+                "font_size": 9,
+                "padding": "0px 5px 0px 4px",
+                "left_border": 2,
+                "radius": 4,
+                "spacing": 3,
+            },
+            "large": {
+                "max_height": 18,
+                "font_size": 10,
+                "padding": "0px 6px 0px 5px",
+                "left_border": 3,
+                "radius": 4,
+                "spacing": 3,
+            },
+        }
+        return presets.get(self._tag_size, presets["small"])
     
     def init_ui(self):
         outer = QHBoxLayout()
@@ -792,21 +857,22 @@ class AccountListItem(QFrame):
         user_row.addWidget(region_label)
 
         tags = getattr(self.account, "tags", []) or []
-        if tags:
+        if self._show_tags and tags:
+            size = self._tag_size_preset()
             tags_wrap = QWidget()
             tags_wrap.setAttribute(Qt.WA_TranslucentBackground, True)
             tags_layout = QHBoxLayout(tags_wrap)
             tags_layout.setContentsMargins(0, 0, 0, 0)
-            tags_layout.setSpacing(2)
+            tags_layout.setSpacing(size["spacing"])
             for tag in tags[:4]:
                 tag_label = QLabel(f"#{tag}")
-                tag_label.setMaximumHeight(14)
+                tag_label.setMaximumHeight(size["max_height"])
                 tag_label.setStyleSheet(self._tag_chip_stylesheet(len(self._tag_chip_labels)))
                 self._tag_chip_labels.append(tag_label)
                 tags_layout.addWidget(tag_label)
             if len(tags) > 4:
                 more_label = QLabel(f"+{len(tags) - 4}")
-                more_label.setMaximumHeight(14)
+                more_label.setMaximumHeight(size["max_height"])
                 more_label.setStyleSheet(self._tag_more_chip_stylesheet())
                 self._tag_chip_labels.append(more_label)
                 tags_layout.addWidget(more_label)
@@ -863,41 +929,43 @@ class AccountListItem(QFrame):
     def _tag_chip_stylesheet(self, chip_index: int) -> str:
         """Return themed chip style using index-based unique color assignment."""
         palette = self._TAG_PALETTE_DARK if self._dark_mode else self._TAG_PALETTE_LIGHT
+        size = self._tag_size_preset()
         idx = chip_index % len(palette)
         bg, border, fg, accent = palette[idx]
         return (
             f"background-color: {bg};"
             f"border: 1px solid {border};"
-            f"border-left: 2px solid {accent};"
-            "border-radius: 3px;"
+            f"border-left: {size['left_border']}px solid {accent};"
+            f"border-radius: {size['radius']}px;"
             f"color: {fg};"
-            "font-size: 8px;"
+            f"font-size: {size['font_size']}px;"
             "font-weight: 700;"
-            "padding: 0px 4px 0px 3px;"
+            f"padding: {size['padding']};"
         )
 
     def _tag_more_chip_stylesheet(self) -> str:
         """Return style for the overflow chip (+N)."""
+        size = self._tag_size_preset()
         if self._dark_mode:
             return (
                 "background-color: #2e3448;"
                 "border: 1px solid #566080;"
-                "border-left: 2px solid #9fb2e8;"
-                "border-radius: 3px;"
+                f"border-left: {size['left_border']}px solid #9fb2e8;"
+                f"border-radius: {size['radius']}px;"
                 "color: #cfd7f2;"
-                "font-size: 8px;"
+                f"font-size: {size['font_size']}px;"
                 "font-weight: 600;"
-                "padding: 0px 4px 0px 3px;"
+                f"padding: {size['padding']};"
             )
         return (
             "background-color: #eef1f7;"
             "border: 1px solid #b7bfd3;"
-            "border-left: 2px solid #93a4ce;"
-            "border-radius: 3px;"
+            f"border-left: {size['left_border']}px solid #93a4ce;"
+            f"border-radius: {size['radius']}px;"
             "color: #44506d;"
-            "font-size: 8px;"
+            f"font-size: {size['font_size']}px;"
             "font-weight: 600;"
-            "padding: 0px 4px 0px 3px;"
+            f"padding: {size['padding']};"
         )
 
     def _refresh_tag_chip_styles(self):
@@ -1022,6 +1090,8 @@ class MainWindow(QMainWindow):
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._show_ranks: bool = self._settings.get('show_ranks', True)
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
+        self._show_tags: bool = self._settings.get('show_tags', True)
+        self._tag_size: str = str(self._settings.get('tag_size', 'small'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._search_query: str = ""
@@ -1219,6 +1289,8 @@ class MainWindow(QMainWindow):
         self._settings.update(values)
         self._show_ranks = bool(values['show_ranks'])
         self._show_rank_images = bool(values['show_rank_images'])
+        self._show_tags = bool(values['show_tags'])
+        self._tag_size = str(values['tag_size'])
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._window_size = values['window_size']
 
@@ -1381,6 +1453,8 @@ class MainWindow(QMainWindow):
                     account,
                     show_ranks=self._show_ranks,
                     show_rank_images=self._show_rank_images,
+                    show_tags=self._show_tags,
+                    tag_size=self._tag_size,
                 )
                 self.account_list.setItemWidget(item, widget)
 
