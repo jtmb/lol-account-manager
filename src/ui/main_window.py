@@ -453,7 +453,7 @@ class AccountListItem(QFrame):
         self.rank_label.setStyleSheet(
             "background: transparent; border: none; color: #8b93a8; font-size: 10px;"
         )
-        self.rank_label.setMinimumWidth(120)
+        self.rank_label.setMinimumWidth(150)
         outer.addWidget(self.rank_label)
 
         self.setLayout(outer)
@@ -544,8 +544,8 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("League of Legends Account Manager")
-        self.setMinimumSize(500, 400)
-        self.resize(500, 400)
+        self.setMinimumSize(560, 400)
+        self.resize(560, 400)
 
         # Central widget
         central_widget = QWidget()

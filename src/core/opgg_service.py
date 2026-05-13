@@ -104,7 +104,7 @@ def _parse_meta_description(html: str):
     win_rate = int(m.group(6))
 
     div_str = f" {division}" if division else ""
-    text = f"{tier}{div_str}  {lp} LP  {wins}W / {losses}L"
+    text = f"{tier}{div_str}  {lp} LP  {wins}W / {losses}L  {win_rate}% WR"
     return {
         "status": "ok",
         "text": text,
