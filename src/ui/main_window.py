@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QTextEdit, QSpinBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
-from PyQt5.QtGui import QFont, QColor, QPixmap
+from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
 from pathlib import Path
 from typing import Optional
 import sys
@@ -1462,8 +1462,38 @@ class MainWindow(QMainWindow):
             self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET, dark_mode=False))
             self._theme_button.setText("Dark Mode")
 
+        # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
+        self._apply_filter_input_palette()
+        QTimer.singleShot(0, self._apply_filter_input_palette)
+
         self.update_account_item_states()
         self._apply_title_bar_theme()
+
+    def _apply_filter_input_palette(self):
+        """Apply stable text/placeholder colors for filter controls."""
+        if not hasattr(self, "search_input"):
+            return
+
+        search_palette = self.search_input.palette()
+        combo_palette = self.tag_filter_combo.palette()
+
+        if self._dark_mode:
+            search_palette.setColor(QPalette.Base, QColor("#171a2a"))
+            search_palette.setColor(QPalette.Text, QColor("#dbe4ff"))
+            search_palette.setColor(QPalette.PlaceholderText, QColor("#a8b4d6"))
+            combo_palette.setColor(QPalette.Base, QColor("#181825"))
+            combo_palette.setColor(QPalette.Text, QColor("#cdd6f4"))
+            combo_palette.setColor(QPalette.ButtonText, QColor("#cdd6f4"))
+        else:
+            search_palette.setColor(QPalette.Base, QColor("#ffffff"))
+            search_palette.setColor(QPalette.Text, QColor("#1f2937"))
+            search_palette.setColor(QPalette.PlaceholderText, QColor("#6b7280"))
+            combo_palette.setColor(QPalette.Base, QColor("#ffffff"))
+            combo_palette.setColor(QPalette.Text, QColor("#111827"))
+            combo_palette.setColor(QPalette.ButtonText, QColor("#111827"))
+
+        self.search_input.setPalette(search_palette)
+        self.tag_filter_combo.setPalette(combo_palette)
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
