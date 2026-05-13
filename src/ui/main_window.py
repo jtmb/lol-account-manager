@@ -1276,9 +1276,15 @@ class MainWindow(QMainWindow):
         self._settings['dark_mode'] = self._dark_mode
         save_settings(self._settings)
 
-    def _theme_with_text_zoom(self, base: str) -> str:
+    def _theme_with_text_zoom(self, base: str, dark_mode: bool) -> str:
         """Merge base theme with text zoom scaling."""
         point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
+        cog_bg = "#313244" if dark_mode else "#f3f4f6"
+        cog_fg = "#cdd6f4" if dark_mode else "#111827"
+        cog_border = "#45475a" if dark_mode else "#cfcfcf"
+        cog_hover = "#45475a" if dark_mode else "#e5e7eb"
+        cog_pressed = "#585b70" if dark_mode else "#d1d5db"
+        cog_focus = "#6c7086" if dark_mode else "#9ca3af"
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -1288,9 +1294,9 @@ class MainWindow(QMainWindow):
             + "    max-width: 30px;\n"
             + "    min-height: 30px;\n"
             + "    max-height: 30px;\n"
-            + "    background-color: #313244;\n"
-            + "    color: #cdd6f4;\n"
-            + "    border: 1px solid #45475a;\n"
+            + f"    background-color: {cog_bg};\n"
+            + f"    color: {cog_fg};\n"
+            + f"    border: 1px solid {cog_border};\n"
             + "    border-radius: 5px;\n"
             + "    padding: 0px;\n"
             + "    font-size: 14px;\n"
@@ -1298,14 +1304,14 @@ class MainWindow(QMainWindow):
             + "    text-align: center;\n"
             + "}\n"
             + "QPushButton#settingsCogButton:hover {\n"
-            + "    background-color: #45475a;\n"
+            + f"    background-color: {cog_hover};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:pressed {\n"
-            + "    background-color: #585b70;\n"
+            + f"    background-color: {cog_pressed};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:focus {\n"
             + "    outline: none;\n"
-            + "    border: 1px solid #6c7086;\n"
+            + f"    border: 1px solid {cog_focus};\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
@@ -1322,7 +1328,7 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
         if self._dark_mode:
-            self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET))
+            self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
             self._theme_button.setText("Light Mode")
             self.search_input.setStyleSheet(
                 "QLineEdit#accountSearchInput {"
@@ -1337,7 +1343,7 @@ class MainWindow(QMainWindow):
                 "}"
             )
         else:
-            self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET))
+            self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET, dark_mode=False))
             self._theme_button.setText("Dark Mode")
             self.search_input.setStyleSheet(
                 "QLineEdit#accountSearchInput {"
