@@ -509,6 +509,8 @@ class SettingsDialog(QDialog):
 
         actions_grid = QGridLayout()
         actions_grid.setSpacing(8)
+        actions_grid.setColumnStretch(0, 1)
+        actions_grid.setColumnStretch(1, 1)
 
         mw = self.parent()
 
