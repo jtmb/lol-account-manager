@@ -693,21 +693,21 @@ class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
 
     _TAG_PALETTE_DARK = [
-        ("#24314a", "#5d86c9", "#d8e7ff"),
-        ("#3a2f1f", "#c8a464", "#ffefcf"),
-        ("#24382a", "#6fbc86", "#d5f3de"),
-        ("#3a2638", "#b08ac7", "#f0ddff"),
-        ("#3a2626", "#c47b7b", "#ffe0e0"),
-        ("#26353a", "#74b9c9", "#ddf8ff"),
+        ("#0d2f40", "#1a556d", "#93dcff", "#27b5f7"),
+        ("#33250c", "#5f4313", "#ffd38a", "#f5a623"),
+        ("#133321", "#24613d", "#9de8bd", "#32c46d"),
+        ("#35152b", "#662a57", "#f4b5e5", "#de4db5"),
+        ("#3a171d", "#6f2d38", "#ffb8c2", "#ff5c7a"),
+        ("#202d46", "#374c72", "#b9d2ff", "#5f9cff"),
     ]
 
     _TAG_PALETTE_LIGHT = [
-        ("#edf3ff", "#89aee8", "#2e4f8f"),
-        ("#fff5e9", "#e2b879", "#8a5f24"),
-        ("#edf9ef", "#95d2a8", "#2f6a45"),
-        ("#f8f1ff", "#c5a9e8", "#69408f"),
-        ("#ffefef", "#e4a4a4", "#8f3e3e"),
-        ("#ecf9fc", "#97d3df", "#2f6471"),
+        ("#e8f7ff", "#badff2", "#0f4c6a", "#1f9ed6"),
+        ("#fff5e6", "#f0d3a3", "#6d4a13", "#d18908"),
+        ("#ebfaef", "#bde7c8", "#1d6339", "#2fa35d"),
+        ("#fff0fb", "#e6c0da", "#7d2f6d", "#c24ea1"),
+        ("#fff0f2", "#efc1ca", "#7f3040", "#d75b72"),
+        ("#edf2ff", "#c3d0ef", "#27467a", "#4d78db"),
     ]
     
     def __init__(self, account: Account, parent=None, show_ranks: bool = True, show_rank_images: bool = True):
@@ -800,7 +800,7 @@ class AccountListItem(QFrame):
             tags_layout.setSpacing(3)
             for tag in tags[:4]:
                 tag_label = QLabel(f"#{tag}")
-                tag_label.setStyleSheet(self._tag_chip_stylesheet(tag))
+                tag_label.setStyleSheet(self._tag_chip_stylesheet(len(self._tag_chip_labels)))
                 self._tag_chip_labels.append(tag_label)
                 tags_layout.addWidget(tag_label)
             if len(tags) > 4:
@@ -858,19 +858,20 @@ class AccountListItem(QFrame):
         self.setLayout(outer)
         self._update_visual_state()
 
-    def _tag_chip_stylesheet(self, tag_text: str) -> str:
-        """Return themed chip style for a tag text."""
+    def _tag_chip_stylesheet(self, chip_index: int) -> str:
+        """Return themed chip style using index-based unique color assignment."""
         palette = self._TAG_PALETTE_DARK if self._dark_mode else self._TAG_PALETTE_LIGHT
-        idx = sum(ord(ch) for ch in (tag_text or "")) % len(palette)
-        bg, border, fg = palette[idx]
+        idx = chip_index % len(palette)
+        bg, border, fg, accent = palette[idx]
         return (
             f"background-color: {bg};"
             f"border: 1px solid {border};"
-            "border-radius: 7px;"
+            f"border-left: 3px solid {accent};"
+            "border-radius: 4px;"
             f"color: {fg};"
             "font-size: 9px;"
-            "font-weight: 600;"
-            "padding: 1px 5px;"
+            "font-weight: 700;"
+            "padding: 1px 5px 1px 4px;"
         )
 
     def _tag_more_chip_stylesheet(self) -> str:
@@ -879,30 +880,32 @@ class AccountListItem(QFrame):
             return (
                 "background-color: #2e3448;"
                 "border: 1px solid #566080;"
-                "border-radius: 7px;"
+                "border-left: 3px solid #9fb2e8;"
+                "border-radius: 4px;"
                 "color: #cfd7f2;"
                 "font-size: 9px;"
                 "font-weight: 600;"
-                "padding: 1px 5px;"
+                "padding: 1px 5px 1px 4px;"
             )
         return (
             "background-color: #eef1f7;"
             "border: 1px solid #b7bfd3;"
-            "border-radius: 7px;"
+            "border-left: 3px solid #93a4ce;"
+            "border-radius: 4px;"
             "color: #44506d;"
             "font-size: 9px;"
             "font-weight: 600;"
-            "padding: 1px 5px;"
+            "padding: 1px 5px 1px 4px;"
         )
 
     def _refresh_tag_chip_styles(self):
         """Refresh chip colors when theme changes."""
-        for label in self._tag_chip_labels:
+        for idx, label in enumerate(self._tag_chip_labels):
             text = label.text().strip()
             if text.startswith("+"):
                 label.setStyleSheet(self._tag_more_chip_stylesheet())
             else:
-                label.setStyleSheet(self._tag_chip_stylesheet(text.lstrip("#")))
+                label.setStyleSheet(self._tag_chip_stylesheet(idx))
 
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
