@@ -462,27 +462,12 @@ class AccountListItem(QFrame):
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
         status = rank_data.get("status", "error")
+        color = rank_data.get("color", "#585b70")
         if status == "ok":
-            tier = rank_data.get("tier", "").upper()
-            # Colour the tier text
-            tier_colors = {
-                "IRON": "#7c7c7c",
-                "BRONZE": "#cd7f32",
-                "SILVER": "#a8a8a8",
-                "GOLD": "#f4c430",
-                "PLATINUM": "#4ead8e",
-                "EMERALD": "#50c878",
-                "DIAMOND": "#5f9ea0",
-                "MASTER": "#9b59b6",
-                "GRANDMASTER": "#e74c3c",
-                "CHALLENGER": "#f1c40f",
-            }
-            color = tier_colors.get(tier, "#8b93a8")
-            text = rank_data.get("text", "")
             self.rank_label.setStyleSheet(
                 f"background: transparent; border: none; color: {color}; font-size: 10px; font-weight: bold;"
             )
-            self.rank_label.setText(text)
+            self.rank_label.setText(rank_data.get("text", ""))
         elif status == "unranked":
             self.rank_label.setStyleSheet(
                 "background: transparent; border: none; color: #585b70; font-size: 10px;"
@@ -807,7 +792,7 @@ class MainWindow(QMainWindow):
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
-        # Cancel any leftover threads from a previous refresh
+        # Stop leftover threads from a previous refresh
         for t in self._rank_threads:
             t.quit()
         self._rank_threads.clear()
@@ -818,13 +803,13 @@ class MainWindow(QMainWindow):
             if not isinstance(widget, AccountListItem):
                 continue
             account = widget.account
-            if not getattr(account, 'display_name', None):
-                continue
-            tag_line = getattr(account, 'tag_line', 'NA1') or 'NA1'
-            region = getattr(account, 'region', 'NA') or 'NA'
+            # Use display_name if set, otherwise fall back to username
+            display_name = (getattr(account, 'display_name', '') or '').strip() or account.username
+            tag_line = (getattr(account, 'tag_line', '') or 'NA1').strip() or 'NA1'
+            region = (getattr(account, 'region', '') or 'NA').strip() or 'NA'
             thread = RankFetchThread(
                 account.username,
-                account.display_name,
+                display_name,
                 tag_line,
                 region,
             )

@@ -1,5 +1,4 @@
 """op.gg rank fetching service"""
-import json
 import re
 from urllib.parse import quote
 
@@ -28,17 +27,17 @@ OPGG_REGION_MAP = {
     "PBE": "pbe",
 }
 
-TIER_DISPLAY = {
-    "IRON": "Iron",
-    "BRONZE": "Bronze",
-    "SILVER": "Silver",
-    "GOLD": "Gold",
-    "PLATINUM": "Platinum",
-    "EMERALD": "Emerald",
-    "DIAMOND": "Diamond",
-    "MASTER": "Master",
-    "GRANDMASTER": "Grandmaster",
-    "CHALLENGER": "Challenger",
+TIER_COLORS = {
+    "Iron":        "#7c7c7c",
+    "Bronze":      "#cd7f32",
+    "Silver":      "#a8a8a8",
+    "Gold":        "#f4c430",
+    "Platinum":    "#4ead8e",
+    "Emerald":     "#50c878",
+    "Diamond":     "#5f9ea0",
+    "Master":      "#9b59b6",
+    "Grandmaster": "#e74c3c",
+    "Challenger":  "#f1c40f",
 }
 
 _HEADERS = {
@@ -49,75 +48,85 @@ _HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
     "Cache-Control": "no-cache",
 }
 
+# op.gg meta description format:
+# "Name#Tag / Silver 2 48LP / 13Win 14Lose Win rate 48% / ..."
+# (sometimes an extra number appears after division: "Silver 2 2 48LP")
+_TIERS = (
+    "Challenger", "Grandmaster", "Master",
+    "Diamond", "Emerald", "Platinum", "Gold", "Silver", "Bronze", "Iron"
+)
+_TIER_PAT = "|".join(_TIERS)
+_DESC_RE = re.compile(
+    rf'({_TIER_PAT})'
+    r'(?:\s+(\d+))?'          # optional division numeral (1-4)
+    r'(?:\s+\d+)?'            # optional extra number op.gg sometimes inserts
+    r'\s+(\d+)LP'
+    r'\s*/\s*(\d+)Win\s+(\d+)Lose'
+    r'\s+Win rate\s+(\d+)%',
+    re.IGNORECASE,
+)
 
-def _extract_next_data(html: str) -> dict:
-    """Extract the __NEXT_DATA__ JSON blob from a Next.js page."""
-    match = re.search(
-        r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
+
+def _parse_meta_description(html: str):
+    """
+    Extract rank info from the og:description / meta description tag.
+    Returns a dict or None.
+    """
+    # Try <meta name="description" content="...">
+    meta_match = re.search(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=(["\'])(.*?)\1',
         html,
-        re.DOTALL,
+        re.DOTALL | re.IGNORECASE,
     )
-    if not match:
-        return {}
-    try:
-        return json.loads(match.group(1))
-    except (json.JSONDecodeError, ValueError):
-        return {}
+    if not meta_match:
+        # Also try content-first attribute ordering
+        meta_match = re.search(
+            r'<meta[^>]+content=(["\'])(.*?)\1[^>]+name=["\']description["\']',
+            html,
+            re.DOTALL | re.IGNORECASE,
+        )
+    description = meta_match.group(2) if meta_match else ""
+
+    m = _DESC_RE.search(description)
+    if not m:
+        return None
+
+    tier = m.group(1).capitalize()
+    # Normalise multi-word tiers
+    tier = {"Grandmaster": "Grandmaster", "Challenger": "Challenger"}.get(tier, tier)
+    division = m.group(2) or ""   # empty for Master+
+    lp = int(m.group(3))
+    wins = int(m.group(4))
+    losses = int(m.group(5))
+    win_rate = int(m.group(6))
+
+    div_str = f" {division}" if division else ""
+    text = f"{tier}{div_str}  {lp} LP  {wins}W / {losses}L"
+    return {
+        "status": "ok",
+        "text": text,
+        "tier": tier,
+        "division": division,
+        "lp": lp,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": win_rate,
+        "color": TIER_COLORS.get(tier, "#8b93a8"),
+    }
 
 
-def _parse_league_stats(next_data: dict) -> dict | None:
-    """
-    Walk the __NEXT_DATA__ tree to find solo-queue league stats.
-    Returns a dict with keys: tier, division, lp, wins, losses
-    or None if not found / unranked.
-    """
-    try:
-        page_props = next_data.get("props", {}).get("pageProps", {})
-        data = page_props.get("data", {})
-
-        # op.gg sometimes wraps data under "summoner", sometimes directly
-        summoner = data.get("summoner", data)
-
-        league_stats = summoner.get("league_stats") or summoner.get("leagueStats") or []
-
-        for stat in league_stats:
-            queue = stat.get("queue_info") or stat.get("queueInfo") or {}
-            game_type = queue.get("game_type") or queue.get("gameType") or ""
-            if "SOLO" not in game_type.upper():
-                continue
-
-            tier_info = stat.get("tier_info") or stat.get("tierInfo") or {}
-            tier = (tier_info.get("tier") or "").upper()
-            division = tier_info.get("division") or tier_info.get("rank") or ""
-            lp = tier_info.get("lp") or tier_info.get("leaguePoints") or 0
-            wins = stat.get("win") or stat.get("wins") or 0
-            losses = stat.get("lose") or stat.get("losses") or 0
-
-            if tier:
-                return {
-                    "tier": tier,
-                    "division": division,
-                    "lp": lp,
-                    "wins": wins,
-                    "losses": losses,
-                }
-    except Exception:
-        pass
-    return None
-
-
-def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 10) -> dict:
+def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 12) -> dict:
     """
     Fetch solo-queue rank data for an account from op.gg.
 
     Returns a dict with:
         - ``status``: "ok", "unranked", or "error"
-        - ``text``:   short display string, e.g. "Gold II  45 LP  80W / 70L"
-        - ``tier``, ``division``, ``lp``, ``wins``, ``losses``  (when status=="ok")
+        - ``text``:   short display string, e.g. "Gold 2  45 LP  80W / 70L"
+        - ``color``:  hex colour for the tier label
+        - extra keys when status=="ok": tier, division, lp, wins, losses, win_rate
         - ``message``:  error description (when status=="error")
     """
     region_slug = OPGG_REGION_MAP.get(region.upper(), region.lower())
@@ -128,26 +137,18 @@ def fetch_rank(display_name: str, tag_line: str, region: str, timeout: int = 10)
         response = requests.get(url, headers=_HEADERS, timeout=timeout)
         response.raise_for_status()
     except requests.exceptions.Timeout:
-        return {"status": "error", "message": "Timeout"}
+        return {"status": "error", "message": "Timeout", "color": "#585b70"}
     except requests.exceptions.HTTPError as exc:
-        return {"status": "error", "message": f"HTTP {exc.response.status_code}"}
+        code = exc.response.status_code if exc.response is not None else "?"
+        return {"status": "error", "message": f"HTTP {code}", "color": "#585b70"}
     except requests.exceptions.RequestException as exc:
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": str(exc), "color": "#585b70"}
 
-    next_data = _extract_next_data(response.text)
-    stats = _parse_league_stats(next_data)
+    result = _parse_meta_description(response.text)
+    if result:
+        return result
 
-    if stats is None:
-        return {"status": "unranked", "text": "Unranked"}
+    return {"status": "unranked", "text": "Unranked", "color": "#585b70"}
 
-    tier_label = TIER_DISPLAY.get(stats["tier"], stats["tier"].capitalize())
-    division = stats["division"]
-    # Master+ tiers have no division
-    div_str = f" {division}" if division and stats["tier"] not in ("MASTER", "GRANDMASTER", "CHALLENGER") else ""
 
-    text = f"{tier_label}{div_str}  {stats['lp']} LP  {stats['wins']}W / {stats['losses']}L"
-    return {
-        "status": "ok",
-        "text": text,
-        **stats,
-    }
+
