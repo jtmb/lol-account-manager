@@ -15,6 +15,7 @@ import time
 
 from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
+from src.core.opgg_service import fetch_rank
 from src.security.encryption import PasswordEncryption
 from src.config.paths import (
     get_lol_executable,
@@ -119,6 +120,22 @@ if sys.platform.startswith("win"):
     DWMWA_BORDER_COLOR = 34
     DWMWA_CAPTION_COLOR = 35
     DWMWA_TEXT_COLOR = 36
+
+
+class RankFetchThread(QThread):
+    """Background thread that fetches rank data from op.gg for one account."""
+    result_ready = pyqtSignal(str, dict)  # username, rank_data
+
+    def __init__(self, username: str, display_name: str, tag_line: str, region: str):
+        super().__init__()
+        self.username = username
+        self.display_name = display_name
+        self.tag_line = tag_line
+        self.region = region
+
+    def run(self):
+        data = fetch_rank(self.display_name, self.tag_line, self.region)
+        self.result_ready.emit(self.username, data)
 
 
 class LoginThread(QThread):
@@ -428,8 +445,54 @@ class AccountListItem(QFrame):
 
         outer.addLayout(text_layout)
         outer.addStretch()
+
+        # Rank label (right side)
+        self.rank_label = QLabel("...")
+        self.rank_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        self.rank_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.rank_label.setStyleSheet(
+            "background: transparent; border: none; color: #8b93a8; font-size: 10px;"
+        )
+        self.rank_label.setMinimumWidth(120)
+        outer.addWidget(self.rank_label)
+
         self.setLayout(outer)
         self._update_visual_state()
+
+    def set_rank(self, rank_data: dict):
+        """Update the rank label with fetched op.gg data."""
+        status = rank_data.get("status", "error")
+        if status == "ok":
+            tier = rank_data.get("tier", "").upper()
+            # Colour the tier text
+            tier_colors = {
+                "IRON": "#7c7c7c",
+                "BRONZE": "#cd7f32",
+                "SILVER": "#a8a8a8",
+                "GOLD": "#f4c430",
+                "PLATINUM": "#4ead8e",
+                "EMERALD": "#50c878",
+                "DIAMOND": "#5f9ea0",
+                "MASTER": "#9b59b6",
+                "GRANDMASTER": "#e74c3c",
+                "CHALLENGER": "#f1c40f",
+            }
+            color = tier_colors.get(tier, "#8b93a8")
+            text = rank_data.get("text", "")
+            self.rank_label.setStyleSheet(
+                f"background: transparent; border: none; color: {color}; font-size: 10px; font-weight: bold;"
+            )
+            self.rank_label.setText(text)
+        elif status == "unranked":
+            self.rank_label.setStyleSheet(
+                "background: transparent; border: none; color: #585b70; font-size: 10px;"
+            )
+            self.rank_label.setText("Unranked")
+        else:
+            self.rank_label.setStyleSheet(
+                "background: transparent; border: none; color: #585b70; font-size: 10px;"
+            )
+            self.rank_label.setText("")
 
     def set_dark_mode(self, enabled: bool):
         self._dark_mode = enabled
@@ -489,6 +552,7 @@ class MainWindow(QMainWindow):
         self.launch_progress: Optional[QProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._dark_mode: bool = load_settings().get('dark_mode', True)
+        self._rank_threads: list = []  # keep references so threads aren't GC'd
         self.init_ui()
         self._apply_theme()
         self.check_master_password()
@@ -739,7 +803,44 @@ class MainWindow(QMainWindow):
                 self.account_list.setItemWidget(item, widget)
 
             self.update_account_item_states()
+            self._start_rank_fetches()
     
+    def _start_rank_fetches(self):
+        """Kick off a background rank fetch for every visible account row."""
+        # Cancel any leftover threads from a previous refresh
+        for t in self._rank_threads:
+            t.quit()
+        self._rank_threads.clear()
+
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            widget = self.account_list.itemWidget(item)
+            if not isinstance(widget, AccountListItem):
+                continue
+            account = widget.account
+            if not getattr(account, 'display_name', None):
+                continue
+            tag_line = getattr(account, 'tag_line', 'NA1') or 'NA1'
+            region = getattr(account, 'region', 'NA') or 'NA'
+            thread = RankFetchThread(
+                account.username,
+                account.display_name,
+                tag_line,
+                region,
+            )
+            thread.result_ready.connect(self._on_rank_result)
+            self._rank_threads.append(thread)
+            thread.start()
+
+    def _on_rank_result(self, username: str, rank_data: dict):
+        """Update the matching AccountListItem widget with fresh rank data."""
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            widget = self.account_list.itemWidget(item)
+            if isinstance(widget, AccountListItem) and widget.account.username == username:
+                widget.set_rank(rank_data)
+                break
+
     def on_account_selected(self):
         """Handle account selection"""
         selected = self.account_list.currentItem()
