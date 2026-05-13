@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog, QProgressDialog, QComboBox,
+    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox
 )
@@ -252,6 +252,18 @@ QProgressDialog {
     background-color: #1e1e2e;
     color: #cdd6f4;
 }
+
+QProgressBar {
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    background-color: #181825;
+    text-align: center;
+    min-height: 16px;
+}
+QProgressBar::chunk {
+    border-radius: 5px;
+    background-color: #7aa2f7;
+}
 """
 
 LIGHT_STYLESHEET = """
@@ -477,6 +489,124 @@ class MasterPasswordDialog(QDialog):
         
         layout.addLayout(button_layout)
         self.setLayout(layout)
+
+
+class LaunchProgressDialog(QDialog):
+    """Compact launch dialog with predictable proportions."""
+
+    def __init__(self, message: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Launching...")
+        self.setModal(True)
+        self.setMinimumSize(440, 170)
+        self.setMaximumWidth(560)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
+        dark_mode = bool(getattr(parent, "_dark_mode", True))
+        if dark_mode:
+            self.setStyleSheet(
+                "QDialog {"
+                "background-color: #1e1e2e;"
+                "color: #cdd6f4;"
+                "}"
+                "QLabel#launchTitle {"
+                "font-size: 12pt;"
+                "font-weight: 600;"
+                "color: #e2e8f0;"
+                "}"
+                "QLabel#launchMessage {"
+                "font-size: 10.5pt;"
+                "color: #cdd6f4;"
+                "}"
+                "QProgressBar {"
+                "border: 1px solid #45475a;"
+                "border-radius: 7px;"
+                "background-color: #181825;"
+                "text-align: center;"
+                "min-height: 18px;"
+                "}"
+                "QProgressBar::chunk {"
+                "border-radius: 6px;"
+                "background-color: #7aa2f7;"
+                "}"
+                "QPushButton {"
+                "background-color: #313244;"
+                "color: #cdd6f4;"
+                "border: 1px solid #45475a;"
+                "border-radius: 5px;"
+                "padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #45475a; }"
+                "QPushButton:pressed { background-color: #585b70; }"
+            )
+        else:
+            self.setStyleSheet(
+                "QDialog {"
+                "background-color: #f8fafc;"
+                "color: #111827;"
+                "}"
+                "QLabel#launchTitle {"
+                "font-size: 12pt;"
+                "font-weight: 600;"
+                "color: #111827;"
+                "}"
+                "QLabel#launchMessage {"
+                "font-size: 10.5pt;"
+                "color: #374151;"
+                "}"
+                "QProgressBar {"
+                "border: 1px solid #d1d5db;"
+                "border-radius: 7px;"
+                "background-color: #ffffff;"
+                "text-align: center;"
+                "min-height: 18px;"
+                "}"
+                "QProgressBar::chunk {"
+                "border-radius: 6px;"
+                "background-color: #4f7cff;"
+                "}"
+                "QPushButton {"
+                "background-color: #f3f4f6;"
+                "color: #111827;"
+                "border: 1px solid #d1d5db;"
+                "border-radius: 5px;"
+                "padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #e5e7eb; }"
+                "QPushButton:pressed { background-color: #d1d5db; }"
+            )
+
+        self._title_label = QLabel("Starting launch")
+        self._title_label.setObjectName("launchTitle")
+        self._message_label = QLabel(message)
+        self._message_label.setObjectName("launchMessage")
+        self._message_label.setWordWrap(True)
+
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setRange(0, 0)
+        self._progress_bar.setTextVisible(False)
+
+        self._close_button = QPushButton("Close")
+        self._close_button.setAutoDefault(False)
+        self._close_button.setDefault(False)
+        self._close_button.setFixedWidth(86)
+        self._close_button.clicked.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        layout.addWidget(self._title_label)
+        layout.addWidget(self._message_label)
+        layout.addWidget(self._progress_bar)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        button_row.addWidget(self._close_button)
+        layout.addLayout(button_row)
+
+    def set_message(self, message: str):
+        self._message_label.setText(message)
     
     def get_password(self):
         if self.is_setup:
@@ -1304,7 +1434,7 @@ class MainWindow(QMainWindow):
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
-        self.launch_progress: Optional[QProgressDialog] = None
+        self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._show_ranks: bool = self._settings.get('show_ranks', True)
@@ -2050,19 +2180,12 @@ QMenu::separator {
         self.current_launch_username = account.username
         
         # Show cancellable progress dialog
-        self.launch_progress = QProgressDialog(
+        self.launch_progress = LaunchProgressDialog(
             f"Starting League of Legends for {account.display_name}...",
-            "Close",
-            0,
-            0,
             self,
         )
-        self.launch_progress.setWindowTitle("Launching...")
         self.launch_progress.setWindowModality(Qt.WindowModal)
-        self.launch_progress.setAutoClose(False)
-        self.launch_progress.setAutoReset(False)
-        self.launch_progress.setMinimumDuration(0)
-        self.launch_progress.canceled.connect(self._dismiss_launch_progress)
+        self.launch_progress.rejected.connect(self._dismiss_launch_progress)
         self.launch_progress.show()
         QTimer.singleShot(0, self._center_launch_progress)
         
@@ -2177,7 +2300,7 @@ QMenu::separator {
         # Clear shared reference first to avoid re-entrant double-close crashes.
         self.launch_progress = None
         try:
-            progress.canceled.disconnect(self._dismiss_launch_progress)
+            progress.rejected.disconnect(self._dismiss_launch_progress)
         except Exception:
             pass
 
