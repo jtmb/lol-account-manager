@@ -27,6 +27,16 @@ from src.config.paths import (
 )
 
 
+def _escape_html(text: str) -> str:
+    """Escape text before inserting it into rich-text labels."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -450,6 +460,7 @@ class AccountListItem(QFrame):
         self.rank_label = QLabel("...")
         self.rank_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.rank_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.rank_label.setTextFormat(Qt.RichText)
         self.rank_label.setStyleSheet(
             "background: transparent; border: none; color: #8b93a8; font-size: 10px;"
         )
@@ -464,10 +475,16 @@ class AccountListItem(QFrame):
         status = rank_data.get("status", "error")
         color = rank_data.get("color", "#585b70")
         if status == "ok":
-            self.rank_label.setStyleSheet(
-                f"background: transparent; border: none; color: {color}; font-size: 10px; font-weight: bold;"
+            tier = _escape_html(f"{rank_data.get('tier', '')}{(' ' + rank_data.get('division', '')) if rank_data.get('division') else ''}")
+            lp = _escape_html(f"{rank_data.get('lp', '')} LP")
+            wins = _escape_html(f"{rank_data.get('wins', '')}W / {rank_data.get('losses', '')}L")
+            win_rate = _escape_html(f"{rank_data.get('win_rate', '')}% WR")
+            neutral_color = "#8b93a8" if self._dark_mode else "#4b5563"
+            self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 10px;")
+            self.rank_label.setText(
+                f"<span style='color:{color}; font-weight:600;'>{tier}</span> "
+                f"<span style='color:{neutral_color};'>{lp}  {wins}  {win_rate}</span>"
             )
-            self.rank_label.setText(rank_data.get("text", ""))
         elif status == "unranked":
             self.rank_label.setStyleSheet(
                 "background: transparent; border: none; color: #585b70; font-size: 10px;"
