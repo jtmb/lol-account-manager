@@ -36,6 +36,8 @@
 
 Windows desktop app for saving, organizing, and launching multiple League of Legends accounts from one place.
 
+![League of Legends Account Manager Preview](assets/image.png)
+
 ## Highlighted Features
 
 ## Full Feature List

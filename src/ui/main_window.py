@@ -1198,6 +1198,8 @@ class MainWindow(QMainWindow):
         self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
         self._settings_button.setFixedSize(30, 30)
+        self._settings_button.setAutoDefault(False)
+        self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
         top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
@@ -1286,10 +1288,24 @@ class MainWindow(QMainWindow):
             + "    max-width: 30px;\n"
             + "    min-height: 30px;\n"
             + "    max-height: 30px;\n"
+            + "    background-color: #313244;\n"
+            + "    color: #cdd6f4;\n"
+            + "    border: 1px solid #45475a;\n"
+            + "    border-radius: 5px;\n"
             + "    padding: 0px;\n"
             + "    font-size: 14px;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
+            + "}\n"
+            + "QPushButton#settingsCogButton:hover {\n"
+            + "    background-color: #45475a;\n"
+            + "}\n"
+            + "QPushButton#settingsCogButton:pressed {\n"
+            + "    background-color: #585b70;\n"
+            + "}\n"
+            + "QPushButton#settingsCogButton:focus {\n"
+            + "    outline: none;\n"
+            + "    border: 1px solid #6c7086;\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
