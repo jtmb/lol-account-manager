@@ -797,14 +797,16 @@ class AccountListItem(QFrame):
             tags_wrap.setAttribute(Qt.WA_TranslucentBackground, True)
             tags_layout = QHBoxLayout(tags_wrap)
             tags_layout.setContentsMargins(0, 0, 0, 0)
-            tags_layout.setSpacing(3)
+            tags_layout.setSpacing(2)
             for tag in tags[:4]:
                 tag_label = QLabel(f"#{tag}")
+                tag_label.setMaximumHeight(14)
                 tag_label.setStyleSheet(self._tag_chip_stylesheet(len(self._tag_chip_labels)))
                 self._tag_chip_labels.append(tag_label)
                 tags_layout.addWidget(tag_label)
             if len(tags) > 4:
                 more_label = QLabel(f"+{len(tags) - 4}")
+                more_label.setMaximumHeight(14)
                 more_label.setStyleSheet(self._tag_more_chip_stylesheet())
                 self._tag_chip_labels.append(more_label)
                 tags_layout.addWidget(more_label)
@@ -866,12 +868,12 @@ class AccountListItem(QFrame):
         return (
             f"background-color: {bg};"
             f"border: 1px solid {border};"
-            f"border-left: 3px solid {accent};"
-            "border-radius: 4px;"
+            f"border-left: 2px solid {accent};"
+            "border-radius: 3px;"
             f"color: {fg};"
-            "font-size: 9px;"
+            "font-size: 8px;"
             "font-weight: 700;"
-            "padding: 1px 5px 1px 4px;"
+            "padding: 0px 4px 0px 3px;"
         )
 
     def _tag_more_chip_stylesheet(self) -> str:
@@ -880,22 +882,22 @@ class AccountListItem(QFrame):
             return (
                 "background-color: #2e3448;"
                 "border: 1px solid #566080;"
-                "border-left: 3px solid #9fb2e8;"
-                "border-radius: 4px;"
+                "border-left: 2px solid #9fb2e8;"
+                "border-radius: 3px;"
                 "color: #cfd7f2;"
-                "font-size: 9px;"
+                "font-size: 8px;"
                 "font-weight: 600;"
-                "padding: 1px 5px 1px 4px;"
+                "padding: 0px 4px 0px 3px;"
             )
         return (
             "background-color: #eef1f7;"
             "border: 1px solid #b7bfd3;"
-            "border-left: 3px solid #93a4ce;"
-            "border-radius: 4px;"
+            "border-left: 2px solid #93a4ce;"
+            "border-radius: 3px;"
             "color: #44506d;"
-            "font-size: 9px;"
+            "font-size: 8px;"
             "font-weight: 600;"
-            "padding: 1px 5px 1px 4px;"
+            "padding: 0px 4px 0px 3px;"
         )
 
     def _refresh_tag_chip_styles(self):
