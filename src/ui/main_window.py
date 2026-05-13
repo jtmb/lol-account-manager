@@ -691,6 +691,24 @@ class SettingsDialog(QDialog):
 
 class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
+
+    _TAG_PALETTE_DARK = [
+        ("#24314a", "#5d86c9", "#d8e7ff"),
+        ("#3a2f1f", "#c8a464", "#ffefcf"),
+        ("#24382a", "#6fbc86", "#d5f3de"),
+        ("#3a2638", "#b08ac7", "#f0ddff"),
+        ("#3a2626", "#c47b7b", "#ffe0e0"),
+        ("#26353a", "#74b9c9", "#ddf8ff"),
+    ]
+
+    _TAG_PALETTE_LIGHT = [
+        ("#edf3ff", "#89aee8", "#2e4f8f"),
+        ("#fff5e9", "#e2b879", "#8a5f24"),
+        ("#edf9ef", "#95d2a8", "#2f6a45"),
+        ("#f8f1ff", "#c5a9e8", "#69408f"),
+        ("#ffefef", "#e4a4a4", "#8f3e3e"),
+        ("#ecf9fc", "#97d3df", "#2f6471"),
+    ]
     
     def __init__(self, account: Account, parent=None, show_ranks: bool = True, show_rank_images: bool = True):
         super().__init__(parent)
@@ -709,6 +727,7 @@ class AccountListItem(QFrame):
         self._selected = False
         self._hovered = False
         self._dark_mode = True
+        self._tag_chip_labels: list[QLabel] = []
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setOffset(0, 3)
         self._shadow.setBlurRadius(0)
@@ -774,13 +793,18 @@ class AccountListItem(QFrame):
 
         tags = getattr(self.account, "tags", []) or []
         if tags:
-            preview = " ".join(f"#{t}" for t in tags[:3])
-            if len(tags) > 3:
-                preview += " +"
-            tags_label = QLabel(preview)
-            tags_label.setAttribute(Qt.WA_TranslucentBackground, True)
-            tags_label.setStyleSheet("background: transparent; border: none; color: #7c87a6; font-size: 10px;")
-            user_row.addWidget(tags_label)
+            for tag in tags[:4]:
+                tag_label = QLabel(f"#{tag}")
+                tag_label.setAttribute(Qt.WA_TranslucentBackground, True)
+                tag_label.setStyleSheet(self._tag_chip_stylesheet(tag))
+                self._tag_chip_labels.append(tag_label)
+                user_row.addWidget(tag_label)
+            if len(tags) > 4:
+                more_label = QLabel(f"+{len(tags) - 4}")
+                more_label.setAttribute(Qt.WA_TranslucentBackground, True)
+                more_label.setStyleSheet(self._tag_more_chip_stylesheet())
+                self._tag_chip_labels.append(more_label)
+                user_row.addWidget(more_label)
 
         if self.account.ban_status == "permanent":
             ban_label = QLabel("⛔ Permanently Banned")
@@ -829,6 +853,52 @@ class AccountListItem(QFrame):
 
         self.setLayout(outer)
         self._update_visual_state()
+
+    def _tag_chip_stylesheet(self, tag_text: str) -> str:
+        """Return themed chip style for a tag text."""
+        palette = self._TAG_PALETTE_DARK if self._dark_mode else self._TAG_PALETTE_LIGHT
+        idx = sum(ord(ch) for ch in (tag_text or "")) % len(palette)
+        bg, border, fg = palette[idx]
+        return (
+            f"background-color: {bg};"
+            f"border: 1px solid {border};"
+            "border-radius: 8px;"
+            f"color: {fg};"
+            "font-size: 9px;"
+            "font-weight: 600;"
+            "padding: 1px 6px;"
+        )
+
+    def _tag_more_chip_stylesheet(self) -> str:
+        """Return style for the overflow chip (+N)."""
+        if self._dark_mode:
+            return (
+                "background-color: #2e3448;"
+                "border: 1px solid #566080;"
+                "border-radius: 8px;"
+                "color: #cfd7f2;"
+                "font-size: 9px;"
+                "font-weight: 600;"
+                "padding: 1px 6px;"
+            )
+        return (
+            "background-color: #eef1f7;"
+            "border: 1px solid #b7bfd3;"
+            "border-radius: 8px;"
+            "color: #44506d;"
+            "font-size: 9px;"
+            "font-weight: 600;"
+            "padding: 1px 6px;"
+        )
+
+    def _refresh_tag_chip_styles(self):
+        """Refresh chip colors when theme changes."""
+        for label in self._tag_chip_labels:
+            text = label.text().strip()
+            if text.startswith("+"):
+                label.setStyleSheet(self._tag_more_chip_stylesheet())
+            else:
+                label.setStyleSheet(self._tag_chip_stylesheet(text.lstrip("#")))
 
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
@@ -883,6 +953,7 @@ class AccountListItem(QFrame):
 
     def set_dark_mode(self, enabled: bool):
         self._dark_mode = enabled
+        self._refresh_tag_chip_styles()
         self._update_visual_state()
 
     def set_selected(self, selected: bool):
