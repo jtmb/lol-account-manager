@@ -30,6 +30,7 @@ from src.config.paths import (
     set_custom_lol_exe,
     reset_settings,
     get_default_lol_executable_path,
+    BACKUPS_DIR,
     load_settings,
     save_settings,
 )
@@ -2190,7 +2191,7 @@ QMenu::separator {
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Export Backup",
-            "lol_accounts_backup.lolbak",
+            str(BACKUPS_DIR / "lol_accounts_backup.lolbak"),
             "LoL Backup (*.lolbak);;JSON files (*.json);;All files (*)",
         )
         if not file_path:
@@ -2216,7 +2217,7 @@ QMenu::separator {
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Import Backup",
-            "",
+            str(BACKUPS_DIR),
             "LoL Backup (*.lolbak);;JSON files (*.json);;All files (*)",
         )
         if not file_path:
