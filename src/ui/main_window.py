@@ -646,6 +646,8 @@ class SettingsDialog(QDialog):
         ("Large", "large"),
     ]
 
+    BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
+
     def __init__(self, parent=None, settings: Optional[dict] = None):
         super().__init__(parent)
         self._settings = settings or {}
@@ -724,16 +726,31 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.auto_backup_checkbox)
 
         backup_keep_row = QHBoxLayout()
-        backup_keep_row.addWidget(QLabel("Keep auto backups:"))
-        self.auto_backup_keep_spin = QSpinBox()
-        self.auto_backup_keep_spin.setRange(1, 200)
-        self.auto_backup_keep_spin.setValue(int(self._settings.get("auto_backup_keep_count", 20)))
-        self.auto_backup_keep_spin.setSuffix(" files")
-        backup_keep_row.addWidget(self.auto_backup_keep_spin)
+        keep_backups_tip = (
+            "A backup is created each time account data is saved "
+            "(for example after add, edit, delete, or import).\n"
+            "This value controls how many recent auto backups are kept; "
+            "older backups are removed automatically."
+        )
+        keep_backups_label = QLabel("Keep auto backups:")
+        keep_backups_label.setToolTip(keep_backups_tip)
+        backup_keep_row.addWidget(keep_backups_label)
+        self.auto_backup_keep_combo = QComboBox()
+        self.auto_backup_keep_combo.setToolTip(keep_backups_tip)
+        for value in self.BACKUP_KEEP_OPTIONS:
+            self.auto_backup_keep_combo.addItem(f"{value}", value)
+        current_keep = int(self._settings.get("auto_backup_keep_count", 20))
+        keep_index = self.auto_backup_keep_combo.findData(current_keep)
+        if keep_index < 0:
+            # Keep values constrained to the preset choices.
+            nearest = min(self.BACKUP_KEEP_OPTIONS, key=lambda option: abs(option - current_keep))
+            keep_index = self.auto_backup_keep_combo.findData(nearest)
+        self.auto_backup_keep_combo.setCurrentIndex(max(0, keep_index))
+        backup_keep_row.addWidget(self.auto_backup_keep_combo)
         backup_keep_row.addStretch()
         layout.addLayout(backup_keep_row)
-        self.auto_backup_checkbox.toggled.connect(self.auto_backup_keep_spin.setEnabled)
-        self.auto_backup_keep_spin.setEnabled(self.auto_backup_checkbox.isChecked())
+        self.auto_backup_checkbox.toggled.connect(self.auto_backup_keep_combo.setEnabled)
+        self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
 
         # ── Actions section ────────────────────────────────────────────
         sep = QFrame()
@@ -821,7 +838,7 @@ class SettingsDialog(QDialog):
             "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
-            "auto_backup_keep_count": int(self.auto_backup_keep_spin.value()),
+            "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
         }
 
 
