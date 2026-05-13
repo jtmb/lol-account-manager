@@ -120,60 +120,6 @@ def _set_startup_enabled(enabled: bool):
                 pass
 
 
-def _apply_windows11_chrome(widget, dark_mode: bool):
-    """Apply Windows 11 title bar/chrome colors to a top-level window."""
-    if not sys.platform.startswith("win"):
-        return
-
-    try:
-        hwnd = int(widget.winId())
-        corner_preference = ctypes.c_int(2)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            ctypes.byref(corner_preference),
-            ctypes.sizeof(corner_preference),
-        )
-
-        value = ctypes.c_int(1 if dark_mode else 0)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_USE_IMMERSIVE_DARK_MODE,
-            ctypes.byref(value),
-            ctypes.sizeof(value),
-        )
-
-        if dark_mode:
-            caption_color = ctypes.c_int(0x302B2B)
-            text_color = ctypes.c_int(0xF4D6CD)
-        else:
-            caption_color = ctypes.c_int(0xF3F3F3)
-            text_color = ctypes.c_int(0x1E1E1E)
-
-        border_color = caption_color
-
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_CAPTION_COLOR,
-            ctypes.byref(caption_color),
-            ctypes.sizeof(caption_color),
-        )
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_TEXT_COLOR,
-            ctypes.byref(text_color),
-            ctypes.sizeof(text_color),
-        )
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_BORDER_COLOR,
-            ctypes.byref(border_color),
-            ctypes.sizeof(border_color),
-        )
-    except Exception:
-        pass
-
-
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -609,151 +555,6 @@ class LaunchProgressDialog(QDialog):
         self._message_label.setText(message)
 
 
-class ToastNotificationDialog(QDialog):
-    """Small transient toast-style notification."""
-
-    def __init__(self, title: str, message: str, parent=None, timeout_ms: int = 2400):
-        super().__init__(parent)
-        self._timeout_ms = timeout_ms
-        self.setWindowFlags(
-            Qt.Tool |
-            Qt.FramelessWindowHint |
-            Qt.WindowStaysOnTopHint
-        )
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.setModal(False)
-
-        self._card = QFrame(self)
-        self._card.setObjectName("toastCard")
-        self._card.setAttribute(Qt.WA_StyledBackground, True)
-
-        parent_dark = bool(getattr(parent, "_dark_mode", True))
-        if parent_dark:
-            self._card.setStyleSheet(
-                "QFrame#toastCard {"
-                "background-color: #232334;"
-                "border: 1px solid #45475a;"
-                "border-radius: 14px;"
-                "}"
-                "QLabel#toastTitle { color: #e2e8f0; font-weight: 700; font-size: 10.5pt; }"
-                "QLabel#toastMessage { color: #cdd6f4; font-size: 10pt; }"
-                "QPushButton#toastClose {"
-                "background: transparent;"
-                "border: none;"
-                "color: #aab3c8;"
-                "font-size: 14pt;"
-                "padding: 0px;"
-                "min-width: 20px;"
-                "max-width: 20px;"
-                "}"
-                "QPushButton#toastClose:hover { color: #ffffff; }"
-            )
-            accent_bg = "#1f6feb"
-        else:
-            self._card.setStyleSheet(
-                "QFrame#toastCard {"
-                "background-color: #ffffff;"
-                "border: 1px solid #d1d5db;"
-                "border-radius: 14px;"
-                "}"
-                "QLabel#toastTitle { color: #111827; font-weight: 700; font-size: 10.5pt; }"
-                "QLabel#toastMessage { color: #374151; font-size: 10pt; }"
-                "QPushButton#toastClose {"
-                "background: transparent;"
-                "border: none;"
-                "color: #6b7280;"
-                "font-size: 14pt;"
-                "padding: 0px;"
-                "min-width: 20px;"
-                "max-width: 20px;"
-                "}"
-                "QPushButton#toastClose:hover { color: #111827; }"
-            )
-            accent_bg = "#2563eb"
-
-        self._shadow = QGraphicsDropShadowEffect(self)
-        self._shadow.setBlurRadius(28)
-        self._shadow.setOffset(0, 6)
-        self._shadow.setColor(QColor(0, 0, 0, 120 if parent_dark else 60))
-        self._card.setGraphicsEffect(self._shadow)
-
-        accent = QLabel()
-        accent.setFixedSize(10, 10)
-        accent.setStyleSheet(
-            f"background-color: {accent_bg}; border-radius: 5px;"
-        )
-
-        title_label = QLabel(title)
-        title_label.setObjectName("toastTitle")
-
-        message_label = QLabel(message)
-        message_label.setObjectName("toastMessage")
-        message_label.setWordWrap(True)
-
-        close_btn = QPushButton("\u00d7")
-        close_btn.setObjectName("toastClose")
-        close_btn.setCursor(Qt.PointingHandCursor)
-        close_btn.clicked.connect(self.close)
-
-        text_layout = QVBoxLayout()
-        text_layout.setSpacing(4)
-        text_layout.setContentsMargins(0, 0, 0, 0)
-        text_layout.addWidget(title_label)
-        text_layout.addWidget(message_label)
-
-        top_row = QHBoxLayout()
-        top_row.setSpacing(10)
-        top_row.setContentsMargins(18, 16, 14, 16)
-        top_row.addWidget(accent, 0, Qt.AlignTop)
-        top_row.addLayout(text_layout, 1)
-        top_row.addWidget(close_btn, 0, Qt.AlignTop)
-
-        card_layout = QVBoxLayout(self._card)
-        card_layout.setContentsMargins(0, 0, 0, 0)
-        card_layout.addLayout(top_row)
-
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(self._card)
-
-        self._close_timer = QTimer(self)
-        self._close_timer.setSingleShot(True)
-        self._close_timer.timeout.connect(self.close)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.adjustSize()
-        self._position_toast()
-        self._close_timer.start(self._timeout_ms)
-
-    def _position_toast(self):
-        parent = self.parentWidget()
-        if parent:
-            ref = parent.geometry()
-            global_top_left = parent.mapToGlobal(ref.topLeft())
-            x = global_top_left.x() + ref.width() - self.width() - 20
-            y = global_top_left.y() + 20
-            self.move(max(x, 20), max(y, 20))
-        else:
-            screen = QApplication.primaryScreen()
-            if screen:
-                geo = screen.availableGeometry()
-                x = geo.x() + geo.width() - self.width() - 20
-                y = geo.y() + 20
-                self.move(max(x, 20), max(y, 20))
-    
-    def get_password(self):
-        if self.is_setup:
-            if self.password_input.text() != self.confirm_input.text():
-                QMessageBox.warning(self, "Error", "Passwords do not match!")
-                return None
-            if len(self.password_input.text()) < 4:
-                QMessageBox.warning(self, "Error", "Password must be at least 4 characters!")
-                return None
-        return self.password_input.text()
-
-
 class AddAccountDialog(QDialog):
     """Dialog for adding or editing an account"""
 
@@ -762,7 +563,7 @@ class AddAccountDialog(QDialog):
         self.editing_account = account
         self.account = None
         self.init_ui()
-    
+
     def init_ui(self):
         is_edit = self.editing_account is not None
         self.setWindowTitle("Edit Account" if is_edit else "Add Account")
@@ -1231,6 +1032,7 @@ class AccountListItem(QFrame):
         self.setMouseTracking(True)
         self._selected = False
         self._hovered = False
+        self._logged_in = False
         self._dark_mode = True
         self._tag_chip_labels: list[QLabel] = []
         self._shadow = QGraphicsDropShadowEffect(self)
@@ -1349,6 +1151,14 @@ class AccountListItem(QFrame):
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
         rank_layout.addWidget(self.rank_icon_label)
 
+        self.logged_in_label = QLabel("Logged in")
+        self.logged_in_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.logged_in_label.setVisible(False)
+        self.logged_in_label.setAlignment(Qt.AlignCenter)
+        self.logged_in_label.setFixedHeight(20)
+        self.logged_in_label.setMinimumWidth(70)
+        rank_layout.addWidget(self.logged_in_label)
+
         self.rank_label = QLabel("...")
         self.rank_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
         self.rank_label.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -1364,6 +1174,7 @@ class AccountListItem(QFrame):
         outer.addWidget(rank_widget)
 
         self.setLayout(outer)
+        self._refresh_logged_in_badge_style()
         self._update_visual_state()
 
     @classmethod
@@ -1442,6 +1253,29 @@ class AccountListItem(QFrame):
             else:
                 label.setStyleSheet(self._tag_chip_stylesheet(text.lstrip("#")))
 
+    def _refresh_logged_in_badge_style(self):
+        """Refresh the logged-in badge style for the active theme."""
+        if self._dark_mode:
+            self.logged_in_label.setStyleSheet(
+                "background-color: rgba(91, 141, 239, 0.18);"
+                "border: 1px solid rgba(91, 141, 239, 0.45);"
+                "border-radius: 10px;"
+                "color: #dbeafe;"
+                "font-size: 9px;"
+                "font-weight: 700;"
+                "padding: 0px 8px;"
+            )
+        else:
+            self.logged_in_label.setStyleSheet(
+                "background-color: rgba(79, 124, 255, 0.12);"
+                "border: 1px solid rgba(79, 124, 255, 0.28);"
+                "border-radius: 10px;"
+                "color: #1d4ed8;"
+                "font-size: 9px;"
+                "font-weight: 700;"
+                "padding: 0px 8px;"
+            )
+
     def set_rank(self, rank_data: dict):
         """Update the rank label with fetched op.gg data."""
         if not self._show_ranks:
@@ -1496,6 +1330,12 @@ class AccountListItem(QFrame):
     def set_dark_mode(self, enabled: bool):
         self._dark_mode = enabled
         self._refresh_tag_chip_styles()
+        self._refresh_logged_in_badge_style()
+        self._update_visual_state()
+
+    def set_logged_in(self, logged_in: bool):
+        self._logged_in = logged_in
+        self.logged_in_label.setVisible(logged_in)
         self._update_visual_state()
 
     def set_selected(self, selected: bool):
@@ -1516,7 +1356,29 @@ class AccountListItem(QFrame):
         active = self._selected or self._hovered
 
         if self._dark_mode:
-            if active:
+            if self._logged_in and active:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background-color: rgba(69, 71, 90, 205);"
+                    "border: 1px solid rgba(122, 162, 247, 190);"
+                    "border-left: 4px solid rgba(122, 162, 247, 230);"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(18)
+                self._shadow.setColor(QColor(30, 60, 110, 110))
+            elif self._logged_in:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background-color: rgba(30, 41, 70, 120);"
+                    "border: 1px solid rgba(122, 162, 247, 130);"
+                    "border-left: 4px solid rgba(122, 162, 247, 220);"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(14)
+                self._shadow.setColor(QColor(30, 60, 110, 90))
+            elif active:
                 self.setStyleSheet(
                     "#accountListItem {"
                     "background-color: rgba(69, 71, 90, 180);"
@@ -1538,7 +1400,29 @@ class AccountListItem(QFrame):
                 self._shadow.setColor(QColor(0, 0, 0, 0))
             return
 
-        if active:
+        if self._logged_in and active:
+            self.setStyleSheet(
+                "#accountListItem {"
+                "background-color: #e7efff;"
+                "border: 1px solid #9db8ff;"
+                "border-left: 4px solid #4f7cff;"
+                "border-radius: 10px;"
+                "}"
+            )
+            self._shadow.setBlurRadius(10)
+            self._shadow.setColor(QColor(15, 23, 42, 30))
+        elif self._logged_in:
+            self.setStyleSheet(
+                "#accountListItem {"
+                "background-color: #f1f5ff;"
+                "border: 1px solid #c7d2fe;"
+                "border-left: 4px solid #4f7cff;"
+                "border-radius: 10px;"
+                "}"
+            )
+            self._shadow.setBlurRadius(8)
+            self._shadow.setColor(QColor(15, 23, 42, 20))
+        elif active:
             self.setStyleSheet(
                 "#accountListItem {"
                 "background-color: #eef2ff;"
@@ -1590,7 +1474,7 @@ class MainWindow(QMainWindow):
         self._search_query: str = ""
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
-        self._toast_notifications: list[ToastNotificationDialog] = []
+        self._logged_in_username: Optional[str] = None
         self._window_resize_save_timer = QTimer(self)
         self._window_resize_save_timer.setSingleShot(True)
         self._window_resize_save_timer.setInterval(250)
@@ -1848,23 +1732,6 @@ class MainWindow(QMainWindow):
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
 
-    def _show_toast(self, title: str, message: str, timeout_ms: int = 2400):
-        """Show a transient toast notification."""
-        toast = ToastNotificationDialog(title, message, self, timeout_ms=timeout_ms)
-        self._toast_notifications.append(toast)
-
-        def _cleanup(*_):
-            try:
-                self._toast_notifications.remove(toast)
-            except ValueError:
-                pass
-
-        toast.destroyed.connect(_cleanup)
-        toast.show()
-        toast.raise_()
-        toast.activateWindow()
-        return toast
-
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
         dialog_settings = dict(self._settings)
@@ -2113,6 +1980,10 @@ class MainWindow(QMainWindow):
             if isinstance(widget, AccountListItem):
                 widget.set_dark_mode(self._dark_mode)
                 widget.set_selected(item.isSelected())
+                widget.set_logged_in(
+                    bool(self._logged_in_username)
+                    and item.data(Qt.UserRole) == self._logged_in_username
+                )
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
@@ -2232,6 +2103,7 @@ QMenu::separator {
             data = dialog.get_data()
 
             try:
+                old_logged_in = self._logged_in_username
                 self.account_manager.update_account(
                     username=username,
                     new_username=data['username'],
@@ -2244,6 +2116,8 @@ QMenu::separator {
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
+                if old_logged_in and old_logged_in == username:
+                    self._logged_in_username = data['username']
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account updated successfully!")
             except ValueError as e:
@@ -2304,6 +2178,8 @@ QMenu::separator {
         if reply == QMessageBox.Yes:
             try:
                 self.account_manager.delete_account(username)
+                if self._logged_in_username == username:
+                    self._logged_in_username = None
                 self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
@@ -2364,9 +2240,11 @@ QMenu::separator {
         if success:
             username = self.current_launch_username or "Unknown"
             account = self.account_manager.get_account(username) if self.account_manager else None
+            if account:
+                self._logged_in_username = account.username
+                self.update_account_item_states()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
-            self._show_toast("Success", f"{username} login successful!")
         else:
             self._show_error("Error", "Failed to launch. Make sure League of Legends is installed.")
 
