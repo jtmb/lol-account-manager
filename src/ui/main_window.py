@@ -952,7 +952,7 @@ class MainWindow(QMainWindow):
         top_row.addStretch()
         self._theme_button = QPushButton()
         self._theme_button.setObjectName("themeTopButton")
-        self._theme_button.setMinimumHeight(30)
+        self._theme_button.setFixedSize(130, 30)
         self._theme_button.setToolTip("Switch between dark and light mode")
         self._theme_button.clicked.connect(self.toggle_theme)
         top_row.addWidget(self._theme_button)
