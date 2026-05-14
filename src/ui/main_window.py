@@ -3405,59 +3405,40 @@ QMenu#trayQuickMenu::separator {
                 dialog_bg = "#0f1424"
                 text_primary = "#eef3ff"
                 text_secondary = "#aeb6cc"
-                header_text = "#f4f7ff"
-                primary_card_bg = "#151b2d"
-                primary_card_border = "#2f3650"
-                primary_card_text = "#dbe3ff"
-                notes_card_bg = "#101525"
-                notes_card_border = "#3a435f"
-                notes_title_text = "#cad5f5"
-                notes_body_text = "#e7ecff"
+                text_accent = "#8bb0ff"
+                divider_color = "#2b3652"
             else:
                 dialog_bg = "#f3f5fb"
                 text_primary = "#1f2937"
                 text_secondary = "#5b657a"
-                header_text = "#0f172a"
-                primary_card_bg = "#ffffff"
-                primary_card_border = "#cfd6e6"
-                primary_card_text = "#1f2937"
-                notes_card_bg = "#f8fafd"
-                notes_card_border = "#d8deec"
-                notes_title_text = "#1f2a44"
-                notes_body_text = "#23324f"
+                text_accent = "#2d5ca8"
+                divider_color = "#d5dcec"
 
             prompt = (
-                "<div style='margin-bottom: 10px;'>"
-                f"<div style='font-size: 15px; font-weight: 700; color: {header_text};'>Update available: {latest_tag}</div>"
+                "<div style='margin-bottom: 8px;'>"
+                f"<div style='font-size: 15px; font-weight: 700; color: {text_primary};'>Update available: {latest_tag}</div>"
                 f"<div style='margin-top: 2px; color: {text_secondary};'>Current version: {APP_VERSION}</div>"
                 "</div>"
-                f"<div style='padding: 10px 12px; border: 1px solid {primary_card_border}; border-radius: 8px; "
-                f"background-color: {primary_card_bg}; color: {primary_card_text};'>"
-                "<b>Update now?</b><br/>"
-                "The app will restart to finish the update."
-                "</div>"
+                f"<div style='font-weight: 700; color: {text_accent}; margin-bottom: 2px;'>Update now?</div>"
+                f"<div style='color: {text_primary};'>The app will restart to finish the update.</div>"
             )
-            notes_html = ""
+            body_html = prompt
             if note_preview:
                 escaped_notes = _escape_html(note_preview).replace("\n", "<br/>")
-                notes_html = (
-                    f"<div style='margin-top: 12px; padding: 10px 12px; border: 1px solid {notes_card_border}; "
-                    f"border-radius: 8px; background-color: {notes_card_bg};'>"
-                    f"<div style='font-weight: 700; color: {notes_title_text}; margin-bottom: 6px;'>Release notes</div>"
-                    f"<div style='color: {notes_body_text};'>{escaped_notes}</div>"
-                    "</div>"
+                body_html += (
+                    f"<div style='border-top: 1px solid {divider_color}; margin: 10px 0 8px 0;'></div>"
+                    f"<div style='font-weight: 700; color: {text_primary}; margin-bottom: 6px;'>Release notes</div>"
+                    f"<div style='color: {text_primary}; line-height: 1.35;'>{escaped_notes}</div>"
                 )
 
             box = QMessageBox(self)
             box.setIcon(QMessageBox.Information)
             box.setWindowTitle("Update Available")
             box.setTextFormat(Qt.RichText)
-            box.setText(prompt)
-            if notes_html:
-                box.setInformativeText(notes_html)
+            box.setText(body_html)
             box.setStyleSheet(
                 f"QMessageBox {{ background-color: {dialog_bg}; }}"
-                f"QMessageBox QLabel {{ color: {text_primary}; font-size: 12px; min-width: 320px; }}"
+                f"QMessageBox QLabel {{ color: {text_primary}; font-size: 12px; min-width: 320px; background: transparent; }}"
                 "QPushButton {"
                 "  background-color: #252b40;"
                 "  color: #f2f5ff;"
