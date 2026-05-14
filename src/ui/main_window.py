@@ -3954,10 +3954,7 @@ class MainWindow(QMainWindow):
         self._hover_highlight_color_setting = str(
             values.get('hover_highlight_color', self._hover_highlight_color_setting)
         )
-        self._hover_highlight_color = _resolve_row_hover_highlight(
-            self._hover_highlight_color_setting,
-            self._dark_mode,
-        )
+        self._hover_highlight_color = _resolve_row_hover_highlight(self._hover_highlight_color_setting)
         self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
         self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
         self._champion_splash_skin = int(values.get('champion_splash_skin', self._champion_splash_skin))
