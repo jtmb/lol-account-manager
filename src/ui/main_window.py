@@ -1268,7 +1268,7 @@ class SettingsDialog(QDialog):
         for label, value in self.TEXT_ZOOM_OPTIONS:
             self.text_zoom_combo.addItem(label, value)
         self.text_zoom_combo.setToolTip("Increase or decrease the UI text size for readability.")
-        current_zoom = int(self._settings.get("text_zoom_percent", 110))
+        current_zoom = int(self._settings.get("text_zoom_percent", 100))
         zoom_index = self.text_zoom_combo.findData(current_zoom)
         if zoom_index < 0:
             self.text_zoom_combo.addItem(f"{current_zoom}%", current_zoom)
