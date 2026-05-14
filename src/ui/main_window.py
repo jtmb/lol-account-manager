@@ -3075,7 +3075,7 @@ class MainWindow(QMainWindow):
         self.account_list.setStyleSheet(
             "QListWidget#accountListWidget { background: transparent; border: none; outline: none; }"
             "QListWidget#accountListWidget:focus { outline: none; }"
-            "QListWidget#accountListWidget::item { background: transparent; border: none; margin: 0px 0px 6px 0px; }"
+            "QListWidget#accountListWidget::item { background: transparent; border: none; margin: 0px; }"
             "QListWidget#accountListWidget::item:selected { background: transparent; border: none; }"
             "QListWidget#accountListWidget::item:selected:active { outline: none; }"
             "QListWidget#accountListWidget::item:hover { background: transparent; border: none; }"
@@ -4380,11 +4380,12 @@ QMenu#trayQuickMenu::separator {
             self.edit_btn.setEnabled(False)
             self.delete_btn.setEnabled(False)
         else:
+            row_gap = 6
             for account in filtered_accounts:
                 row_height = self._account_row_height()
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, row_height))
+                item.setSizeHint(QSize(0, row_height + row_gap))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
