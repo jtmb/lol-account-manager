@@ -1606,13 +1606,10 @@ class SettingsDialog(QDialog):
         value = self._theme_color_values.get(key, "")
         if swatch is None:
             return
-        swatch.setStyleSheet(
-            "QLabel {"
-            f"background-color: {value};"
-            "border: 1px solid #666;"
-            "border-radius: 4px;"
-            "}"
-        )
+        palette = swatch.palette()
+        palette.setColor(QPalette.Background, QColor(value))
+        swatch.setPalette(palette)
+        swatch.setAutoFillBackground(True)
         swatch.setToolTip(value)
 
     def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
