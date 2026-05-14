@@ -3962,13 +3962,8 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._perform_refresh_ui)
 
     def _perform_refresh_ui(self):
-        self.setUpdatesEnabled(False)
-        try:
-            self._apply_theme()
-            self.refresh_account_list()
-        finally:
-            self.setUpdatesEnabled(True)
-            self.update()
+        self._apply_theme()
+        self.refresh_account_list()
         self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
@@ -4225,22 +4220,28 @@ class MainWindow(QMainWindow):
         original_settings = dict(self._settings)
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
+        preview_was_applied = [False]
+
+        def _preview_callback(values):
+            preview_was_applied[0] = True
+            self._apply_settings_values(values, persist=False)
+
         dialog = SettingsDialog(
             self,
             settings=dialog_settings,
             apply_callback=self._apply_settings_values,
-            preview_callback=lambda values: self._apply_settings_values(values, persist=False),
+            preview_callback=_preview_callback,
         )
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
         try:
             if dialog.exec_() != QDialog.Accepted:
-                _restore = dict(original_settings)
-                QTimer.singleShot(0, lambda: self._apply_settings_values(_restore, persist=False))
+                if preview_was_applied[0]:
+                    self._apply_settings_values(original_settings, persist=False)
                 return
 
             values = dialog.get_values()
-            QTimer.singleShot(0, lambda: self._apply_settings_values(values, persist=True))
+            self._apply_settings_values(values, persist=True)
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
@@ -5224,64 +5225,68 @@ QMenu#trayQuickMenu::separator {
     
     def refresh_account_list(self):
         """Refresh the account list display"""
-        self.account_list.clear()
-        
-        if not self.account_manager:
-            return
-        
-        accounts = self.account_manager.get_all_accounts()
-        accounts = self._sorted_accounts(accounts)
-        self._rebuild_tag_filter_options(accounts)
-        filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
-        
-        if not accounts:
-            item = QListWidgetItem()
-            item.setText("No accounts saved. Click 'Add Account' to get started.")
-            item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
-            self.account_list.addItem(item)
-            self.launch_btn.setEnabled(False)
-            self.edit_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
-        elif not filtered_accounts:
-            item = QListWidgetItem()
-            item.setText("No accounts match current filters.")
-            item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
-            self.account_list.addItem(item)
-            self.launch_btn.setEnabled(False)
-            self.edit_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
-        else:
-            row_gap = 6
-            for account in filtered_accounts:
-                row_height = self._account_row_height()
-                item = QListWidgetItem()
-                item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, row_height + row_gap))
-                self.account_list.addItem(item)
-                
-                # Create custom widget
-                widget = AccountListItem(
-                    account,
-                    show_ranks=self._show_ranks,
-                    show_rank_images=self._show_rank_images,
-                    show_tags=self._show_tags,
-                    tag_size=self._tag_size,
-                    tag_chip_style=self._tag_chip_style,
-                    logged_in_gradient_color=self._logged_in_gradient_color,
-                    hover_highlight_color=self._hover_highlight_color,
-                    logged_in_gradient_intensity=self._logged_in_gradient_intensity,
-                    logged_in_border_width=self._logged_in_border_width,
-                    logged_in_border_opacity=self._logged_in_border_opacity,
-                    row_density=self._row_density,
-                    rank_icon_size=self._rank_icon_size,
-                    rank_text_brightness=self._rank_text_brightness,
-                )
-                widget.setFixedHeight(row_height)
-                self.account_list.setItemWidget(item, widget)
+        self.account_list.setUpdatesEnabled(False)
+        try:
+            self.account_list.clear()
 
-            self.update_account_item_states()
-            if self._show_ranks:
-                self._start_rank_fetches()
+            if not self.account_manager:
+                return
+
+            accounts = self.account_manager.get_all_accounts()
+            accounts = self._sorted_accounts(accounts)
+            self._rebuild_tag_filter_options(accounts)
+            filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
+
+            if not accounts:
+                item = QListWidgetItem()
+                item.setText("No accounts saved. Click 'Add Account' to get started.")
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.account_list.addItem(item)
+                self.launch_btn.setEnabled(False)
+                self.edit_btn.setEnabled(False)
+                self.delete_btn.setEnabled(False)
+            elif not filtered_accounts:
+                item = QListWidgetItem()
+                item.setText("No accounts match current filters.")
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.account_list.addItem(item)
+                self.launch_btn.setEnabled(False)
+                self.edit_btn.setEnabled(False)
+                self.delete_btn.setEnabled(False)
+            else:
+                row_gap = 6
+                for account in filtered_accounts:
+                    row_height = self._account_row_height()
+                    item = QListWidgetItem()
+                    item.setData(Qt.UserRole, account.username)
+                    item.setSizeHint(QSize(0, row_height + row_gap))
+                    self.account_list.addItem(item)
+
+                    # Create custom widget
+                    widget = AccountListItem(
+                        account,
+                        show_ranks=self._show_ranks,
+                        show_rank_images=self._show_rank_images,
+                        show_tags=self._show_tags,
+                        tag_size=self._tag_size,
+                        tag_chip_style=self._tag_chip_style,
+                        logged_in_gradient_color=self._logged_in_gradient_color,
+                        hover_highlight_color=self._hover_highlight_color,
+                        logged_in_gradient_intensity=self._logged_in_gradient_intensity,
+                        logged_in_border_width=self._logged_in_border_width,
+                        logged_in_border_opacity=self._logged_in_border_opacity,
+                        row_density=self._row_density,
+                        rank_icon_size=self._rank_icon_size,
+                        rank_text_brightness=self._rank_text_brightness,
+                    )
+                    widget.setFixedHeight(row_height)
+                    self.account_list.setItemWidget(item, widget)
+
+                self.update_account_item_states()
+                if self._show_ranks:
+                    self._start_rank_fetches()
+        finally:
+            self.account_list.setUpdatesEnabled(True)
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
