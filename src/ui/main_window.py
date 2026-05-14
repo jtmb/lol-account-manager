@@ -3076,7 +3076,7 @@ class MainWindow(QMainWindow):
         account_list_layout.setSpacing(0)
         self.account_list = QListWidget()
         self.account_list.setObjectName("accountListWidget")
-        self.account_list.setSpacing(0)
+        self.account_list.setSpacing(6)
         self.account_list.setViewportMargins(0, 0, 0, 0)
         self.account_list.setFrameShape(QFrame.NoFrame)
         self.account_list.setContentsMargins(0, 0, 0, 0)
