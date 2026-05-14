@@ -155,7 +155,7 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
             caption_color = ctypes.c_int(0x302B2B)
             text_color = ctypes.c_int(0xF4D6CD)
         else:
-            caption_color = ctypes.c_int(0xE6E3DE)
+            caption_color = ctypes.c_int(0xD9DFE2)
             text_color = ctypes.c_int(0x1E1E1E)
 
         border_color = caption_color
@@ -428,22 +428,22 @@ QScrollBar::sub-page:horizontal {
     background: transparent;
 }
 QPushButton {
-    background-color: #ddd8cf;
+    background-color: #e7e7e7;
     color: #2e2d2a;
-    border: 1px solid #bfb6aa;
+    border: 1px solid #c9c9c9;
     border-radius: 5px;
     padding: 5px 10px;
 }
 QPushButton:hover {
-    background-color: #d1cbc0;
+    background-color: #dddddd;
 }
 QPushButton:pressed {
-    background-color: #c3bcae;
+    background-color: #d2d2d2;
 }
 QPushButton:disabled {
-    background-color: #e6e1d9;
-    color: #9a9184;
-    border: 1px solid #ccc4b8;
+    background-color: #efefef;
+    color: #9a9ea6;
+    border: 1px solid #dddddd;
 }
 QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
     background-color: #f4f1eb;
@@ -652,10 +652,10 @@ class InGameDiagnosticsDialog(QDialog):
                 "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #2e2d2a; }"
                 "QLabel#diagValue { color: #2e2d2a; }"
                 "QPushButton {"
-                "background-color: #ddd8cf; color: #2e2d2a; border: 1px solid #bfb6aa;"
+                "background-color: #e7e7e7; color: #2e2d2a; border: 1px solid #c9c9c9;"
                 "border-radius: 6px; padding: 6px 12px;"
                 "}"
-                "QPushButton:hover { background-color: #d1cbc0; }"
+                "QPushButton:hover { background-color: #dddddd; }"
             )
 
         layout = QVBoxLayout(self)
@@ -880,14 +880,14 @@ class LaunchProgressDialog(QDialog):
                 "background-color: #9a8f7f;"
                 "}"
                 "QPushButton {"
-                "background-color: #ddd8cf;"
+                "background-color: #e7e7e7;"
                 "color: #2e2d2a;"
-                "border: 1px solid #bfb6aa;"
+                "border: 1px solid #c9c9c9;"
                 "border-radius: 5px;"
                 "padding: 6px 12px;"
                 "}"
-                "QPushButton:hover { background-color: #d1cbc0; }"
-                "QPushButton:pressed { background-color: #c3bcae; }"
+                "QPushButton:hover { background-color: #dddddd; }"
+                "QPushButton:pressed { background-color: #d2d2d2; }"
             )
 
         self._title_label = QLabel("Starting launch")
@@ -2609,12 +2609,12 @@ class MainWindow(QMainWindow):
     def _theme_with_text_zoom(self, base: str, dark_mode: bool) -> str:
         """Merge base theme with text zoom scaling."""
         point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
-        cog_bg = "#313244" if dark_mode else "#f3f4f6"
+        cog_bg = "#313244" if dark_mode else "#e7e7e7"
         cog_fg = "#cdd6f4" if dark_mode else "#2e2d2a"
-        cog_border = "#45475a" if dark_mode else "#bfb6aa"
-        cog_hover = "#45475a" if dark_mode else "#d1cbc0"
-        cog_pressed = "#585b70" if dark_mode else "#c3bcae"
-        cog_focus = "#6c7086" if dark_mode else "#968e81"
+        cog_border = "#45475a" if dark_mode else "#c9c9c9"
+        cog_hover = "#45475a" if dark_mode else "#dddddd"
+        cog_pressed = "#585b70" if dark_mode else "#d2d2d2"
+        cog_focus = "#6c7086" if dark_mode else "#9da3ad"
         search_fg = "#dbe4ff" if dark_mode else "#2e2d2a"
         search_bg = "#171a2a" if dark_mode else "#f4f1eb"
         search_border = "#3f4b71" if dark_mode else "#bfb6aa"
