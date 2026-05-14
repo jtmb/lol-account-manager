@@ -1,5 +1,5 @@
 {
-  "app_version": "1.0.2",
+  "app_version": "1.0.3",
   "settings_panel_defaults": {
     "start_on_windows_startup": false,
     "start_minimized_to_tray": false,
