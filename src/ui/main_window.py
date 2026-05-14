@@ -174,37 +174,38 @@ class AccountListBackgroundFrame(QFrame):
             painter.drawPixmap(target.topLeft(), crop)
             painter.setOpacity(1.0)
 
-            edge_alpha_base = 230 if self._dark_mode else 120
+            edge_alpha_base = 230 if self._dark_mode else 90
             edge_alpha = int(edge_alpha_base * (self._edge_fade / 100.0))
             if edge_alpha > 0:
+                edge_color = base_color if self._dark_mode else QColor("#c8ccd6")
                 fade_width = max(24, int(min(rect.width(), rect.height()) * 0.20))
                 left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
-                left_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
-                left_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                left_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
+                left_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.top(), fade_width, rect.height(), left_grad)
 
                 right_grad = QLinearGradient(rect.right(), 0, rect.right() - fade_width, 0)
-                right_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
-                right_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                right_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
+                right_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.right() - fade_width, rect.top(), fade_width, rect.height(), right_grad)
 
                 top_grad = QLinearGradient(0, rect.top(), 0, rect.top() + fade_width)
-                top_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
-                top_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                top_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
+                top_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.top(), rect.width(), fade_width, top_grad)
 
                 bottom_grad = QLinearGradient(0, rect.bottom(), 0, rect.bottom() - fade_width)
-                bottom_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
-                bottom_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                bottom_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
+                bottom_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.bottom() - fade_width, rect.width(), fade_width, bottom_grad)
 
-            inner_alpha_base = 190 if self._dark_mode else 90
+            inner_alpha_base = 120 if self._dark_mode else 170
             inner_alpha = int(inner_alpha_base * (self._inner_fade / 100.0))
             if inner_alpha > 0:
                 radial = QRadialGradient(rect.center(), max(rect.width(), rect.height()) * 0.45)
-                radial.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), inner_alpha))
-                radial.setColorAt(0.62, QColor(base_color.red(), base_color.green(), base_color.blue(), int(inner_alpha * 0.35)))
-                radial.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                radial.setColorAt(0.0, QColor(0, 0, 0, inner_alpha))
+                radial.setColorAt(0.62, QColor(0, 0, 0, int(inner_alpha * 0.42)))
+                radial.setColorAt(1.0, QColor(0, 0, 0, 0))
                 painter.fillRect(rect, radial)
 
 
@@ -1778,8 +1779,8 @@ class SettingsDialog(QDialog):
             f"QComboBox QAbstractItemView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; selection-background-color: {popup_sel_bg}; selection-color: {popup_sel_fg}; padding: 4px; }}"
         )
         completer.popup().setStyleSheet(
-            f"QListView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; padding: 4px; outline: none; }}"
-            f"QListView::item {{ padding: 6px 8px; border-radius: 6px; }}"
+            f"QListView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; padding: 1px; outline: none; }}"
+            f"QListView::item {{ padding: 4px 8px; min-height: 20px; border-radius: 6px; }}"
             f"QListView::item:selected {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
             f"QListView::item:hover {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
         )
