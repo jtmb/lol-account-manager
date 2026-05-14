@@ -1,2 +1,4 @@
 """League of Legends Account Manager"""
-__version__ = "1.0.2"
+from src.config.app_config import APP_VERSION
+
+__version__ = APP_VERSION

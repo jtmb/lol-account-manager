@@ -16,6 +16,7 @@ args = [
     '--windowed',  # Hide console window
     '--onefile',  # Create single executable
     '--add-data', f'src:src',
+    '--add-data', 'app_config.json:.',
     '--distpath', 'dist',
     '--buildpath', 'build/.build',
     '--specpath', 'build',

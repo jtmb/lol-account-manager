@@ -50,25 +50,26 @@ from src.config.paths import (
     load_settings,
     save_settings,
 )
+from src.config.app_config import SETTINGS_PANEL_DEFAULTS
 from src import __version__ as APP_VERSION
 
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 DDRAGON_VERSION = "14.24.1"
-DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#9ca3af"
-DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#9ca3af"
+DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#32c46d"))
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#32c46d"))
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 SPLASH_THEME_AUTO = "__none__"
 LOCKED_CHAMPION_SPLASH_EDGE_FADE = 80
 LOCKED_CHAMPION_SPLASH_INNER_FADE = 75
-DEFAULT_APP_BG_COLOR = "#1e1e2e"
-DEFAULT_APP_SURFACE_COLOR = "#181825"
-DEFAULT_APP_BORDER_COLOR = "#313244"
-DEFAULT_APP_TEXT_COLOR = "#cdd6f4"
-DEFAULT_APP_ACCENT_COLOR = "#313244"
+DEFAULT_APP_BG_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_bg_color", "#1e1e2e"))
+DEFAULT_APP_SURFACE_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_surface_color", "#181825"))
+DEFAULT_APP_BORDER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_border_color", "#313244"))
+DEFAULT_APP_TEXT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_text_color", "#cdd6f4"))
+DEFAULT_APP_ACCENT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_accent_color", "#313244"))
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -1522,9 +1523,114 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
         super().__init__(parent)
-        self._settings = settings or {}
+        merged_settings = dict(SETTINGS_PANEL_DEFAULTS)
+        if settings:
+            merged_settings.update(settings)
+        self._settings = merged_settings
         self._apply_callback = apply_callback
         self.init_ui()
+
+    def _default_settings_values(self) -> dict:
+        return dict(SETTINGS_PANEL_DEFAULTS)
+
+    @staticmethod
+    def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
+        index = combo.findData(target_value)
+        combo.setCurrentIndex(fallback_index if index < 0 else index)
+
+    def _apply_values_to_controls(self, values: dict):
+        self.startup_checkbox.setChecked(bool(values.get("start_on_windows_startup", _is_startup_enabled())))
+        self.start_minimized_checkbox.setChecked(bool(values.get("start_minimized_to_tray", False)))
+        self._set_combo_to_data(self.close_behavior_combo, str(values.get("close_behavior", "tray")))
+        self._set_combo_to_data(self.auto_lock_combo, int(values.get("auto_lock_minutes", 0)))
+        self.remember_password_24h_checkbox.setChecked(bool(values.get("remember_password_24h", True)))
+        self._set_combo_to_data(self.clipboard_clear_combo, int(values.get("clipboard_auto_clear_seconds", 0)))
+        self.confirm_launch_checkbox.setChecked(bool(values.get("confirm_before_launch", True)))
+        self.confirm_delete_checkbox.setChecked(bool(values.get("confirm_before_delete", True)))
+        self._set_combo_to_data(self.account_sort_mode_combo, str(values.get("account_sort_mode", "manual")))
+        self._set_combo_to_data(self.rank_refresh_combo, str(values.get("rank_refresh_mode", "manual")))
+        self.auto_check_updates_checkbox.setChecked(bool(values.get("auto_check_updates", True)))
+        self._set_combo_to_data(self.log_level_combo, str(values.get("diagnostics_log_level", "INFO")))
+
+        window_size_mode = str(values.get("window_size_mode", "static"))
+        window_size = str(values.get("window_size", "800x600"))
+        if window_size_mode == "custom":
+            self.window_size_combo.setCurrentIndex(0)
+        else:
+            index = self.window_size_combo.findText(window_size)
+            self.window_size_combo.setCurrentIndex(0 if index < 0 else index)
+
+        self._set_combo_to_data(self.text_zoom_combo, int(values.get("text_zoom_percent", 110)))
+        self.show_ranks_checkbox.setChecked(bool(values.get("show_ranks", True)))
+        self.show_images_checkbox.setChecked(bool(values.get("show_rank_images", True)))
+        self.show_tags_checkbox.setChecked(bool(values.get("show_tags", True)))
+        self.auto_open_ingame_checkbox.setChecked(bool(values.get("auto_open_ingame_page", True)))
+        self._set_combo_to_data(self.tag_size_combo, str(values.get("tag_size", "medium")))
+        self._set_combo_to_data(self.tag_style_combo, str(values.get("tag_chip_style", "vibrant")))
+        self._set_combo_to_data(
+            self.logged_in_gradient_color_combo,
+            str(values.get("logged_in_gradient_color", _default_logged_in_highlight(bool(getattr(self.parent(), "_dark_mode", True))))),
+        )
+        self._set_combo_to_data(
+            self.hover_highlight_color_combo,
+            str(values.get("hover_highlight_color", HOVER_HIGHLIGHT_THEME_AUTO)),
+        )
+
+        self.champion_splash_enabled_checkbox.setChecked(bool(values.get("champion_splash_enabled", False)))
+        self._set_combo_to_data(
+            self.champion_splash_combo,
+            str(values.get("champion_splash_champion", SPLASH_THEME_AUTO)),
+        )
+        self._refresh_champion_skin_options()
+        self._set_combo_to_data(self.champion_splash_skin_combo, int(values.get("champion_splash_skin", 0)))
+        self._set_combo_to_data(self.champion_splash_opacity_combo, int(values.get("champion_splash_opacity", 70)))
+        self._set_combo_to_data(self.logged_in_gradient_intensity_combo, int(values.get("logged_in_gradient_intensity", 20)))
+        self._set_combo_to_data(self.logged_in_border_width_combo, int(values.get("logged_in_border_width", 2)))
+        self._set_combo_to_data(self.logged_in_border_opacity_combo, int(values.get("logged_in_border_opacity", 60)))
+        self._set_combo_to_data(self.row_density_combo, str(values.get("row_density", "compact")))
+        self._set_combo_to_data(self.rank_icon_size_combo, int(values.get("rank_icon_size", 34)))
+        self._set_combo_to_data(self.rank_text_brightness_combo, int(values.get("rank_text_brightness", 100)))
+
+        self.auto_backup_checkbox.setChecked(bool(values.get("auto_backup_enabled", True)))
+        self._set_combo_to_data(self.auto_backup_keep_combo, int(values.get("auto_backup_keep_count", 20)))
+
+        self._settings.update({
+            "app_bg_color": str(values.get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(values.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(values.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(values.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(values.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+        })
+        self.app_theme_combo.setCurrentIndex(self._find_app_theme_preset_index())
+
+        self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.rank_icon_size_combo.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.rank_text_brightness_combo.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.tag_size_combo.setEnabled(self.show_tags_checkbox.isChecked())
+        self.tag_style_combo.setEnabled(self.show_tags_checkbox.isChecked())
+        splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
+        self.champion_splash_combo.setEnabled(splash_enabled)
+        self.champion_splash_skin_combo.setEnabled(splash_enabled and self.champion_splash_combo.currentData() != SPLASH_THEME_AUTO)
+        self.champion_splash_opacity_combo.setEnabled(splash_enabled)
+        self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
+
+    def _reset_to_defaults(self):
+        result = QMessageBox.question(
+            self,
+            "Reset Settings",
+            "Are you sure you want to reset all settings to defaults?\n\nThis will reset all settings except your master password.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if result != QMessageBox.Yes:
+            return
+
+        default_values = self._default_settings_values()
+        reset_settings()
+        self._settings = dict(default_values)
+        self._apply_values_to_controls(default_values)
+        if self._apply_callback:
+            self._apply_callback(default_values)
 
     def init_ui(self):
         self.setWindowTitle("Settings")
@@ -2118,6 +2224,11 @@ class SettingsDialog(QDialog):
         layout.addSpacing(2)
 
         button_row = QHBoxLayout()
+        reset_btn = QPushButton("Reset to Defaults")
+        reset_btn.setAutoDefault(False)
+        reset_btn.setDefault(False)
+        reset_btn.clicked.connect(self._reset_to_defaults)
+        button_row.addWidget(reset_btn)
         button_row.addStretch()
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setFixedWidth(100)
@@ -3022,7 +3133,8 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self._settings = load_settings()
+        self._settings = dict(SETTINGS_PANEL_DEFAULTS)
+        self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
@@ -5644,6 +5756,10 @@ QMenu::separator {
         dev_label = QLabel("Developer: jtmb")
         dev_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(dev_label)
+
+        version_label = QLabel(f"Version: {APP_VERSION}")
+        version_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(version_label)
 
         repo_label = QLabel('<a href="https://github.com/jtmb/lol-account-manager">github.com/jtmb/lol-account-manager</a>')
         repo_label.setAlignment(Qt.AlignCenter)
