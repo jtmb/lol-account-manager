@@ -3072,11 +3072,14 @@ class MainWindow(QMainWindow):
         self.account_list.setSpacing(0)
         self.account_list.setViewportMargins(0, 0, 0, 0)
         self.account_list.setStyleSheet(
-            "QListWidget#accountListWidget { background: transparent; border: none; }"
+            "QListWidget#accountListWidget { background: transparent; border: none; outline: none; }"
+            "QListWidget#accountListWidget:focus { outline: none; }"
             "QListWidget#accountListWidget::item { background: transparent; border: none; }"
             "QListWidget#accountListWidget::item:selected { background: transparent; border: none; }"
+            "QListWidget#accountListWidget::item:selected:active { outline: none; }"
             "QListWidget#accountListWidget::item:hover { background: transparent; border: none; }"
         )
+        self.account_list.setFocusPolicy(Qt.NoFocus)
         self.account_list.setAttribute(Qt.WA_TranslucentBackground, True)
         self.account_list.viewport().setAutoFillBackground(False)
         self.account_list.itemClicked.connect(self.on_account_selected)
