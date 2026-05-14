@@ -50,7 +50,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "app_surface_color": "#181825",
         "app_border_color": "#313244",
         "app_text_color": "#cdd6f4",
-        "app_accent_color": "#313244"
+        "app_accent_color": "#313244",
+        "app_hover_color": "#45475a"
     }
 }
 

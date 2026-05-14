@@ -70,6 +70,7 @@ DEFAULT_APP_SURFACE_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_surface_color",
 DEFAULT_APP_BORDER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_border_color", "#313244"))
 DEFAULT_APP_TEXT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_text_color", "#cdd6f4"))
 DEFAULT_APP_ACCENT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_accent_color", "#313244"))
+DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#45475a"))
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -1450,6 +1451,7 @@ class SettingsDialog(QDialog):
             "app_border_color": DEFAULT_APP_BORDER_COLOR,
             "app_text_color": DEFAULT_APP_TEXT_COLOR,
             "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
         }),
         ("Midnight Slate", {
             "app_bg_color": "#0f111a",
@@ -1457,6 +1459,7 @@ class SettingsDialog(QDialog):
             "app_border_color": "#2a3142",
             "app_text_color": "#d7dbea",
             "app_accent_color": "#8b5cf6",
+            "app_hover_color": "#9d74f8",
         }),
         ("Blurple Night", {
             "app_bg_color": "#1e1f22",
@@ -1464,6 +1467,7 @@ class SettingsDialog(QDialog):
             "app_border_color": "#3f4147",
             "app_text_color": "#dbdee1",
             "app_accent_color": "#4b57c8",
+            "app_hover_color": "#5e6ad5",
         }),
         ("Industrial Graphite", {
             "app_bg_color": "#0b0e14",
@@ -1471,6 +1475,7 @@ class SettingsDialog(QDialog):
             "app_border_color": "#283245",
             "app_text_color": "#c7d0df",
             "app_accent_color": "#66c0f4",
+            "app_hover_color": "#3a4d6e",
         }),
         ("Creator Noir", {
             "app_bg_color": "#0f0f0f",
@@ -1478,6 +1483,7 @@ class SettingsDialog(QDialog):
             "app_border_color": "#2c2c2c",
             "app_text_color": "#f1f1f1",
             "app_accent_color": "#ff3b30",
+            "app_hover_color": "#3a3a3a",
         }),
         ("Crimson Night", {
             "app_bg_color": "#1b0f12",
@@ -1485,13 +1491,15 @@ class SettingsDialog(QDialog):
             "app_border_color": "#443039",
             "app_text_color": "#f0d7db",
             "app_accent_color": "#e85d8a",
+            "app_hover_color": "#584050",
         }),
         ("Classic Light", {
-            "app_bg_color": "#e7e8ec",
-            "app_surface_color": "#ededf0",
-            "app_border_color": "#c4c6cf",
-            "app_text_color": "#2e2d2a",
-            "app_accent_color": "#d2d3db",
+            "app_bg_color": "#c8cad3",
+            "app_surface_color": "#eef0f3",
+            "app_border_color": "#8d909e",
+            "app_text_color": "#1e1c1a",
+            "app_accent_color": "#c0c2ca",
+            "app_hover_color": "#adb0bc",
         }),
     ]
 
@@ -1536,6 +1544,7 @@ class SettingsDialog(QDialog):
                 "app_border_color": self._sanitize_theme_color(str(colors.get("app_border_color", DEFAULT_APP_BORDER_COLOR)), DEFAULT_APP_BORDER_COLOR),
                 "app_text_color": self._sanitize_theme_color(str(colors.get("app_text_color", DEFAULT_APP_TEXT_COLOR)), DEFAULT_APP_TEXT_COLOR),
                 "app_accent_color": self._sanitize_theme_color(str(colors.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)), DEFAULT_APP_ACCENT_COLOR),
+                "app_hover_color": self._sanitize_theme_color(str(colors.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)), DEFAULT_APP_HOVER_COLOR),
             }
             presets.append((name, preset))
         return presets
@@ -1594,6 +1603,7 @@ class SettingsDialog(QDialog):
             "app_text_color": DEFAULT_APP_TEXT_COLOR,
             "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
         }
+        defaults["app_hover_color"] = DEFAULT_APP_HOVER_COLOR
         for key, fallback in defaults.items():
             self._set_theme_color_value(
                 key,
@@ -1640,6 +1650,7 @@ class SettingsDialog(QDialog):
             "app_border_color": DEFAULT_APP_BORDER_COLOR,
             "app_text_color": DEFAULT_APP_TEXT_COLOR,
             "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
         }
         values: dict[str, str] = {}
         for key, fallback in defaults.items():
@@ -1778,6 +1789,7 @@ class SettingsDialog(QDialog):
             "app_border_color": str(values.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
             "app_text_color": str(values.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
             "app_accent_color": str(values.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+            "app_hover_color": str(values.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
         })
         self._custom_theme_presets = self._custom_theme_presets_from_settings(values)
         self._populate_theme_presets()
@@ -2247,6 +2259,7 @@ class SettingsDialog(QDialog):
             ("app_border_color", "Border"),
             ("app_text_color", "Text"),
             ("app_accent_color", "Accent"),
+            ("app_hover_color", "Button hover"),
         ]
         defaults = {
             "app_bg_color": DEFAULT_APP_BG_COLOR,
@@ -2254,6 +2267,7 @@ class SettingsDialog(QDialog):
             "app_border_color": DEFAULT_APP_BORDER_COLOR,
             "app_text_color": DEFAULT_APP_TEXT_COLOR,
             "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
         }
         for key, label in theme_fields:
             row = QHBoxLayout()
@@ -3415,6 +3429,7 @@ class MainWindow(QMainWindow):
         self._app_border_color: str = str(self._settings.get('app_border_color', DEFAULT_APP_BORDER_COLOR) or DEFAULT_APP_BORDER_COLOR)
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
+        self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
         default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
@@ -3766,6 +3781,7 @@ class MainWindow(QMainWindow):
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
+        app_hover = self._sanitize_color(self._app_hover_color, DEFAULT_APP_HOVER_COLOR)
         accent_text = self._contrast_text_color(app_accent)
         # When the accent is very dark, app_text (cool-tinted) contrasts better than
         # pure #ffffff, which appears warm/yellow next to cool-tinted labels.
@@ -3878,6 +3894,12 @@ class MainWindow(QMainWindow):
             + f"    background-color: {app_accent};\n"
             + f"    color: {button_text};\n"
             + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QPushButton:hover {\n"
+            + f"    background-color: {app_hover};\n"
+            + "}\n"
+            + "QPushButton:pressed {\n"
+            + f"    background-color: {app_accent};\n"
             + "}\n"
             + "QPushButton:disabled {\n"
             + f"    background-color: {app_surface};\n"
@@ -4242,6 +4264,7 @@ class MainWindow(QMainWindow):
         self._app_border_color = str(values.get('app_border_color', self._app_border_color) or self._app_border_color)
         self._app_text_color = str(values.get('app_text_color', self._app_text_color) or self._app_text_color)
         self._app_accent_color = str(values.get('app_accent_color', self._app_accent_color) or self._app_accent_color)
+        self._app_hover_color = str(values.get('app_hover_color', self._app_hover_color) or self._app_hover_color)
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
         self._hover_highlight_color_setting = str(
             values.get('hover_highlight_color', self._hover_highlight_color_setting)
