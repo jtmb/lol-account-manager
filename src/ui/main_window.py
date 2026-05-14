@@ -51,11 +51,18 @@ LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#4f7cff"
 DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#d2d3db"
+DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
+DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
     """Return theme-appropriate default logged-in highlight color."""
     return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK if dark_mode else DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT
+
+
+def _default_row_hover_highlight(dark_mode: bool) -> str:
+    """Return theme-appropriate default hover/selection row highlight color."""
+    return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK if dark_mode else DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT
 
 
 def _escape_html(text: str) -> str:
@@ -1127,6 +1134,20 @@ class SettingsDialog(QDialog):
         ("Amber", "#f5a623"),
     ]
 
+    HOVER_HIGHLIGHT_COLOR_OPTIONS = [
+        ("Theme Gray (Button Hover)", "#c8c9d1"),
+        ("Charcoal (Dark Hover)", "#45475a"),
+        ("Soft Silver", "#c6ccd8"),
+        ("Cool Gray", "#9ca3af"),
+        ("Slate", "#6b7280"),
+        ("Blue", "#4f7cff"),
+        ("Cyan", "#27b5f7"),
+        ("Green", "#32c46d"),
+        ("Purple", "#8b5cf6"),
+        ("Rose", "#e85d8a"),
+        ("Amber", "#f5a623"),
+    ]
+
     LOGGED_IN_INTENSITY_OPTIONS = [
         ("Ultra Subtle (5%)", 5),
         ("Very Soft (10%)", 10),
@@ -1505,6 +1526,24 @@ class SettingsDialog(QDialog):
         gradient_color_row.addStretch()
         appearance_layout.addLayout(gradient_color_row)
 
+        hover_color_row = QHBoxLayout()
+        hover_color_row.addWidget(QLabel("Hover/selection highlight color:"))
+        self.hover_highlight_color_combo = QComboBox()
+        for label, value in self.HOVER_HIGHLIGHT_COLOR_OPTIONS:
+            self.hover_highlight_color_combo.addItem(label, value)
+        self.hover_highlight_color_combo.setToolTip(
+            "Choose the color used when hovering or selecting an account row."
+        )
+        default_hover_color = _default_row_hover_highlight(parent_dark_mode)
+        current_hover_color = str(
+            self._settings.get("hover_highlight_color", default_hover_color) or default_hover_color
+        )
+        hover_color_index = self.hover_highlight_color_combo.findData(current_hover_color)
+        self.hover_highlight_color_combo.setCurrentIndex(max(0, hover_color_index))
+        hover_color_row.addWidget(self.hover_highlight_color_combo)
+        hover_color_row.addStretch()
+        appearance_layout.addLayout(hover_color_row)
+
         gradient_intensity_row = QHBoxLayout()
         gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
         self.logged_in_gradient_intensity_combo = QComboBox()
@@ -1724,6 +1763,7 @@ class SettingsDialog(QDialog):
             "tag_size": str(self.tag_size_combo.currentData()),
             "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
+            "hover_highlight_color": str(self.hover_highlight_color_combo.currentData()),
             "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
             "logged_in_border_width": int(self.logged_in_border_width_combo.currentData()),
             "logged_in_border_opacity": int(self.logged_in_border_opacity_combo.currentData()),
@@ -1826,6 +1866,7 @@ class AccountListItem(QFrame):
         show_tags: bool = True,
         tag_size: str = "small",
         logged_in_gradient_color: str = DEFAULT_LOGGED_IN_HIGHLIGHT_DARK,
+        hover_highlight_color: str = DEFAULT_ROW_HOVER_HIGHLIGHT_DARK,
         logged_in_gradient_intensity: int = 20,
         logged_in_border_width: int = 2,
         logged_in_border_opacity: int = 60,
@@ -1841,6 +1882,7 @@ class AccountListItem(QFrame):
         self._show_tags = show_tags
         self._tag_size = tag_size
         self._logged_in_gradient_color = logged_in_gradient_color or DEFAULT_LOGGED_IN_HIGHLIGHT_DARK
+        self._hover_highlight_color = hover_highlight_color or DEFAULT_ROW_HOVER_HIGHLIGHT_DARK
         self._logged_in_gradient_intensity = max(5, min(100, int(logged_in_gradient_intensity)))
         self._logged_in_border_width = max(2, min(5, int(logged_in_border_width)))
         self._logged_in_border_opacity = max(60, min(120, int(logged_in_border_opacity)))
@@ -2344,10 +2386,12 @@ class AccountListItem(QFrame):
                 self._shadow.setBlurRadius(14)
                 self._shadow.setColor(QColor(30, 60, 110, 90))
             elif active:
+                hover_bg = self._rgba(self._hover_highlight_color, 180)
+                hover_border = self._rgba(self._hover_highlight_color, 150)
                 self.setStyleSheet(
                     "#accountListItem {"
-                    "background-color: rgba(69, 71, 90, 180);"
-                    "border: 1px solid rgba(137, 180, 250, 140);"
+                    f"background-color: {hover_bg};"
+                    f"border: 1px solid {hover_border};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -2405,10 +2449,12 @@ class AccountListItem(QFrame):
             self._shadow.setBlurRadius(8)
             self._shadow.setColor(QColor(15, 23, 42, 20))
         elif active:
+            hover_bg = self._rgba(self._hover_highlight_color, 155)
+            hover_border = self._rgba(self._hover_highlight_color, 185)
             self.setStyleSheet(
                 "#accountListItem {"
-                "background-color: #ddd7cd;"
-                "border: 1px solid #c2b7a8;"
+                f"background-color: {hover_bg};"
+                f"border: 1px solid {hover_border};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -2461,6 +2507,10 @@ class MainWindow(QMainWindow):
         default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
+        )
+        default_hover_color = _default_row_hover_highlight(self._dark_mode)
+        self._hover_highlight_color: str = str(
+            self._settings.get('hover_highlight_color', default_hover_color) or default_hover_color
         )
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
@@ -2674,6 +2724,8 @@ class MainWindow(QMainWindow):
         self._dark_mode = not self._dark_mode
         if 'logged_in_gradient_color' not in self._settings:
             self._logged_in_gradient_color = _default_logged_in_highlight(self._dark_mode)
+        if 'hover_highlight_color' not in self._settings:
+            self._hover_highlight_color = _default_row_hover_highlight(self._dark_mode)
         self._apply_theme()
         self._settings['dark_mode'] = self._dark_mode
         save_settings(self._settings)
@@ -2818,6 +2870,7 @@ class MainWindow(QMainWindow):
         self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
+        self._hover_highlight_color = str(values.get('hover_highlight_color', self._hover_highlight_color))
         self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
         self._logged_in_border_width = int(values.get('logged_in_border_width', self._logged_in_border_width))
         self._logged_in_border_opacity = int(values.get('logged_in_border_opacity', self._logged_in_border_opacity))
@@ -3797,6 +3850,7 @@ QMenu#trayQuickMenu::separator {
                     tag_size=self._tag_size,
                     tag_chip_style=self._tag_chip_style,
                     logged_in_gradient_color=self._logged_in_gradient_color,
+                    hover_highlight_color=self._hover_highlight_color,
                     logged_in_gradient_intensity=self._logged_in_gradient_intensity,
                     logged_in_border_width=self._logged_in_border_width,
                     logged_in_border_opacity=self._logged_in_border_opacity,
