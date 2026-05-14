@@ -3399,13 +3399,40 @@ QMenu#trayQuickMenu::separator {
             chosen_asset = self._pick_release_asset(assets)
             notes = str(payload.get("body") or "").strip()
             note_preview = self._build_release_notes_preview(notes)
+
+            dark_mode = bool(getattr(self, "_dark_mode", True))
+            if dark_mode:
+                dialog_bg = "#0f1424"
+                text_primary = "#eef3ff"
+                text_secondary = "#aeb6cc"
+                header_text = "#f4f7ff"
+                primary_card_bg = "#151b2d"
+                primary_card_border = "#2f3650"
+                primary_card_text = "#dbe3ff"
+                notes_card_bg = "#101525"
+                notes_card_border = "#3a435f"
+                notes_title_text = "#cad5f5"
+                notes_body_text = "#e7ecff"
+            else:
+                dialog_bg = "#f3f5fb"
+                text_primary = "#1f2937"
+                text_secondary = "#5b657a"
+                header_text = "#0f172a"
+                primary_card_bg = "#ffffff"
+                primary_card_border = "#cfd6e6"
+                primary_card_text = "#1f2937"
+                notes_card_bg = "#f8fafd"
+                notes_card_border = "#d8deec"
+                notes_title_text = "#1f2a44"
+                notes_body_text = "#23324f"
+
             prompt = (
                 "<div style='margin-bottom: 10px;'>"
-                f"<div style='font-size: 15px; font-weight: 700; color: #f4f7ff;'>Update available: {latest_tag}</div>"
-                f"<div style='margin-top: 2px; color: #aeb6cc;'>Current version: {APP_VERSION}</div>"
+                f"<div style='font-size: 15px; font-weight: 700; color: {header_text};'>Update available: {latest_tag}</div>"
+                f"<div style='margin-top: 2px; color: {text_secondary};'>Current version: {APP_VERSION}</div>"
                 "</div>"
-                "<div style='padding: 10px 12px; border: 1px solid #2f3650; border-radius: 8px; "
-                "background-color: #151b2d; color: #dbe3ff;'>"
+                f"<div style='padding: 10px 12px; border: 1px solid {primary_card_border}; border-radius: 8px; "
+                f"background-color: {primary_card_bg}; color: {primary_card_text};'>"
                 "<b>Update now?</b><br/>"
                 "The app will restart to finish the update."
                 "</div>"
@@ -3414,10 +3441,10 @@ QMenu#trayQuickMenu::separator {
             if note_preview:
                 escaped_notes = _escape_html(note_preview).replace("\n", "<br/>")
                 notes_html = (
-                    "<div style='margin-top: 12px; padding: 10px 12px; border: 1px solid #3a435f; "
-                    "border-radius: 8px; background-color: #101525;'>"
-                    "<div style='font-weight: 700; color: #cad5f5; margin-bottom: 6px;'>Release notes</div>"
-                    f"<div style='color: #e7ecff;'>{escaped_notes}</div>"
+                    f"<div style='margin-top: 12px; padding: 10px 12px; border: 1px solid {notes_card_border}; "
+                    f"border-radius: 8px; background-color: {notes_card_bg};'>"
+                    f"<div style='font-weight: 700; color: {notes_title_text}; margin-bottom: 6px;'>Release notes</div>"
+                    f"<div style='color: {notes_body_text};'>{escaped_notes}</div>"
                     "</div>"
                 )
 
@@ -3429,8 +3456,8 @@ QMenu#trayQuickMenu::separator {
             if notes_html:
                 box.setInformativeText(notes_html)
             box.setStyleSheet(
-                "QMessageBox { background-color: #0f1424; }"
-                "QMessageBox QLabel { color: #eef3ff; font-size: 12px; min-width: 320px; }"
+                f"QMessageBox {{ background-color: {dialog_bg}; }}"
+                f"QMessageBox QLabel {{ color: {text_primary}; font-size: 12px; min-width: 320px; }}"
                 "QPushButton {"
                 "  background-color: #252b40;"
                 "  color: #f2f5ff;"
