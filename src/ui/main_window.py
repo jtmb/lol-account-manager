@@ -3164,9 +3164,9 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._settings_button = QPushButton("Settings")
+        self._settings_button = QPushButton("⚙ Settings")
         self._settings_button.setObjectName("settingsCogButton")
-        self._settings_button.setFixedSize(96, 30)
+        self._settings_button.setFixedSize(118, 30)
         self._settings_button.setAutoDefault(False)
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
