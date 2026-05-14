@@ -2428,6 +2428,7 @@ class MainWindow(QMainWindow):
         self._unlock_prompt_active = False
         self._quitting_to_exit = False
         self._tray_icon: Optional[QSystemTrayIcon] = None
+        self._tray_menu: Optional[QMenu] = None
         self._tray_launch_last_action: Optional[QAction] = None
         self._tray_lock_action: Optional[QAction] = None
         self._tray_settings_action: Optional[QAction] = None
@@ -2679,6 +2680,8 @@ class MainWindow(QMainWindow):
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
+        if self._tray_menu:
+            self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
 
     def _apply_filter_input_palette(self):
         """Apply stable text/placeholder colors for filter controls."""
@@ -2806,6 +2809,7 @@ class MainWindow(QMainWindow):
         """Create system tray icon and menu for minimize-to-tray behavior."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self._tray_icon = None
+            self._tray_menu = None
             return
 
         self._tray_icon = QSystemTrayIcon(self)
@@ -2815,6 +2819,8 @@ class MainWindow(QMainWindow):
         self._tray_icon.setToolTip("League of Legends Account Manager")
 
         tray_menu = QMenu(self)
+        tray_menu.setObjectName("trayQuickMenu")
+        tray_menu.setStyleSheet(self._tray_menu_stylesheet())
         show_action = QAction("Show", self)
         show_action.triggered.connect(self._show_from_tray)
         self._tray_launch_last_action = QAction("Launch last account", self)
@@ -2839,11 +2845,79 @@ class MainWindow(QMainWindow):
         tray_menu.addAction(self._tray_watcher_status_action)
         tray_menu.addSeparator()
         tray_menu.addAction(quit_action)
+        self._tray_menu = tray_menu
         self._tray_icon.setContextMenu(tray_menu)
         self._tray_icon.activated.connect(self._on_tray_activated)
         self._tray_icon.show()
         self._update_tray_actions_state()
         self._update_tray_watcher_status()
+
+    def _tray_menu_stylesheet(self):
+        """Return a theme-aware stylesheet for standout tray quick actions."""
+        if self._dark_mode:
+            return """
+QMenu#trayQuickMenu {
+    background-color: #151a2b;
+    border: 1px solid #39415f;
+    border-radius: 12px;
+    padding: 8px;
+}
+QMenu#trayQuickMenu::item {
+    color: #dbe4ff;
+    background-color: #202947;
+    border: 1px solid #2d385f;
+    border-radius: 9px;
+    margin: 4px 2px;
+    padding: 9px 14px;
+}
+QMenu#trayQuickMenu::item:selected {
+    background-color: #2f4fb5;
+    border: 1px solid #4e76e6;
+    color: #ffffff;
+}
+QMenu#trayQuickMenu::item:disabled {
+    background-color: #161b2f;
+    border: 1px solid #252b45;
+    color: #7d89b2;
+}
+QMenu#trayQuickMenu::separator {
+    height: 1px;
+    background: #3a4363;
+    margin: 8px 10px;
+}
+"""
+
+        return """
+QMenu#trayQuickMenu {
+    background-color: #f5f8ff;
+    border: 1px solid #c4d0ee;
+    border-radius: 12px;
+    padding: 8px;
+}
+QMenu#trayQuickMenu::item {
+    color: #1f2a44;
+    background-color: #ffffff;
+    border: 1px solid #d4def4;
+    border-radius: 9px;
+    margin: 4px 2px;
+    padding: 9px 14px;
+}
+QMenu#trayQuickMenu::item:selected {
+    background-color: #dbe8ff;
+    border: 1px solid #8caef5;
+    color: #0f2148;
+}
+QMenu#trayQuickMenu::item:disabled {
+    background-color: #f0f4fd;
+    border: 1px solid #d5deef;
+    color: #7b8aaa;
+}
+QMenu#trayQuickMenu::separator {
+    height: 1px;
+    background: #d0d9eb;
+    margin: 8px 10px;
+}
+"""
 
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
