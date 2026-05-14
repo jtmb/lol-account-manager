@@ -3697,6 +3697,7 @@ class MainWindow(QMainWindow):
         self._refresh_button.released.connect(self._reset_refresh_button_state)
         for button in self._icon_buttons:
             button.setText("")
+            button.setFlat(True)
             button.setIconSize(QSize(24, 24))
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
@@ -3729,6 +3730,9 @@ class MainWindow(QMainWindow):
             return
         self._set_icon_state(button, "hover" if button.underMouse() else "normal")
 
+    def _sync_refresh_button_state(self):
+        self._set_icon_state(self._refresh_button, "hover" if self._refresh_button.underMouse() else "normal")
+
     def _set_icon_state(self, button: QPushButton, state: str):
         icon_type = self._icon_buttons.get(button)
         if not icon_type:
@@ -3738,7 +3742,7 @@ class MainWindow(QMainWindow):
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         
-        if state == "pressed":
+        if state == "pressed" and button is self._settings_button:
             color = app_border
         elif state == "hover":
             color = app_accent
@@ -3861,7 +3865,10 @@ class MainWindow(QMainWindow):
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_icon_buttons", {}):
             if event.type() == QEvent.MouseButtonPress:
-                self._set_icon_state(obj, "pressed")
+                if obj is self._settings_button:
+                    self._set_icon_state(obj, "pressed")
+                else:
+                    self._sync_refresh_button_state()
             elif event.type() == QEvent.MouseButtonRelease:
                 if obj is self._refresh_button:
                     self._reset_refresh_button_state()
