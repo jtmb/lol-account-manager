@@ -3164,6 +3164,15 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
+        self._refresh_button = QPushButton("⟳")
+        self._refresh_button.setObjectName("refreshIconButton")
+        self._refresh_button.setFixedSize(30, 30)
+        self._refresh_button.setAutoDefault(False)
+        self._refresh_button.setDefault(False)
+        self._refresh_button.setToolTip("Refresh UI")
+        self._refresh_button.clicked.connect(self.refresh_ui)
+        top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
+
         self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
         self._settings_button.setFixedSize(30, 30)
@@ -3441,6 +3450,31 @@ class MainWindow(QMainWindow):
             + "    outline: none;\n"
             + "    border: none;\n"
             + "}\n"
+            + "QPushButton#refreshIconButton {\n"
+            + "    min-width: 30px;\n"
+            + "    max-width: 30px;\n"
+            + "    min-height: 30px;\n"
+            + "    max-height: 30px;\n"
+            + "    background-color: transparent;\n"
+            + f"    color: {cog_fg};\n"
+            + "    border: none;\n"
+            + "    border-radius: 0px;\n"
+            + "    padding: 0px;\n"
+            + "    font-size: 16px;\n"
+            + "    font-weight: 500;\n"
+            + "    margin: 0px;\n"
+            + "    text-align: center;\n"
+            + "}\n"
+            + "QPushButton#refreshIconButton:hover {\n"
+            + f"    color: {accent_text};\n"
+            + "}\n"
+            + "QPushButton#refreshIconButton:pressed {\n"
+            + f"    color: {cog_pressed};\n"
+            + "}\n"
+            + "QPushButton#refreshIconButton:focus {\n"
+            + "    outline: none;\n"
+            + "    border: none;\n"
+            + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
             + "    max-width: 132px;\n"
@@ -3525,6 +3559,11 @@ class MainWindow(QMainWindow):
         self._apply_title_bar_theme()
         if self._tray_menu:
             self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
+
+    def refresh_ui(self):
+        """Force a refresh of UI styling and list visuals."""
+        self._apply_theme()
+        self.refresh_account_list()
 
     def _apply_filter_input_palette(self):
         """Apply stable text/placeholder colors for filter controls."""
