@@ -3097,6 +3097,9 @@ class MainWindow(QMainWindow):
         account_list_layout.addWidget(self.account_list)
         layout.addWidget(self.account_list_background)
         
+        # Apply clipping mask to account list viewport
+        self._apply_account_list_clipping_mask()
+        
         # Button layout
         button_layout = QHBoxLayout()
         
@@ -3159,6 +3162,41 @@ class MainWindow(QMainWindow):
             logging.debug("Failed loading champion splash for %s skin %s", champ, skin, exc_info=True)
         self._champion_splash_pixmap_cache[cache_key] = QPixmap()
         return None
+
+    def _apply_account_list_clipping_mask(self):
+        """Apply a rounded-rectangle clipping mask to the account list viewport."""
+        if not hasattr(self, "account_list_background") or not hasattr(self, "account_list"):
+            return
+        
+        def apply_clipping_mask():
+            w = self.account_list_background.width()
+            h = self.account_list_background.height()
+            if w <= 0 or h <= 0:
+                return
+            
+            # Create a bitmap mask with rounded corners
+            mask_pixmap = QPixmap(w, h)
+            mask_pixmap.fill(Qt.color0)
+            
+            painter = QPainter(mask_pixmap)
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setBrush(Qt.color1)
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(0, 0, w, h, 10, 10)
+            painter.end()
+            
+            # Apply as mask to viewport
+            self.account_list.viewport().setMask(QBitmap(mask_pixmap))
+        
+        # Apply initial mask
+        apply_clipping_mask()
+        
+        # Re-apply mask on container resize
+        original_resize = self.account_list_background.resizeEvent
+        def resize_with_mask(event):
+            original_resize(event)
+            apply_clipping_mask()
+        self.account_list_background.resizeEvent = resize_with_mask
 
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
