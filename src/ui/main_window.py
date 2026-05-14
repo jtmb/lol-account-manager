@@ -1495,15 +1495,24 @@ class SettingsDialog(QDialog):
         }),
     ]
 
-    def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
+    def __init__(
+        self,
+        parent=None,
+        settings: Optional[dict] = None,
+        apply_callback: Optional[Callable[[dict], None]] = None,
+        preview_callback: Optional[Callable[[dict], None]] = None,
+    ):
         super().__init__(parent)
         merged_settings = dict(SETTINGS_PANEL_DEFAULTS)
         if settings:
             merged_settings.update(settings)
         self._settings = merged_settings
         self._custom_theme_presets = self._custom_theme_presets_from_settings(merged_settings)
-        self._theme_color_inputs: dict[str, QLineEdit] = {}
+        self._theme_color_values: dict[str, str] = {}
+        self._theme_color_swatches: dict[str, QLabel] = {}
+        self._theme_color_previous_values: dict[str, str] = {}
         self._apply_callback = apply_callback
+        self._preview_callback = preview_callback
         self.init_ui()
 
     def _default_settings_values(self) -> dict:
@@ -1586,10 +1595,41 @@ class SettingsDialog(QDialog):
             "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
         }
         for key, fallback in defaults.items():
-            editor = self._theme_color_inputs.get(key)
-            if editor is None:
-                continue
-            editor.setText(self._sanitize_theme_color(str(preset.get(key, fallback)), fallback))
+            self._set_theme_color_value(
+                key,
+                self._sanitize_theme_color(str(preset.get(key, fallback)), fallback),
+                track_undo=True,
+            )
+
+    def _update_theme_color_swatch(self, key: str):
+        swatch = self._theme_color_swatches.get(key)
+        value = self._theme_color_values.get(key, "")
+        if swatch is None:
+            return
+        swatch.setStyleSheet(
+            "QLabel {"
+            f"background-color: {value};"
+            "border: 1px solid #666;"
+            "border-radius: 4px;"
+            "}"
+        )
+
+    def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
+        normalized = self._sanitize_theme_color(value, self._theme_color_values.get(key, DEFAULT_APP_ACCENT_COLOR))
+        current = self._theme_color_values.get(key)
+        if track_undo and current and current != normalized:
+            self._theme_color_previous_values[key] = current
+        self._theme_color_values[key] = normalized
+        self._update_theme_color_swatch(key)
+
+    def _undo_theme_color(self, key: str):
+        previous = self._theme_color_previous_values.get(key)
+        if not previous:
+            return
+        current = self._theme_color_values.get(key)
+        self._theme_color_values[key] = previous
+        self._theme_color_previous_values[key] = current or previous
+        self._update_theme_color_swatch(key)
 
     def _current_theme_creator_values(self) -> Optional[dict]:
         defaults = {
@@ -1601,28 +1641,23 @@ class SettingsDialog(QDialog):
         }
         values: dict[str, str] = {}
         for key, fallback in defaults.items():
-            editor = self._theme_color_inputs.get(key)
-            if editor is None:
-                continue
-            raw = editor.text().strip()
+            raw = str(self._theme_color_values.get(key, fallback)).strip()
             color = QColor(raw)
             if not color.isValid():
                 QMessageBox.warning(self, "Theme Creator", f"Invalid color for {key}: {raw}")
                 return None
             values[key] = color.name()
-            editor.setText(values[key])
+            self._theme_color_values[key] = values[key]
+            self._update_theme_color_swatch(key)
         return values
 
     def _pick_theme_color(self, key: str):
-        editor = self._theme_color_inputs.get(key)
-        if editor is None:
-            return
-        start = QColor(editor.text().strip())
+        start = QColor(str(self._theme_color_values.get(key, "")).strip())
         if not start.isValid():
             start = QColor(DEFAULT_APP_ACCENT_COLOR)
         picked = QColorDialog.getColor(start, self, f"Pick {key}")
         if picked.isValid():
-            editor.setText(picked.name())
+            self._set_theme_color_value(key, picked.name(), track_undo=True)
 
     def _save_custom_theme_preset(self):
         colors = self._current_theme_creator_values()
@@ -1664,11 +1699,11 @@ class SettingsDialog(QDialog):
         colors = self._current_theme_creator_values()
         if colors is None:
             return
-        if not self._apply_callback:
+        if not self._preview_callback:
             return
         preview_values = self.get_values()
         preview_values.update(colors)
-        self._apply_callback(preview_values)
+        self._preview_callback(preview_values)
 
     @staticmethod
     def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
@@ -2217,16 +2252,26 @@ class SettingsDialog(QDialog):
         for key, label in theme_fields:
             row = QHBoxLayout()
             row.addWidget(QLabel(f"{label}:"))
-            editor = QLineEdit()
-            editor.setPlaceholderText("#RRGGBB")
-            editor.setText(self._sanitize_theme_color(str(self._selected_app_preset().get(key, defaults[key])), defaults[key]))
-            self._theme_color_inputs[key] = editor
-            row.addWidget(editor)
+            swatch = QLabel("")
+            swatch.setFixedSize(48, 22)
+            self._theme_color_swatches[key] = swatch
+            self._theme_color_values[key] = self._sanitize_theme_color(
+                str(self._selected_app_preset().get(key, defaults[key])),
+                defaults[key],
+            )
+            self._theme_color_previous_values[key] = self._theme_color_values[key]
+            self._update_theme_color_swatch(key)
+            row.addWidget(swatch)
             pick_btn = QPushButton("Pick")
             pick_btn.setAutoDefault(False)
             pick_btn.setDefault(False)
             pick_btn.clicked.connect(lambda _checked=False, k=key: self._pick_theme_color(k))
             row.addWidget(pick_btn)
+            undo_btn = QPushButton("Undo")
+            undo_btn.setAutoDefault(False)
+            undo_btn.setDefault(False)
+            undo_btn.clicked.connect(lambda _checked=False, k=key: self._undo_theme_color(k))
+            row.addWidget(undo_btn)
             row.addStretch()
             advanced_layout.addLayout(row)
 
@@ -2557,6 +2602,7 @@ class SettingsDialog(QDialog):
                     break
         if champion_splash_skin is None:
             champion_splash_skin = 0
+        theme_creator_colors = self._current_theme_creator_values() or {}
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -2593,11 +2639,11 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
-            "app_bg_color": str(self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR)),
-            "app_surface_color": str(self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
-            "app_border_color": str(self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
-            "app_text_color": str(self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
-            "app_accent_color": str(self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+            "app_bg_color": str(theme_creator_colors.get("app_bg_color", self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR))),
+            "app_surface_color": str(theme_creator_colors.get("app_surface_color", self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR))),
+            "app_border_color": str(theme_creator_colors.get("app_border_color", self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR))),
+            "app_text_color": str(theme_creator_colors.get("app_text_color", self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR))),
+            "app_accent_color": str(theme_creator_colors.get("app_accent_color", self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR))),
             "custom_theme_presets": [
                 {"name": label, "colors": preset}
                 for label, preset in self._custom_theme_presets
@@ -4137,22 +4183,29 @@ class MainWindow(QMainWindow):
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
+        original_settings = dict(self._settings)
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
-        dialog = SettingsDialog(self, settings=dialog_settings, apply_callback=self._apply_settings_values)
+        dialog = SettingsDialog(
+            self,
+            settings=dialog_settings,
+            apply_callback=self._apply_settings_values,
+            preview_callback=lambda values: self._apply_settings_values(values, persist=False),
+        )
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
         try:
             if dialog.exec_() != QDialog.Accepted:
+                self._apply_settings_values(original_settings, persist=False)
                 return
 
             values = dialog.get_values()
-            self._apply_settings_values(values)
+            self._apply_settings_values(values, persist=True)
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
 
-    def _apply_settings_values(self, values: dict):
+    def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
         self._settings.update(values)
         self._start_minimized_to_tray = bool(values.get('start_minimized_to_tray', self._start_minimized_to_tray))
@@ -4220,7 +4273,8 @@ class MainWindow(QMainWindow):
         if not self._remember_password_24h:
             self._clear_password_grace()
 
-        save_settings(self._settings)
+        if persist:
+            save_settings(self._settings)
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
