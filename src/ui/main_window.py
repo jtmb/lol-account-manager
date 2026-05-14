@@ -3380,6 +3380,9 @@ QMenu#trayQuickMenu::separator {
             assets = payload.get("assets") or []
             chosen_asset = self._pick_release_asset(assets)
             notes = str(payload.get("body") or "").strip()
+            separator = "-------------------------"
+            if separator in notes:
+                notes = notes.split(separator, 1)[0].rstrip()
             note_preview = notes[:400] + ("..." if len(notes) > 400 else "")
             prompt = (
                 f"Update available: {latest_tag}\n"
