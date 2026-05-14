@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QSizePolicy
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
@@ -1344,6 +1344,16 @@ class SettingsDialog(QDialog):
         self.confirm_delete_checkbox.setChecked(bool(self._settings.get("confirm_before_delete", True)))
         general_layout.addWidget(self.confirm_delete_checkbox)
 
+        security_row = QHBoxLayout()
+        security_row.addWidget(QLabel("Security:"))
+        change_pw_btn = QPushButton("Change master password")
+        change_pw_btn.setAutoDefault(False)
+        change_pw_btn.setDefault(False)
+        change_pw_btn.clicked.connect(lambda: mw.change_master_password() if mw else None)
+        security_row.addWidget(change_pw_btn)
+        security_row.addStretch()
+        general_layout.addLayout(security_row)
+
         rank_refresh_row = QHBoxLayout()
         rank_refresh_row.addWidget(QLabel("Rank refresh cadence:"))
         self.rank_refresh_combo = QComboBox()
@@ -1359,6 +1369,16 @@ class SettingsDialog(QDialog):
         self.auto_check_updates_checkbox = QCheckBox("Auto-check updates on startup")
         self.auto_check_updates_checkbox.setChecked(bool(self._settings.get("auto_check_updates", True)))
         general_layout.addWidget(self.auto_check_updates_checkbox)
+
+        paths_row = QHBoxLayout()
+        paths_row.addWidget(QLabel("League client path:"))
+        lol_path_btn = QPushButton("Set LoL Path...")
+        lol_path_btn.setAutoDefault(False)
+        lol_path_btn.setDefault(False)
+        lol_path_btn.clicked.connect(lambda: mw.browse_for_lol() if mw else None)
+        paths_row.addWidget(lol_path_btn)
+        paths_row.addStretch()
+        general_layout.addLayout(paths_row)
 
         diagnostics_label = QLabel("Diagnostics")
         diagnostics_label.setStyleSheet("font-weight: 600;")
@@ -1575,6 +1595,16 @@ class SettingsDialog(QDialog):
         backup_row.addStretch()
         advanced_layout.addLayout(backup_row)
 
+        about_row = QHBoxLayout()
+        about_row.addWidget(QLabel("Application info:"))
+        about_btn = QPushButton("About")
+        about_btn.setAutoDefault(False)
+        about_btn.setDefault(False)
+        about_btn.clicked.connect(lambda: mw.show_about() if mw else None)
+        about_row.addWidget(about_btn)
+        about_row.addStretch()
+        advanced_layout.addLayout(about_row)
+
         general_layout.addStretch()
         appearance_layout.addStretch()
         advanced_layout.addStretch()
@@ -1582,59 +1612,6 @@ class SettingsDialog(QDialog):
         tabs.addTab(appearance_tab, "Appearance")
         tabs.addTab(advanced_tab, "Advanced")
         layout.addWidget(tabs)
-
-        # ── Actions section ────────────────────────────────────────────
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        layout.addSpacing(4)
-        layout.addWidget(sep)
-        layout.addSpacing(2)
-
-        actions_label = QLabel("Actions")
-        actions_label.setStyleSheet("font-weight: bold; font-size: 10pt; color: #888;")
-        layout.addWidget(actions_label)
-
-        actions_grid = QGridLayout()
-        actions_grid.setSpacing(8)
-        actions_grid.setColumnStretch(0, 1)
-        actions_grid.setColumnStretch(1, 1)
-        actions_grid.setRowMinimumHeight(0, 36)
-        actions_grid.setRowMinimumHeight(1, 36)
-
-        mw = self.parent()
-
-        pw_btn = QPushButton("🔑  Change Master Password")
-        pw_btn.setToolTip("Update the master encryption password")
-        pw_btn.setAutoDefault(False)
-        pw_btn.setDefault(False)
-        pw_btn.setMinimumHeight(34)
-        pw_btn.setMaximumHeight(34)
-        pw_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        pw_btn.clicked.connect(lambda: mw.change_master_password() if mw else None)
-        actions_grid.addWidget(pw_btn, 0, 0)
-
-        about_btn = QPushButton("ℹ  About")
-        about_btn.setAutoDefault(False)
-        about_btn.setDefault(False)
-        about_btn.setMinimumHeight(34)
-        about_btn.setMaximumHeight(34)
-        about_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        about_btn.clicked.connect(lambda: mw.show_about() if mw else None)
-        actions_grid.addWidget(about_btn, 0, 1)
-
-        lol_btn = QPushButton("📁  Set LoL Path…")
-        lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
-        lol_btn.setAutoDefault(False)
-        lol_btn.setDefault(False)
-        lol_btn.setMinimumHeight(34)
-        lol_btn.setMaximumHeight(34)
-        lol_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        lol_btn.clicked.connect(lambda: mw.browse_for_lol() if mw else None)
-        actions_grid.addWidget(lol_btn, 1, 0)
-
-        layout.addLayout(actions_grid)
-        layout.addSpacing(4)
 
         # ── Dialog buttons ─────────────────────────────────────────────
         sep2 = QFrame()
