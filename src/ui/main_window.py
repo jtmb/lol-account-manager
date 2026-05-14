@@ -49,8 +49,8 @@ from src import __version__ as APP_VERSION
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
-DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#4f7cff"
-DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#d2d3db"
+DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#9ca3af"
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#9ca3af"
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
@@ -2334,6 +2334,10 @@ class AccountListItem(QFrame):
         self._refresh_logged_in_badge_style()
         self._update_visual_state()
 
+    def set_hover_highlight_color(self, color: str):
+        self._hover_highlight_color = str(color or self._hover_highlight_color)
+        self._update_visual_state()
+
     def set_logged_in(self, logged_in: bool):
         self._logged_in = logged_in
         self.logged_in_label.setVisible(logged_in)
@@ -3942,6 +3946,7 @@ QMenu#trayQuickMenu::separator {
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
                 widget.set_dark_mode(self._dark_mode)
+                widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
                 widget.set_logged_in(
                     bool(self._logged_in_username)
