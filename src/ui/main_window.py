@@ -155,7 +155,7 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
             caption_color = ctypes.c_int(0x302B2B)
             text_color = ctypes.c_int(0xF4D6CD)
         else:
-            caption_color = ctypes.c_int(0xD9DFE2)
+            caption_color = ctypes.c_int(0xF2F2F2)
             text_color = ctypes.c_int(0x1E1E1E)
 
         border_color = caption_color
@@ -360,8 +360,8 @@ QMainWindow, QDialog, QWidget {
     color: #2e2d2a;
 }
 QListWidget {
-    background-color: #fafafa;
-    border: 1px solid #c9c5be;
+    background-color: #ededf0;
+    border: 1px solid #c4c6cf;
     border-radius: 6px;
     padding: 0px;
 }
