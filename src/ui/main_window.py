@@ -3575,8 +3575,8 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
-            self._refresh_button: ["fa6s.arrows-rotate", "fa5s.sync-alt"],
-            self._settings_button: ["fa6s.gear", "fa5s.cog"],
+            self._refresh_button: ["fa5s.sync-alt", "fa.refresh"],
+            self._settings_button: ["fa5s.cog", "fa.cog"],
         }
         for button in self._icon_buttons:
             button.setText("")
@@ -3584,6 +3584,7 @@ class MainWindow(QMainWindow):
             button.installEventFilter(self)
             button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
             button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
+        QTimer.singleShot(100, self._refresh_icon_buttons)
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
@@ -3623,8 +3624,11 @@ class MainWindow(QMainWindow):
             return None
         for name in names:
             try:
-                return qta.icon(name, color=color)
-            except Exception:
+                icon = qta.icon(name, color=color)
+                if icon and not icon.isNull():
+                    return icon
+            except Exception as e:
+                logging.debug(f"Failed to load icon '{name}': {e}")
                 continue
         return None
 
