@@ -23,6 +23,7 @@ import subprocess
 import shutil
 import zipfile
 import hashlib
+import re
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
@@ -3144,6 +3145,23 @@ QMenu#trayQuickMenu::separator {
     def _is_newer_release(self, latest_tag: str) -> bool:
         return self._version_tuple(latest_tag) > self._version_tuple(APP_VERSION)
 
+    @staticmethod
+    def _build_release_notes_preview(raw_notes: str) -> str:
+        """Trim GitHub release notes down to the user-facing summary section."""
+        notes = str(raw_notes or "").strip()
+        if not notes:
+            return ""
+
+        separator = "-------------------------"
+        if separator in notes:
+            notes = notes.split(separator, 1)[0].rstrip()
+
+        br_matches = list(re.finditer(r"<br\s*/?>", notes, flags=re.IGNORECASE))
+        if br_matches:
+            notes = notes[br_matches[-1].end():].lstrip()
+
+        return notes[:400] + ("..." if len(notes) > 400 else "")
+
     def check_for_updates_now(self):
         """User-triggered update check."""
         self._check_for_updates(force=True)
@@ -3380,10 +3398,7 @@ QMenu#trayQuickMenu::separator {
             assets = payload.get("assets") or []
             chosen_asset = self._pick_release_asset(assets)
             notes = str(payload.get("body") or "").strip()
-            separator = "-------------------------"
-            if separator in notes:
-                notes = notes.split(separator, 1)[0].rstrip()
-            note_preview = notes[:400] + ("..." if len(notes) > 400 else "")
+            note_preview = self._build_release_notes_preview(notes)
             prompt = (
                 f"Update available: {latest_tag}\n"
                 f"Current version: {APP_VERSION}\n\n"
