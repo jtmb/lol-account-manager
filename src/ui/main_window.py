@@ -174,11 +174,12 @@ class AccountListBackgroundFrame(QFrame):
             painter.drawPixmap(target.topLeft(), crop)
             painter.setOpacity(1.0)
 
-            edge_alpha_base = 230 if self._dark_mode else 90
+            edge_alpha_base = 230 if self._dark_mode else 170
             edge_alpha = int(edge_alpha_base * (self._edge_fade / 100.0))
             if edge_alpha > 0:
                 edge_color = base_color if self._dark_mode else QColor("#c8ccd6")
-                fade_width = max(24, int(min(rect.width(), rect.height()) * 0.20))
+                fade_ratio = 0.20 if self._dark_mode else 0.28
+                fade_width = max(24, int(min(rect.width(), rect.height()) * fade_ratio))
                 left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
                 left_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
                 left_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
