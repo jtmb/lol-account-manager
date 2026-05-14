@@ -1613,6 +1613,7 @@ class SettingsDialog(QDialog):
             "border-radius: 4px;"
             "}"
         )
+        swatch.setToolTip(value)
 
     def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
         normalized = self._sanitize_theme_color(value, self._theme_color_values.get(key, DEFAULT_APP_ACCENT_COLOR))
@@ -1704,6 +1705,10 @@ class SettingsDialog(QDialog):
         preview_values = self.get_values()
         preview_values.update(colors)
         self._preview_callback(preview_values)
+
+    def _reset_theme_creator_to_selected_preset(self):
+        self._set_theme_creator_values(self._selected_app_preset())
+        self.apply_settings()
 
     @staticmethod
     def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
@@ -2231,7 +2236,7 @@ class SettingsDialog(QDialog):
         theme_creator_label.setStyleSheet("font-weight: 600;")
         advanced_layout.addWidget(theme_creator_label)
 
-        creator_tip = QLabel("Set app colors with hex values, then save as a preset.")
+        creator_tip = QLabel("Click a color swatch to pick a color, then save as a preset.")
         creator_tip.setWordWrap(True)
         advanced_layout.addWidget(creator_tip)
 
@@ -2252,8 +2257,10 @@ class SettingsDialog(QDialog):
         for key, label in theme_fields:
             row = QHBoxLayout()
             row.addWidget(QLabel(f"{label}:"))
-            swatch = QLabel("")
+            swatch = ClickableIconLabel("")
             swatch.setFixedSize(48, 22)
+            swatch.setCursor(Qt.PointingHandCursor)
+            swatch.clicked.connect(lambda k=key: self._pick_theme_color(k))
             self._theme_color_swatches[key] = swatch
             self._theme_color_values[key] = self._sanitize_theme_color(
                 str(self._selected_app_preset().get(key, defaults[key])),
@@ -2262,11 +2269,6 @@ class SettingsDialog(QDialog):
             self._theme_color_previous_values[key] = self._theme_color_values[key]
             self._update_theme_color_swatch(key)
             row.addWidget(swatch)
-            pick_btn = QPushButton("Pick")
-            pick_btn.setAutoDefault(False)
-            pick_btn.setDefault(False)
-            pick_btn.clicked.connect(lambda _checked=False, k=key: self._pick_theme_color(k))
-            row.addWidget(pick_btn)
             undo_btn = QPushButton("Undo")
             undo_btn.setAutoDefault(False)
             undo_btn.setDefault(False)
@@ -2276,11 +2278,11 @@ class SettingsDialog(QDialog):
             advanced_layout.addLayout(row)
 
         creator_actions_row = QHBoxLayout()
-        use_current_btn = QPushButton("Use selected preset colors")
-        use_current_btn.setAutoDefault(False)
-        use_current_btn.setDefault(False)
-        use_current_btn.clicked.connect(lambda: self._set_theme_creator_values(self._selected_app_preset()))
-        creator_actions_row.addWidget(use_current_btn)
+        reset_btn = QPushButton("Reset")
+        reset_btn.setAutoDefault(False)
+        reset_btn.setDefault(False)
+        reset_btn.clicked.connect(self._reset_theme_creator_to_selected_preset)
+        creator_actions_row.addWidget(reset_btn)
         preview_theme_btn = QPushButton("Preview preset")
         preview_theme_btn.setAutoDefault(False)
         preview_theme_btn.setDefault(False)
