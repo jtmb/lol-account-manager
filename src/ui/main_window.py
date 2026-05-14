@@ -3118,7 +3118,6 @@ class MainWindow(QMainWindow):
 
         self._logged_in_username = None
         self._session_miss_count = 0
-        self._stop_ingame_watcher()
         self.update_account_item_states()
 
     def show_account_context_menu(self, position):
