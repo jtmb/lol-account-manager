@@ -52,7 +52,7 @@ GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/rel
 DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#4f7cff"
 DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#d2d3db"
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
-DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
+DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#45475a"
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
