@@ -90,6 +90,15 @@ def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
     return value
 
 
+class ClickableIconLabel(QLabel):
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 CHAMPION_SPLASH_OPTIONS = [
     ('Aatrox', 'Aatrox'), ('Ahri', 'Ahri'), ('Akali', 'Akali'), ('Akshan', 'Akshan'),
     ('Alistar', 'Alistar'), ('Ambessa', 'Ambessa'), ('Amumu', 'Amumu'), ('Anivia', 'Anivia'),
@@ -3282,10 +3291,10 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._refresh_button = QToolButton()
+        self._refresh_button = ClickableIconLabel()
         self._refresh_button.setObjectName("refreshIconButton")
         self._refresh_button.setFixedSize(26, 26)
-        self._refresh_button.setAutoRaise(True)
+        self._refresh_button.setAlignment(Qt.AlignCenter)
         self._refresh_button.setToolTip("Refresh UI")
         self._refresh_button.clicked.connect(self.refresh_ui)
         top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
@@ -3694,7 +3703,6 @@ class MainWindow(QMainWindow):
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
-        self._refresh_button.released.connect(self._reset_refresh_button_state)
         for button in self._icon_buttons:
             button.setText("")
             button.setIconSize(QSize(24, 24))
@@ -3706,7 +3714,6 @@ class MainWindow(QMainWindow):
             self._set_icon_state(button, "normal")
 
     def _reset_refresh_button_state(self):
-        self._refresh_button.setDown(False)
         self._set_icon_state(self._refresh_button, "hover" if self._refresh_button.underMouse() else "normal")
 
     def _refresh_icon_buttons(self):
@@ -3743,9 +3750,6 @@ class MainWindow(QMainWindow):
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         
-        if button is self._refresh_button:
-            state = "hover" if button.underMouse() else "normal"
-
         if state == "pressed" and button is self._settings_button:
             color = app_border
         elif state == "hover":
@@ -3755,7 +3759,10 @@ class MainWindow(QMainWindow):
         
         icon = self._build_custom_icon(icon_type, color, 24)
         if icon:
-            button.setIcon(icon)
+            if hasattr(button, "setPixmap"):
+                button.setPixmap(icon.pixmap(24, 24))
+            else:
+                button.setIcon(icon)
 
     def _build_custom_icon(self, icon_type: str, color_hex: str, size: int) -> Optional[QIcon]:
         """Build minimalistic custom icons using Qt painting."""
@@ -3871,8 +3878,6 @@ class MainWindow(QMainWindow):
             if event.type() == QEvent.MouseButtonPress:
                 if obj is self._settings_button:
                     self._set_icon_state(obj, "pressed")
-                else:
-                    self._sync_refresh_button_state()
             elif event.type() == QEvent.MouseButtonRelease:
                 if obj is self._refresh_button:
                     self._reset_refresh_button_state()
