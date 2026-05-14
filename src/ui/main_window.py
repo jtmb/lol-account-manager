@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
@@ -58,6 +58,11 @@ HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 SPLASH_THEME_AUTO = "__none__"
 LOCKED_CHAMPION_SPLASH_EDGE_FADE = 80
 LOCKED_CHAMPION_SPLASH_INNER_FADE = 75
+DEFAULT_APP_BG_COLOR = "#1e1e2e"
+DEFAULT_APP_SURFACE_COLOR = "#181825"
+DEFAULT_APP_BORDER_COLOR = "#313244"
+DEFAULT_APP_TEXT_COLOR = "#cdd6f4"
+DEFAULT_APP_ACCENT_COLOR = "#313244"
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -136,6 +141,13 @@ class AccountListBackgroundFrame(QFrame):
         self._edge_fade = 55
         self._inner_fade = 20
         self._dark_mode = True
+        self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
+
+    def set_base_color(self, color: str):
+        candidate = QColor(str(color or "").strip())
+        if candidate.isValid():
+            self._base_color = candidate
+            self.update()
 
     def set_background(self, enabled: bool, pixmap: Optional[QPixmap], opacity: int, edge_fade: int, inner_fade: int):
         self._enabled = bool(enabled)
@@ -161,7 +173,7 @@ class AccountListBackgroundFrame(QFrame):
         path.addRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
         painter.setClipPath(path)
 
-        base_color = QColor("#181b2b") if self._dark_mode else QColor("#ededf0")
+        base_color = self._base_color if self._dark_mode else QColor("#ededf0")
         painter.fillRect(rect, base_color)
 
         if self._enabled and self._pixmap and not self._pixmap.isNull():
@@ -1483,6 +1495,40 @@ class SettingsDialog(QDialog):
         self.text_zoom_combo.setCurrentIndex(max(0, zoom_index))
         appearance_layout.addWidget(self.text_zoom_combo)
 
+        appearance_layout.addWidget(QLabel("Application colors:"))
+        self.app_color_inputs: dict[str, QLineEdit] = {}
+
+        def add_color_row(label: str, setting_key: str, default_color: str):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label))
+            edit = QLineEdit()
+            edit.setText(str(self._settings.get(setting_key, default_color) or default_color))
+            edit.setPlaceholderText(default_color)
+            edit.setMaxLength(9)
+            edit.setFixedWidth(120)
+            pick_btn = QPushButton("Pick")
+            pick_btn.setAutoDefault(False)
+            pick_btn.setDefault(False)
+
+            def pick_color():
+                current = QColor(edit.text().strip() or default_color)
+                chosen = QColorDialog.getColor(current, self, f"Select {label}")
+                if chosen.isValid():
+                    edit.setText(chosen.name())
+
+            pick_btn.clicked.connect(pick_color)
+            row.addWidget(edit)
+            row.addWidget(pick_btn)
+            row.addStretch()
+            appearance_layout.addLayout(row)
+            self.app_color_inputs[setting_key] = edit
+
+        add_color_row("Background", "app_bg_color", DEFAULT_APP_BG_COLOR)
+        add_color_row("Surface", "app_surface_color", DEFAULT_APP_SURFACE_COLOR)
+        add_color_row("Border", "app_border_color", DEFAULT_APP_BORDER_COLOR)
+        add_color_row("Text", "app_text_color", DEFAULT_APP_TEXT_COLOR)
+        add_color_row("Accent", "app_accent_color", DEFAULT_APP_ACCENT_COLOR)
+
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
         self.show_ranks_checkbox.setToolTip("Show or hide op.gg rank information on each account row.")
@@ -2171,6 +2217,11 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
+            "app_bg_color": self.app_color_inputs.get("app_bg_color").text().strip() or DEFAULT_APP_BG_COLOR,
+            "app_surface_color": self.app_color_inputs.get("app_surface_color").text().strip() or DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": self.app_color_inputs.get("app_border_color").text().strip() or DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": self.app_color_inputs.get("app_text_color").text().strip() or DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": self.app_color_inputs.get("app_accent_color").text().strip() or DEFAULT_APP_ACCENT_COLOR,
         }
 
     def apply_settings(self):
@@ -2888,7 +2939,7 @@ class MainWindow(QMainWindow):
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
-        self._dark_mode: bool = self._settings.get('dark_mode', True)
+        self._dark_mode: bool = True
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
         self._close_behavior: str = str(self._settings.get('close_behavior', 'tray'))
         self._auto_lock_minutes: int = int(self._settings.get('auto_lock_minutes', 0))
@@ -2907,6 +2958,11 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
+        self._app_bg_color: str = str(self._settings.get('app_bg_color', DEFAULT_APP_BG_COLOR) or DEFAULT_APP_BG_COLOR)
+        self._app_surface_color: str = str(self._settings.get('app_surface_color', DEFAULT_APP_SURFACE_COLOR) or DEFAULT_APP_SURFACE_COLOR)
+        self._app_border_color: str = str(self._settings.get('app_border_color', DEFAULT_APP_BORDER_COLOR) or DEFAULT_APP_BORDER_COLOR)
+        self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
+        self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
         default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
@@ -3023,12 +3079,6 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._theme_button = QPushButton()
-        self._theme_button.setObjectName("themeTopButton")
-        self._theme_button.setFixedSize(132, 30)
-        self._theme_button.setToolTip("Switch between dark and light mode")
-        self._theme_button.clicked.connect(self.toggle_theme)
-        top_row.addWidget(self._theme_button, 0, Qt.AlignVCenter)
         self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
         self._settings_button.setFixedSize(30, 30)
@@ -3200,6 +3250,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "account_list_background"):
             return
         self.account_list_background.set_dark_mode(self._dark_mode)
+        self.account_list_background.set_base_color(self._app_surface_color)
         pixmap = None
         if self._champion_splash_enabled:
             pixmap = self._load_champion_splash_pixmap(self._champion_splash_champion, self._champion_splash_skin)
@@ -3242,31 +3293,30 @@ class MainWindow(QMainWindow):
     
     def toggle_theme(self):
         """Toggle between dark and light mode."""
-        self._dark_mode = not self._dark_mode
-        if 'logged_in_gradient_color' not in self._settings:
-            self._logged_in_gradient_color = _default_logged_in_highlight(self._dark_mode)
-        self._hover_highlight_color = _resolve_row_hover_highlight(
-            self._hover_highlight_color_setting,
-            self._dark_mode,
-        )
+        self._dark_mode = True
         self._apply_theme()
-        self._settings['dark_mode'] = self._dark_mode
-        save_settings(self._settings)
 
     def _theme_with_text_zoom(self, base: str, dark_mode: bool) -> str:
         """Merge base theme with text zoom scaling."""
         point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
-        cog_bg = "#313244" if dark_mode else "#d2d3db"
-        cog_fg = "#cdd6f4" if dark_mode else "#2e2d2a"
-        cog_border = "#45475a" if dark_mode else "#c4c6cf"
-        cog_hover = "#45475a" if dark_mode else "#c8c9d1"
-        cog_pressed = "#585b70" if dark_mode else "#bebfc8"
-        cog_focus = "#6c7086" if dark_mode else "#a8a8a8"
-        list_border = "#45475a" if dark_mode else "#c4c6cf"
-        search_fg = "#dbe4ff" if dark_mode else "#2e2d2a"
-        search_bg = "#171a2a" if dark_mode else "#f2f3f6"
-        search_border = "#3f4b71" if dark_mode else "#d0d0d6"
-        search_placeholder = "#a8b4d6" if dark_mode else "#7c756b"
+        app_bg = self._sanitize_color(self._app_bg_color, DEFAULT_APP_BG_COLOR)
+        app_surface = self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR)
+        app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
+        app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+        app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
+        accent_text = self._contrast_text_color(app_accent)
+        placeholder = self._placeholder_color(app_text)
+        cog_bg = app_accent
+        cog_fg = accent_text
+        cog_border = app_border
+        cog_hover = app_accent
+        cog_pressed = app_accent
+        cog_focus = app_border
+        list_border = app_border
+        search_fg = app_text
+        search_bg = app_surface
+        search_border = app_border
+        search_placeholder = placeholder
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -3324,16 +3374,47 @@ class MainWindow(QMainWindow):
             + "    background: transparent;\n"
             + "    border: none;\n"
             + "}\n"
+            + "QMainWindow, QDialog, QWidget {\n"
+            + f"    background-color: {app_bg};\n"
+            + f"    color: {app_text};\n"
+            + "}\n"
+            + "QListWidget {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QPushButton {\n"
+            + f"    background-color: {app_accent};\n"
+            + f"    color: {accent_text};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QPushButton:disabled {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_border};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_text};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QTabWidget::pane {\n"
+            + f"    border: 1px solid {app_border};\n"
+            + f"    background-color: {app_bg};\n"
+            + "}\n"
+            + "QTabBar::tab {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_text};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QTabBar::tab:selected {\n"
+            + f"    background-color: {app_bg};\n"
+            + f"    color: {app_text};\n"
+            + "}\n"
         )
 
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
-        if self._dark_mode:
-            self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
-            self._theme_button.setText("Light Mode")
-        else:
-            self.setStyleSheet(self._theme_with_text_zoom(LIGHT_STYLESHEET, dark_mode=False))
-            self._theme_button.setText("Dark Mode")
+        self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
 
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
@@ -3353,23 +3434,39 @@ class MainWindow(QMainWindow):
         search_palette = self.search_input.palette()
         combo_palette = self.tag_filter_combo.palette()
 
-        if self._dark_mode:
-            search_palette.setColor(QPalette.Base, QColor("#171a2a"))
-            search_palette.setColor(QPalette.Text, QColor("#dbe4ff"))
-            search_palette.setColor(QPalette.PlaceholderText, QColor("#a8b4d6"))
-            combo_palette.setColor(QPalette.Base, QColor("#181825"))
-            combo_palette.setColor(QPalette.Text, QColor("#cdd6f4"))
-            combo_palette.setColor(QPalette.ButtonText, QColor("#cdd6f4"))
-        else:
-            search_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
-            search_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
-            search_palette.setColor(QPalette.PlaceholderText, QColor("#7c756b"))
-            combo_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
-            combo_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
-            combo_palette.setColor(QPalette.ButtonText, QColor("#2e2d2a"))
+        base_color = QColor(self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR))
+        text_color = QColor(self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR))
+        placeholder_color = QColor(text_color)
+        placeholder_color.setAlpha(150)
+        search_palette.setColor(QPalette.Base, base_color)
+        search_palette.setColor(QPalette.Text, text_color)
+        search_palette.setColor(QPalette.PlaceholderText, placeholder_color)
+        combo_palette.setColor(QPalette.Base, base_color)
+        combo_palette.setColor(QPalette.Text, text_color)
+        combo_palette.setColor(QPalette.ButtonText, text_color)
 
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
+
+    def _sanitize_color(self, value: str, fallback: str) -> str:
+        candidate = QColor(str(value or "").strip())
+        if not candidate.isValid():
+            return fallback
+        return candidate.name()
+
+    def _contrast_text_color(self, value: str) -> str:
+        candidate = QColor(str(value or "").strip())
+        if not candidate.isValid():
+            candidate = QColor("#000000")
+        luminance = 0.2126 * candidate.redF() + 0.7152 * candidate.greenF() + 0.0722 * candidate.blueF()
+        return "#111111" if luminance > 0.6 else "#ffffff"
+
+    def _placeholder_color(self, value: str) -> str:
+        candidate = QColor(str(value or "").strip())
+        if not candidate.isValid():
+            candidate = QColor(DEFAULT_APP_TEXT_COLOR)
+        candidate.setAlpha(150)
+        return f"rgba({candidate.red()}, {candidate.green()}, {candidate.blue()}, {candidate.alpha()})"
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
@@ -3403,6 +3500,11 @@ class MainWindow(QMainWindow):
         self._tag_size = str(values['tag_size'])
         self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
+        self._app_bg_color = str(values.get('app_bg_color', self._app_bg_color) or self._app_bg_color)
+        self._app_surface_color = str(values.get('app_surface_color', self._app_surface_color) or self._app_surface_color)
+        self._app_border_color = str(values.get('app_border_color', self._app_border_color) or self._app_border_color)
+        self._app_text_color = str(values.get('app_text_color', self._app_text_color) or self._app_text_color)
+        self._app_accent_color = str(values.get('app_accent_color', self._app_accent_color) or self._app_accent_color)
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
         self._hover_highlight_color_setting = str(
             values.get('hover_highlight_color', self._hover_highlight_color_setting)
