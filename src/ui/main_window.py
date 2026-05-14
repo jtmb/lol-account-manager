@@ -1,6 +1,6 @@
 """Main application window"""
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
@@ -3282,11 +3282,10 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._refresh_button = QPushButton("")
+        self._refresh_button = QToolButton()
         self._refresh_button.setObjectName("refreshIconButton")
         self._refresh_button.setFixedSize(26, 26)
-        self._refresh_button.setAutoDefault(False)
-        self._refresh_button.setDefault(False)
+        self._refresh_button.setAutoRaise(True)
         self._refresh_button.setToolTip("Refresh UI")
         self._refresh_button.clicked.connect(self.refresh_ui)
         top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
@@ -3570,7 +3569,7 @@ class MainWindow(QMainWindow):
             + "    outline: none;\n"
             + "    border: none;\n"
             + "}\n"
-            + "QPushButton#refreshIconButton {\n"
+            + "QToolButton#refreshIconButton {\n"
             + "    min-width: 26px;\n"
             + "    max-width: 26px;\n"
             + "    min-height: 26px;\n"
@@ -3585,13 +3584,10 @@ class MainWindow(QMainWindow):
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
-            + "QPushButton#refreshIconButton:hover {\n"
+            + "QToolButton#refreshIconButton:hover {\n"
             + f"    color: {accent_text};\n"
             + "}\n"
-            + "QPushButton#refreshIconButton:pressed {\n"
-            + f"    color: {cog_pressed};\n"
-            + "}\n"
-            + "QPushButton#refreshIconButton:focus {\n"
+            + "QToolButton#refreshIconButton:focus {\n"
             + "    outline: none;\n"
             + "    border: none;\n"
             + "}\n"
