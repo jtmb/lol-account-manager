@@ -3708,6 +3708,8 @@ class MainWindow(QMainWindow):
         }
         self._settings_icon_latched = False
         self._set_refresh_icon_normal()
+        self._refresh_button.setCursor(Qt.PointingHandCursor)
+        self._refresh_button.installEventFilter(self)
         for button in self._icon_buttons:
             button.setText("")
             button.setIconSize(QSize(24, 24))
@@ -3720,6 +3722,11 @@ class MainWindow(QMainWindow):
 
     def _set_refresh_icon_normal(self):
         icon = self._build_custom_icon("refresh", self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR), 24)
+        if icon:
+            self._refresh_button.setPixmap(icon.pixmap(24, 24))
+
+    def _set_refresh_icon_hover(self):
+        icon = self._build_custom_icon("refresh", self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR), 24)
         if icon:
             self._refresh_button.setPixmap(icon.pixmap(24, 24))
 
@@ -3878,6 +3885,15 @@ class MainWindow(QMainWindow):
         painter.drawPath(center_circle)
 
     def eventFilter(self, obj, event):
+        if obj is self._refresh_button:
+            if event.type() == QEvent.Enter:
+                self._set_refresh_icon_hover()
+            elif event.type() == QEvent.Leave:
+                self._set_refresh_icon_normal()
+            elif event.type() == QEvent.MouseButtonRelease:
+                self._set_refresh_icon_hover() if self._refresh_button.underMouse() else self._set_refresh_icon_normal()
+            return super().eventFilter(obj, event)
+
         if obj in getattr(self, "_icon_buttons", {}):
             if event.type() == QEvent.MouseButtonPress:
                 if obj is self._settings_button:
