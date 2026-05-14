@@ -3575,8 +3575,8 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
-            self._refresh_button: ["fa5s.sync-alt", "fa.refresh"],
-            self._settings_button: ["fa5s.cog", "fa.cog"],
+            self._refresh_button: ["fa5s.sync-alt"],
+            self._settings_button: ["fa5s.cog"],
         }
         for button in self._icon_buttons:
             button.setText("")

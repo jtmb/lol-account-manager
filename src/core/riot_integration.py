@@ -8,8 +8,12 @@ from pathlib import Path
 from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_path
 
-import win32con
-import win32gui
+try:
+    import win32con
+    import win32gui
+except ImportError:
+    win32con = None
+    win32gui = None
 
 
 class RiotClientIntegration:
