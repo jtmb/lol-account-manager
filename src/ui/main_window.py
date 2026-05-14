@@ -3566,7 +3566,8 @@ class MainWindow(QMainWindow):
         self._apply_title_bar_theme()
         if self._tray_menu:
             self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
-        self._refresh_icon_buttons()
+        # Delay icon refresh to ensure stylesheet is fully applied
+        QTimer.singleShot(10, self._refresh_icon_buttons)
 
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
@@ -3580,17 +3581,27 @@ class MainWindow(QMainWindow):
         }
         for button in self._icon_buttons:
             button.setText("")
-            button.setFlat(True)
-            button.setIconSize(QSize(20, 20))
+            button.setIconSize(QSize(22, 22))
             button.setFocusPolicy(Qt.NoFocus)
+            button.setCursor(Qt.PointingHandCursor)
             button.installEventFilter(self)
             button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
             button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
-        QTimer.singleShot(100, self._refresh_icon_buttons)
+        # Set initial icons immediately and via timer
+        for button in self._icon_buttons:
+            self._set_icon_state(button, "normal")
+        QTimer.singleShot(50, self._refresh_icon_buttons)
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
             self._set_icon_state(button, "hover" if button.underMouse() else "normal")
+        # Ensure icon buttons have minimal stylesheet to not interfere with icons
+        self._refresh_button.setStyleSheet(
+            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+        )
+        self._settings_button.setStyleSheet(
+            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+        )
 
     def _set_icon_state(self, button: QPushButton, state: str):
         if not qta:
