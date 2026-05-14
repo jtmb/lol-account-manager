@@ -3517,7 +3517,7 @@ class MainWindow(QMainWindow):
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        self.check_master_password()
+        QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
             QTimer.singleShot(4000, self._check_for_updates)
         if self._start_minimized_to_tray and self._tray_icon and self._tray_icon.isVisible():
@@ -4313,8 +4313,13 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        self._apply_theme()
-        self.refresh_account_list()
+        self.setUpdatesEnabled(False)
+        try:
+            self._apply_theme()
+            self.refresh_account_list()
+        finally:
+            self.setUpdatesEnabled(True)
+            self.update()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
