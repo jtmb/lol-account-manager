@@ -156,16 +156,16 @@ class AccountListBackgroundFrame(QFrame):
         painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
 
         rect = self.rect()
-        radius = 6.0
+        radius = 10.0
         path = QPainterPath()
-        path.addRoundedRect(QRectF(rect.adjusted(1, 1, -1, -1)), radius, radius)
+        path.addRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
         painter.setClipPath(path)
 
         base_color = QColor("#181b2b") if self._dark_mode else QColor("#ededf0")
         painter.fillRect(rect, base_color)
 
         if self._enabled and self._pixmap and not self._pixmap.isNull():
-            target = rect.adjusted(1, 1, -1, -1)
+            target = rect.adjusted(2, 2, -2, -2)
             scaled = self._pixmap.scaled(target.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
             if self._dark_mode:
                 x = max(0, (scaled.width() - target.width()) // 2)
@@ -3069,7 +3069,7 @@ class MainWindow(QMainWindow):
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
         account_list_layout = QVBoxLayout(self.account_list_background)
-        account_list_layout.setContentsMargins(0, 0, 0, 0)
+        account_list_layout.setContentsMargins(6, 6, 6, 6)
         account_list_layout.setSpacing(0)
         self.account_list = QListWidget()
         self.account_list.setObjectName("accountListWidget")
@@ -3275,7 +3275,7 @@ class MainWindow(QMainWindow):
             + "}\n"
             + "QFrame#accountListContainer {\n"
             + f"    border: 1px solid {list_border};\n"
-            + "    border-radius: 6px;\n"
+            + "    border-radius: 10px;\n"
             + "    background: transparent;\n"
             + "}\n"
             + "QListWidget#accountListWidget {\n"
