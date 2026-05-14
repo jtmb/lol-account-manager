@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
 from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
@@ -1209,10 +1209,13 @@ class SettingsDialog(QDialog):
         tabs = QTabWidget()
         general_tab = QWidget()
         appearance_tab = QWidget()
+        advanced_tab = QWidget()
         general_layout = QVBoxLayout(general_tab)
         appearance_layout = QVBoxLayout(appearance_tab)
+        advanced_layout = QVBoxLayout(advanced_tab)
         general_layout.setSpacing(8)
         appearance_layout.setSpacing(8)
+        advanced_layout.setSpacing(8)
 
         startup_default = self._settings.get("start_on_windows_startup", _is_startup_enabled())
         self.startup_checkbox = QCheckBox("Start Program at Windows startup")
@@ -1357,6 +1360,10 @@ class SettingsDialog(QDialog):
         self.auto_check_updates_checkbox.setChecked(bool(self._settings.get("auto_check_updates", True)))
         general_layout.addWidget(self.auto_check_updates_checkbox)
 
+        diagnostics_label = QLabel("Diagnostics")
+        diagnostics_label.setStyleSheet("font-weight: 600;")
+        advanced_layout.addWidget(diagnostics_label)
+
         diagnostics_row = QHBoxLayout()
         diagnostics_row.addWidget(QLabel("Diagnostics log level:"))
         self.log_level_combo = QComboBox()
@@ -1378,7 +1385,7 @@ class SettingsDialog(QDialog):
         watcher_diag_btn.clicked.connect(lambda: mw.open_ingame_diagnostics() if mw and hasattr(mw, "open_ingame_diagnostics") else None)
         diagnostics_row.addWidget(watcher_diag_btn)
         diagnostics_row.addStretch()
-        general_layout.addLayout(diagnostics_row)
+        advanced_layout.addLayout(diagnostics_row)
 
         tag_size_row = QHBoxLayout()
         tag_size_row.addWidget(QLabel("Tag size:"))
@@ -1520,12 +1527,16 @@ class SettingsDialog(QDialog):
         self.rank_icon_size_combo.setEnabled(self.show_ranks_checkbox.isChecked())
         self.rank_text_brightness_combo.setEnabled(self.show_ranks_checkbox.isChecked())
 
+        backups_label = QLabel("Backups")
+        backups_label.setStyleSheet("font-weight: 600;")
+        advanced_layout.addWidget(backups_label)
+
         self.auto_backup_checkbox = QCheckBox("Automatic versioned backups")
         self.auto_backup_checkbox.setChecked(bool(self._settings.get("auto_backup_enabled", True)))
         self.auto_backup_checkbox.setToolTip(
             "Create an encrypted backup each time account data is saved."
         )
-        general_layout.addWidget(self.auto_backup_checkbox)
+        advanced_layout.addWidget(self.auto_backup_checkbox)
 
         backup_keep_row = QHBoxLayout()
         keep_backups_tip = (
@@ -1550,14 +1561,26 @@ class SettingsDialog(QDialog):
         self.auto_backup_keep_combo.setCurrentIndex(max(0, keep_index))
         backup_keep_row.addWidget(self.auto_backup_keep_combo)
         backup_keep_row.addStretch()
-        general_layout.addLayout(backup_keep_row)
+        advanced_layout.addLayout(backup_keep_row)
         self.auto_backup_checkbox.toggled.connect(self.auto_backup_keep_combo.setEnabled)
         self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
 
+        backup_row = QHBoxLayout()
+        backup_btn = QPushButton("Backup / Restore...")
+        backup_btn.setToolTip("Export or import an encrypted account backup")
+        backup_btn.setAutoDefault(False)
+        backup_btn.setDefault(False)
+        backup_btn.clicked.connect(lambda: mw.open_backup_dialog() if mw else None)
+        backup_row.addWidget(backup_btn)
+        backup_row.addStretch()
+        advanced_layout.addLayout(backup_row)
+
         general_layout.addStretch()
         appearance_layout.addStretch()
+        advanced_layout.addStretch()
         tabs.addTab(general_tab, "General")
         tabs.addTab(appearance_tab, "Appearance")
+        tabs.addTab(advanced_tab, "Advanced")
         layout.addWidget(tabs)
 
         # ── Actions section ────────────────────────────────────────────
@@ -1576,6 +1599,8 @@ class SettingsDialog(QDialog):
         actions_grid.setSpacing(8)
         actions_grid.setColumnStretch(0, 1)
         actions_grid.setColumnStretch(1, 1)
+        actions_grid.setRowMinimumHeight(0, 36)
+        actions_grid.setRowMinimumHeight(1, 36)
 
         mw = self.parent()
 
@@ -1583,12 +1608,18 @@ class SettingsDialog(QDialog):
         pw_btn.setToolTip("Update the master encryption password")
         pw_btn.setAutoDefault(False)
         pw_btn.setDefault(False)
+        pw_btn.setMinimumHeight(34)
+        pw_btn.setMaximumHeight(34)
+        pw_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         pw_btn.clicked.connect(lambda: mw.change_master_password() if mw else None)
         actions_grid.addWidget(pw_btn, 0, 0)
 
         about_btn = QPushButton("ℹ  About")
         about_btn.setAutoDefault(False)
         about_btn.setDefault(False)
+        about_btn.setMinimumHeight(34)
+        about_btn.setMaximumHeight(34)
+        about_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         about_btn.clicked.connect(lambda: mw.show_about() if mw else None)
         actions_grid.addWidget(about_btn, 0, 1)
 
@@ -1596,15 +1627,11 @@ class SettingsDialog(QDialog):
         lol_btn.setToolTip("Browse for LeagueClient.exe if auto-detection fails")
         lol_btn.setAutoDefault(False)
         lol_btn.setDefault(False)
+        lol_btn.setMinimumHeight(34)
+        lol_btn.setMaximumHeight(34)
+        lol_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         lol_btn.clicked.connect(lambda: mw.browse_for_lol() if mw else None)
         actions_grid.addWidget(lol_btn, 1, 0)
-
-        backup_btn = QPushButton("💾  Backup / Restore…")
-        backup_btn.setToolTip("Export or import an encrypted account backup")
-        backup_btn.setAutoDefault(False)
-        backup_btn.setDefault(False)
-        backup_btn.clicked.connect(lambda: mw.open_backup_dialog() if mw else None)
-        actions_grid.addWidget(backup_btn, 1, 1)
 
         layout.addLayout(actions_grid)
         layout.addSpacing(4)
