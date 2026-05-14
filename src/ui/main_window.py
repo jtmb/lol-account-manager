@@ -154,7 +154,7 @@ class AccountListBackgroundFrame(QFrame):
         rect = self.rect()
         radius = 6.0
         path = QPainterPath()
-        path.addRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
+        path.addRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius)
         painter.setClipPath(path)
 
         base_color = QColor("#181b2b") if self._dark_mode else QColor("#ededf0")
