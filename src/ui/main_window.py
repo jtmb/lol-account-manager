@@ -1,13 +1,13 @@
 """Main application window"""
 from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
-from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
+from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
 from pathlib import Path
 from typing import Optional, Callable
 import sys
@@ -24,8 +24,14 @@ import shutil
 import zipfile
 import hashlib
 import re
+import math
 from urllib.request import Request, urlopen
 from urllib.parse import quote
+
+try:
+    import qtawesome as qta
+except Exception:
+    qta = None
 
 if sys.platform.startswith("win"):
     import winreg
@@ -44,25 +50,27 @@ from src.config.paths import (
     load_settings,
     save_settings,
 )
+from src.config.app_config import SETTINGS_PANEL_DEFAULTS
 from src import __version__ as APP_VERSION
 
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 DDRAGON_VERSION = "14.24.1"
-DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#9ca3af"
-DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#9ca3af"
+DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 SPLASH_THEME_AUTO = "__none__"
 LOCKED_CHAMPION_SPLASH_EDGE_FADE = 80
 LOCKED_CHAMPION_SPLASH_INNER_FADE = 75
-DEFAULT_APP_BG_COLOR = "#1e1e2e"
-DEFAULT_APP_SURFACE_COLOR = "#181825"
-DEFAULT_APP_BORDER_COLOR = "#313244"
-DEFAULT_APP_TEXT_COLOR = "#cdd6f4"
-DEFAULT_APP_ACCENT_COLOR = "#313244"
+DEFAULT_APP_BG_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_bg_color", "#1e1e2e"))
+DEFAULT_APP_SURFACE_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_surface_color", "#181825"))
+DEFAULT_APP_BORDER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_border_color", "#313244"))
+DEFAULT_APP_TEXT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_text_color", "#cdd6f4"))
+DEFAULT_APP_ACCENT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_accent_color", "#313244"))
+DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#45475a"))
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -81,6 +89,15 @@ def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
     if value == HOVER_HIGHLIGHT_THEME_AUTO:
         return _default_row_hover_highlight(dark_mode)
     return value
+
+
+class ClickableIconLabel(QLabel):
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
 
 
 CHAMPION_SPLASH_OPTIONS = [
@@ -1427,11 +1444,388 @@ class SettingsDialog(QDialog):
 
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
-    def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
+    APP_COLOR_PRESETS = [
+        ("Default Dark", {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
+        }),
+        ("Midnight Slate", {
+            "app_bg_color": "#0f111a",
+            "app_surface_color": "#171a26",
+            "app_border_color": "#2a3142",
+            "app_text_color": "#d7dbea",
+            "app_accent_color": "#8b5cf6",
+            "app_hover_color": "#9d74f8",
+        }),
+        ("Blurple Night", {
+            "app_bg_color": "#1e1f22",
+            "app_surface_color": "#2b2d31",
+            "app_border_color": "#3f4147",
+            "app_text_color": "#dbdee1",
+            "app_accent_color": "#4b57c8",
+            "app_hover_color": "#5e6ad5",
+        }),
+        ("Industrial Graphite", {
+            "app_bg_color": "#0b0e14",
+            "app_surface_color": "#141a24",
+            "app_border_color": "#283245",
+            "app_text_color": "#c7d0df",
+            "app_accent_color": "#66c0f4",
+            "app_hover_color": "#3a4d6e",
+        }),
+        ("Creator Noir", {
+            "app_bg_color": "#0f0f0f",
+            "app_surface_color": "#1a1a1a",
+            "app_border_color": "#2c2c2c",
+            "app_text_color": "#f1f1f1",
+            "app_accent_color": "#ff3b30",
+            "app_hover_color": "#3a3a3a",
+        }),
+        ("Crimson Night", {
+            "app_bg_color": "#1b0f12",
+            "app_surface_color": "#2a171c",
+            "app_border_color": "#443039",
+            "app_text_color": "#f0d7db",
+            "app_accent_color": "#e85d8a",
+            "app_hover_color": "#584050",
+        }),
+        ("Classic Light", {
+            "app_bg_color": "#c8cad3",
+            "app_surface_color": "#eef0f3",
+            "app_border_color": "#8d909e",
+            "app_text_color": "#1e1c1a",
+            "app_accent_color": "#c0c2ca",
+            "app_hover_color": "#adb0bc",
+        }),
+    ]
+
+    def __init__(
+        self,
+        parent=None,
+        settings: Optional[dict] = None,
+        apply_callback: Optional[Callable[[dict], None]] = None,
+        preview_callback: Optional[Callable[[dict], None]] = None,
+    ):
         super().__init__(parent)
-        self._settings = settings or {}
+        merged_settings = dict(SETTINGS_PANEL_DEFAULTS)
+        if settings:
+            merged_settings.update(settings)
+        self._settings = merged_settings
+        self._custom_theme_presets = self._custom_theme_presets_from_settings(merged_settings)
+        self._theme_color_values: dict[str, str] = {}
+        self._theme_color_swatches: dict[str, QLabel] = {}
+        self._theme_color_previous_values: dict[str, str] = {}
         self._apply_callback = apply_callback
+        self._preview_callback = preview_callback
         self.init_ui()
+
+    def _default_settings_values(self) -> dict:
+        return dict(SETTINGS_PANEL_DEFAULTS)
+
+    def _custom_theme_presets_from_settings(self, values: dict) -> list[tuple[str, dict]]:
+        raw = values.get("custom_theme_presets", [])
+        if not isinstance(raw, list):
+            return []
+        presets: list[tuple[str, dict]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name", "")).strip()
+            colors = item.get("colors", {})
+            if not name or not isinstance(colors, dict):
+                continue
+            preset = {
+                "app_bg_color": self._sanitize_theme_color(str(colors.get("app_bg_color", DEFAULT_APP_BG_COLOR)), DEFAULT_APP_BG_COLOR),
+                "app_surface_color": self._sanitize_theme_color(str(colors.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)), DEFAULT_APP_SURFACE_COLOR),
+                "app_border_color": self._sanitize_theme_color(str(colors.get("app_border_color", DEFAULT_APP_BORDER_COLOR)), DEFAULT_APP_BORDER_COLOR),
+                "app_text_color": self._sanitize_theme_color(str(colors.get("app_text_color", DEFAULT_APP_TEXT_COLOR)), DEFAULT_APP_TEXT_COLOR),
+                "app_accent_color": self._sanitize_theme_color(str(colors.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)), DEFAULT_APP_ACCENT_COLOR),
+                "app_hover_color": self._sanitize_theme_color(str(colors.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)), DEFAULT_APP_HOVER_COLOR),
+            }
+            presets.append((name, preset))
+        return presets
+
+    @staticmethod
+    def _sanitize_theme_color(value: str, fallback: str) -> str:
+        candidate = QColor(str(value or "").strip())
+        return candidate.name() if candidate.isValid() else fallback
+
+    def _all_app_color_presets(self) -> list[tuple[str, dict]]:
+        return list(self.APP_COLOR_PRESETS) + list(self._custom_theme_presets)
+
+    def _populate_theme_presets(self):
+        if not hasattr(self, "app_theme_combo"):
+            return
+        self.app_theme_combo.blockSignals(True)
+        self.app_theme_combo.clear()
+        for label, preset in self._all_app_color_presets():
+            self.app_theme_combo.addItem(label, preset)
+        self.app_theme_combo.setCurrentIndex(self._find_app_theme_preset_index())
+        self.app_theme_combo.blockSignals(False)
+
+    def _is_classic_light_selected(self) -> bool:
+        return hasattr(self, "app_theme_combo") and self.app_theme_combo.currentText() == "Classic Light"
+
+    def _sync_champion_splash_availability(self):
+        classic_light = self._is_classic_light_selected()
+        if classic_light:
+            self.champion_splash_enabled_checkbox.blockSignals(True)
+            self.champion_splash_enabled_checkbox.setChecked(False)
+            self.champion_splash_enabled_checkbox.blockSignals(False)
+        self.champion_splash_enabled_checkbox.setEnabled(not classic_light)
+        if classic_light:
+            self.champion_splash_enabled_checkbox.setToolTip("Disabled for Classic Light preset.")
+        else:
+            self.champion_splash_enabled_checkbox.setToolTip(
+                "Show selected champion base splash art behind the account entries."
+            )
+
+        splash_enabled = self.champion_splash_enabled_checkbox.isChecked() and not classic_light
+        self.champion_splash_combo.setEnabled(splash_enabled)
+        self.champion_splash_skin_combo.setEnabled(splash_enabled and self.champion_splash_combo.currentData() != SPLASH_THEME_AUTO)
+        self.champion_splash_opacity_combo.setEnabled(splash_enabled)
+
+    def _on_theme_preset_changed(self, _index: int):
+        self._set_theme_creator_values(self._selected_app_preset())
+        self._sync_champion_splash_availability()
+
+    def _set_theme_creator_values(self, preset: dict):
+        if not preset:
+            return
+        defaults = {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+        }
+        defaults["app_hover_color"] = DEFAULT_APP_HOVER_COLOR
+        for key, fallback in defaults.items():
+            self._set_theme_color_value(
+                key,
+                self._sanitize_theme_color(str(preset.get(key, fallback)), fallback),
+                track_undo=True,
+            )
+
+    def _update_theme_color_swatch(self, key: str):
+        swatch = self._theme_color_swatches.get(key)
+        value = self._theme_color_values.get(key, "")
+        if swatch is None:
+            return
+        object_name = f"theme_swatch_{key}"
+        swatch.setStyleSheet(
+            f"#{object_name} {{"
+            f"background-color: {value};"
+            "border: 1px solid #666;"
+            "border-radius: 4px;"
+            "}"
+        )
+        swatch.setToolTip(value)
+
+    def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
+        normalized = self._sanitize_theme_color(value, self._theme_color_values.get(key, DEFAULT_APP_ACCENT_COLOR))
+        current = self._theme_color_values.get(key)
+        if track_undo and current and current != normalized:
+            self._theme_color_previous_values[key] = current
+        self._theme_color_values[key] = normalized
+        self._update_theme_color_swatch(key)
+
+    def _undo_theme_color(self, key: str):
+        previous = self._theme_color_previous_values.get(key)
+        if not previous:
+            return
+        current = self._theme_color_values.get(key)
+        self._theme_color_values[key] = previous
+        self._theme_color_previous_values[key] = current or previous
+        self._update_theme_color_swatch(key)
+
+    def _current_theme_creator_values(self) -> Optional[dict]:
+        defaults = {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
+        }
+        values: dict[str, str] = {}
+        for key, fallback in defaults.items():
+            raw = str(self._theme_color_values.get(key, fallback)).strip()
+            color = QColor(raw)
+            if not color.isValid():
+                QMessageBox.warning(self, "Theme Creator", f"Invalid color for {key}: {raw}")
+                return None
+            values[key] = color.name()
+            self._theme_color_values[key] = values[key]
+            self._update_theme_color_swatch(key)
+        return values
+
+    def _pick_theme_color(self, key: str):
+        start = QColor(str(self._theme_color_values.get(key, "")).strip())
+        if not start.isValid():
+            start = QColor(DEFAULT_APP_ACCENT_COLOR)
+        picked = QColorDialog.getColor(start, self, f"Pick {key}")
+        if picked.isValid():
+            self._set_theme_color_value(key, picked.name(), track_undo=True)
+
+    def _save_custom_theme_preset(self):
+        colors = self._current_theme_creator_values()
+        if colors is None:
+            return
+
+        name, ok = QInputDialog.getText(self, "Save Theme", "Preset name:")
+        if not ok:
+            return
+        preset_name = str(name or "").strip()
+        if not preset_name:
+            QMessageBox.warning(self, "Theme Creator", "Preset name cannot be empty.")
+            return
+
+        builtin_names = {label for label, _ in self.APP_COLOR_PRESETS}
+        if preset_name in builtin_names:
+            QMessageBox.warning(self, "Theme Creator", "That name is reserved by a built-in preset.")
+            return
+
+        replaced = False
+        for idx, (label, _preset) in enumerate(self._custom_theme_presets):
+            if label == preset_name:
+                self._custom_theme_presets[idx] = (preset_name, colors)
+                replaced = True
+                break
+        if not replaced:
+            self._custom_theme_presets.append((preset_name, colors))
+
+        self._settings["custom_theme_presets"] = [
+            {"name": label, "colors": preset}
+            for label, preset in self._custom_theme_presets
+        ]
+        self._populate_theme_presets()
+        index = self.app_theme_combo.findText(preset_name)
+        if index >= 0:
+            self.app_theme_combo.setCurrentIndex(index)
+
+    def _preview_theme_creator(self):
+        colors = self._current_theme_creator_values()
+        if colors is None:
+            return
+        if not self._preview_callback:
+            return
+        preview_values = self.get_values()
+        preview_values.update(colors)
+        self._preview_callback(preview_values)
+
+    def _reset_theme_creator_to_selected_preset(self):
+        self._set_theme_creator_values(self._selected_app_preset())
+        self.apply_settings()
+
+    @staticmethod
+    def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
+        index = combo.findData(target_value)
+        combo.setCurrentIndex(fallback_index if index < 0 else index)
+
+    def _apply_values_to_controls(self, values: dict):
+        self.startup_checkbox.setChecked(bool(values.get("start_on_windows_startup", _is_startup_enabled())))
+        self.start_minimized_checkbox.setChecked(bool(values.get("start_minimized_to_tray", False)))
+        self._set_combo_to_data(self.close_behavior_combo, str(values.get("close_behavior", "tray")))
+        self._set_combo_to_data(self.auto_lock_combo, int(values.get("auto_lock_minutes", 0)))
+        self.remember_password_24h_checkbox.setChecked(bool(values.get("remember_password_24h", True)))
+        self._set_combo_to_data(self.clipboard_clear_combo, int(values.get("clipboard_auto_clear_seconds", 0)))
+        self.confirm_launch_checkbox.setChecked(bool(values.get("confirm_before_launch", True)))
+        self.confirm_delete_checkbox.setChecked(bool(values.get("confirm_before_delete", True)))
+        self._set_combo_to_data(self.account_sort_mode_combo, str(values.get("account_sort_mode", "manual")))
+        self._set_combo_to_data(self.rank_refresh_combo, str(values.get("rank_refresh_mode", "manual")))
+        self.auto_check_updates_checkbox.setChecked(bool(values.get("auto_check_updates", True)))
+        self._set_combo_to_data(self.log_level_combo, str(values.get("diagnostics_log_level", "INFO")))
+
+        window_size_mode = str(values.get("window_size_mode", "static"))
+        window_size = str(values.get("window_size", "800x600"))
+        if window_size_mode == "custom":
+            self.window_size_combo.setCurrentIndex(0)
+        else:
+            index = self.window_size_combo.findText(window_size)
+            self.window_size_combo.setCurrentIndex(0 if index < 0 else index)
+
+        self._set_combo_to_data(self.text_zoom_combo, int(values.get("text_zoom_percent", 110)))
+        self.show_ranks_checkbox.setChecked(bool(values.get("show_ranks", True)))
+        self.show_images_checkbox.setChecked(bool(values.get("show_rank_images", True)))
+        self.show_tags_checkbox.setChecked(bool(values.get("show_tags", True)))
+        self.auto_open_ingame_checkbox.setChecked(bool(values.get("auto_open_ingame_page", True)))
+        self._set_combo_to_data(self.tag_size_combo, str(values.get("tag_size", "medium")))
+        self._set_combo_to_data(self.tag_style_combo, str(values.get("tag_chip_style", "vibrant")))
+        self._set_combo_to_data(
+            self.logged_in_gradient_color_combo,
+            str(values.get("logged_in_gradient_color", _default_logged_in_highlight(bool(getattr(self.parent(), "_dark_mode", True))))),
+        )
+        self._set_combo_to_data(
+            self.hover_highlight_color_combo,
+            str(values.get("hover_highlight_color", HOVER_HIGHLIGHT_THEME_AUTO)),
+        )
+
+        self.champion_splash_enabled_checkbox.setChecked(bool(values.get("champion_splash_enabled", False)))
+        self._set_combo_to_data(
+            self.champion_splash_combo,
+            str(values.get("champion_splash_champion", SPLASH_THEME_AUTO)),
+        )
+        self._refresh_champion_skin_options()
+        self._set_combo_to_data(self.champion_splash_skin_combo, int(values.get("champion_splash_skin", 0)))
+        self._set_combo_to_data(self.champion_splash_opacity_combo, int(values.get("champion_splash_opacity", 70)))
+        self._set_combo_to_data(self.logged_in_gradient_intensity_combo, int(values.get("logged_in_gradient_intensity", 20)))
+        self._set_combo_to_data(self.logged_in_border_width_combo, int(values.get("logged_in_border_width", 2)))
+        self._set_combo_to_data(self.logged_in_border_opacity_combo, int(values.get("logged_in_border_opacity", 60)))
+        self._set_combo_to_data(self.row_density_combo, str(values.get("row_density", "compact")))
+        self._set_combo_to_data(self.rank_icon_size_combo, int(values.get("rank_icon_size", 34)))
+        self._set_combo_to_data(self.rank_text_brightness_combo, int(values.get("rank_text_brightness", 100)))
+
+        self.auto_backup_checkbox.setChecked(bool(values.get("auto_backup_enabled", True)))
+        self._set_combo_to_data(self.auto_backup_keep_combo, int(values.get("auto_backup_keep_count", 20)))
+
+        self._settings.update({
+            "app_bg_color": str(values.get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(values.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(values.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(values.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(values.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+            "app_hover_color": str(values.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
+        })
+        self._custom_theme_presets = self._custom_theme_presets_from_settings(values)
+        self._populate_theme_presets()
+        self._set_theme_creator_values(self._selected_app_preset())
+
+        self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.rank_icon_size_combo.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.rank_text_brightness_combo.setEnabled(self.show_ranks_checkbox.isChecked())
+        self.tag_size_combo.setEnabled(self.show_tags_checkbox.isChecked())
+        self.tag_style_combo.setEnabled(self.show_tags_checkbox.isChecked())
+        self._sync_champion_splash_availability()
+        self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
+
+    def _reset_to_defaults(self):
+        self._confirm_reset_btn = getattr(self, "_confirm_reset_btn", None)
+        if self._confirm_reset_btn is not None:
+            self._confirm_reset_btn.setDown(False)
+        QTimer.singleShot(0, self._confirm_reset_to_defaults)
+
+    def _confirm_reset_to_defaults(self):
+        result = QMessageBox.question(
+            self,
+            "Reset Settings",
+            "Are you sure you want to reset all settings to defaults?\n\nThis will reset all settings except your master password.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if result != QMessageBox.Yes:
+            return
+
+        default_values = self._default_settings_values()
+        reset_settings()
+        self._settings = dict(default_values)
+        self._apply_values_to_controls(default_values)
+        if self._apply_callback:
+            self._apply_callback(default_values)
 
     def init_ui(self):
         self.setWindowTitle("Settings")
@@ -1496,38 +1890,15 @@ class SettingsDialog(QDialog):
         appearance_layout.addWidget(self.text_zoom_combo)
 
         appearance_layout.addWidget(QLabel("Application colors:"))
-        self.app_color_inputs: dict[str, QLineEdit] = {}
 
-        def add_color_row(label: str, setting_key: str, default_color: str):
-            row = QHBoxLayout()
-            row.addWidget(QLabel(label))
-            edit = QLineEdit()
-            edit.setText(str(self._settings.get(setting_key, default_color) or default_color))
-            edit.setPlaceholderText(default_color)
-            edit.setMaxLength(9)
-            edit.setFixedWidth(120)
-            pick_btn = QPushButton("Pick")
-            pick_btn.setAutoDefault(False)
-            pick_btn.setDefault(False)
-
-            def pick_color():
-                current = QColor(edit.text().strip() or default_color)
-                chosen = QColorDialog.getColor(current, self, f"Select {label}")
-                if chosen.isValid():
-                    edit.setText(chosen.name())
-
-            pick_btn.clicked.connect(pick_color)
-            row.addWidget(edit)
-            row.addWidget(pick_btn)
-            row.addStretch()
-            appearance_layout.addLayout(row)
-            self.app_color_inputs[setting_key] = edit
-
-        add_color_row("Background", "app_bg_color", DEFAULT_APP_BG_COLOR)
-        add_color_row("Surface", "app_surface_color", DEFAULT_APP_SURFACE_COLOR)
-        add_color_row("Border", "app_border_color", DEFAULT_APP_BORDER_COLOR)
-        add_color_row("Text", "app_text_color", DEFAULT_APP_TEXT_COLOR)
-        add_color_row("Accent", "app_accent_color", DEFAULT_APP_ACCENT_COLOR)
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("Theme preset:"))
+        self.app_theme_combo = QComboBox()
+        self._populate_theme_presets()
+        theme_row.addWidget(self.app_theme_combo)
+        theme_row.addStretch()
+        appearance_layout.addLayout(theme_row)
+        self.app_theme_combo.currentIndexChanged.connect(self._on_theme_preset_changed)
 
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
@@ -1870,13 +2241,76 @@ class SettingsDialog(QDialog):
         splash_opacity_row.addStretch()
         appearance_layout.addLayout(splash_opacity_row)
 
-        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_combo.setEnabled)
-        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_skin_combo.setEnabled)
-        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_opacity_combo.setEnabled)
-        splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
-        self.champion_splash_combo.setEnabled(splash_enabled)
-        self.champion_splash_skin_combo.setEnabled(splash_enabled and self.champion_splash_combo.currentData() != SPLASH_THEME_AUTO)
-        self.champion_splash_opacity_combo.setEnabled(splash_enabled)
+        self.champion_splash_enabled_checkbox.toggled.connect(lambda _checked: self._sync_champion_splash_availability())
+        self.champion_splash_combo.currentIndexChanged.connect(lambda _index: self._sync_champion_splash_availability())
+        self._sync_champion_splash_availability()
+
+        theme_creator_label = QLabel("Theme creator")
+        theme_creator_label.setStyleSheet("font-weight: 600;")
+        advanced_layout.addWidget(theme_creator_label)
+
+        creator_tip = QLabel("Click a color swatch to pick a color, then save as a preset.")
+        creator_tip.setWordWrap(True)
+        advanced_layout.addWidget(creator_tip)
+
+        theme_fields = [
+            ("app_bg_color", "Background"),
+            ("app_surface_color", "Surface"),
+            ("app_border_color", "Border"),
+            ("app_text_color", "Text"),
+            ("app_accent_color", "Accent"),
+            ("app_hover_color", "Button hover"),
+        ]
+        defaults = {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
+        }
+        for key, label in theme_fields:
+            row = QHBoxLayout()
+            row.addWidget(QLabel(f"{label}:"))
+            swatch = ClickableIconLabel("")
+            swatch.setFixedSize(48, 22)
+            swatch.setCursor(Qt.PointingHandCursor)
+            swatch.setObjectName(f"theme_swatch_{key}")
+            swatch.clicked.connect(lambda k=key: self._pick_theme_color(k))
+            self._theme_color_swatches[key] = swatch
+            self._theme_color_values[key] = self._sanitize_theme_color(
+                str(self._selected_app_preset().get(key, defaults[key])),
+                defaults[key],
+            )
+            self._theme_color_previous_values[key] = self._theme_color_values[key]
+            self._update_theme_color_swatch(key)
+            row.addWidget(swatch)
+            undo_btn = QPushButton("Undo")
+            undo_btn.setAutoDefault(False)
+            undo_btn.setDefault(False)
+            undo_btn.clicked.connect(lambda _checked=False, k=key: self._undo_theme_color(k))
+            row.addWidget(undo_btn)
+            row.addStretch()
+            advanced_layout.addLayout(row)
+
+        creator_actions_row = QHBoxLayout()
+        reset_btn = QPushButton("Reset")
+        reset_btn.setAutoDefault(False)
+        reset_btn.setDefault(False)
+        reset_btn.clicked.connect(self._reset_theme_creator_to_selected_preset)
+        creator_actions_row.addWidget(reset_btn)
+        preview_theme_btn = QPushButton("Preview preset")
+        preview_theme_btn.setAutoDefault(False)
+        preview_theme_btn.setDefault(False)
+        preview_theme_btn.clicked.connect(self._preview_theme_creator)
+        creator_actions_row.addWidget(preview_theme_btn)
+        save_theme_btn = QPushButton("Save custom preset")
+        save_theme_btn.setAutoDefault(False)
+        save_theme_btn.setDefault(False)
+        save_theme_btn.clicked.connect(self._save_custom_theme_preset)
+        creator_actions_row.addWidget(save_theme_btn)
+        creator_actions_row.addStretch()
+        advanced_layout.addLayout(creator_actions_row)
 
         gradient_intensity_row = QHBoxLayout()
         gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
@@ -2047,6 +2481,11 @@ class SettingsDialog(QDialog):
         layout.addSpacing(2)
 
         button_row = QHBoxLayout()
+        self._confirm_reset_btn = QPushButton("Reset to Defaults")
+        self._confirm_reset_btn.setAutoDefault(False)
+        self._confirm_reset_btn.setDefault(False)
+        self._confirm_reset_btn.clicked.connect(self._reset_to_defaults)
+        button_row.addWidget(self._confirm_reset_btn)
         button_row.addStretch()
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setFixedWidth(100)
@@ -2181,6 +2620,7 @@ class SettingsDialog(QDialog):
                     break
         if champion_splash_skin is None:
             champion_splash_skin = 0
+        theme_creator_colors = self._current_theme_creator_values() or {}
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -2205,7 +2645,7 @@ class SettingsDialog(QDialog):
             "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
             "hover_highlight_color": str(self.hover_highlight_color_combo.currentData()),
-            "champion_splash_enabled": self.champion_splash_enabled_checkbox.isChecked(),
+            "champion_splash_enabled": self.champion_splash_enabled_checkbox.isChecked() and not self._is_classic_light_selected(),
             "champion_splash_champion": str(champion_splash_value),
             "champion_splash_skin": int(champion_splash_skin),
             "champion_splash_opacity": int(self.champion_splash_opacity_combo.currentData()),
@@ -2217,17 +2657,43 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
-            "app_bg_color": self.app_color_inputs.get("app_bg_color").text().strip() or DEFAULT_APP_BG_COLOR,
-            "app_surface_color": self.app_color_inputs.get("app_surface_color").text().strip() or DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": self.app_color_inputs.get("app_border_color").text().strip() or DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": self.app_color_inputs.get("app_text_color").text().strip() or DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": self.app_color_inputs.get("app_accent_color").text().strip() or DEFAULT_APP_ACCENT_COLOR,
+            "app_bg_color": str(theme_creator_colors.get("app_bg_color", self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR))),
+            "app_surface_color": str(theme_creator_colors.get("app_surface_color", self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR))),
+            "app_border_color": str(theme_creator_colors.get("app_border_color", self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR))),
+            "app_text_color": str(theme_creator_colors.get("app_text_color", self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR))),
+            "app_accent_color": str(theme_creator_colors.get("app_accent_color", self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR))),
+            "app_hover_color": str(theme_creator_colors.get("app_hover_color", self._selected_app_preset().get("app_hover_color", DEFAULT_APP_HOVER_COLOR))),
+            "custom_theme_presets": [
+                {"name": label, "colors": preset}
+                for label, preset in self._custom_theme_presets
+            ],
         }
 
     def apply_settings(self):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
             self._apply_callback(self.get_values())
+
+    def _selected_app_preset(self) -> dict:
+        if not hasattr(self, "app_theme_combo"):
+            return {}
+        preset = self.app_theme_combo.currentData() or {}
+        return preset if isinstance(preset, dict) else {}
+
+    def _find_app_theme_preset_index(self) -> int:
+        current = {
+            "app_bg_color": str(self._settings.get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(self._settings.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(self._settings.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(self._settings.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(self._settings.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+        }
+        all_presets = self._all_app_color_presets()
+        for index in range(len(all_presets)):
+            preset = all_presets[index][1]
+            if all(current.get(k) == v for k, v in preset.items()):
+                return index
+        return 0
 
     def eventFilter(self, obj, event):
         if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
@@ -2931,7 +3397,8 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self._settings = load_settings()
+        self._settings = dict(SETTINGS_PANEL_DEFAULTS)
+        self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
@@ -2963,6 +3430,7 @@ class MainWindow(QMainWindow):
         self._app_border_color: str = str(self._settings.get('app_border_color', DEFAULT_APP_BORDER_COLOR) or DEFAULT_APP_BORDER_COLOR)
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
+        self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
         default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
@@ -3049,7 +3517,7 @@ class MainWindow(QMainWindow):
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        self.check_master_password()
+        QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
             QTimer.singleShot(4000, self._check_for_updates)
         if self._start_minimized_to_tray and self._tray_icon and self._tray_icon.isVisible():
@@ -3079,9 +3547,17 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._settings_button = QPushButton("⚙")
+        self._refresh_button = ClickableIconLabel()
+        self._refresh_button.setObjectName("refreshIconButton")
+        self._refresh_button.setFixedSize(26, 26)
+        self._refresh_button.setAlignment(Qt.AlignCenter)
+        self._refresh_button.setToolTip("Refresh UI")
+        self._refresh_button.clicked.connect(self.refresh_ui)
+        top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
+
+        self._settings_button = QPushButton("")
         self._settings_button.setObjectName("settingsCogButton")
-        self._settings_button.setFixedSize(30, 30)
+        self._settings_button.setFixedSize(26, 26)
         self._settings_button.setAutoDefault(False)
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
@@ -3179,6 +3655,8 @@ class MainWindow(QMainWindow):
         self._apply_account_list_background()
         
         central_widget.setLayout(layout)
+
+        self._configure_icon_buttons()
 
     @staticmethod
     def _champion_splash_url(champion_id: str, skin_num: int = 0) -> str:
@@ -3304,13 +3782,21 @@ class MainWindow(QMainWindow):
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
+        app_hover = self._sanitize_color(self._app_hover_color, DEFAULT_APP_HOVER_COLOR)
         accent_text = self._contrast_text_color(app_accent)
+        # When the accent is very dark, app_text (cool-tinted) contrasts better than
+        # pure #ffffff, which appears warm/yellow next to cool-tinted labels.
+        accent_color_obj = QColor(app_accent)
+        accent_lum = (0.2126 * accent_color_obj.redF()
+                      + 0.7152 * accent_color_obj.greenF()
+                      + 0.0722 * accent_color_obj.blueF())
+        button_text = app_text if accent_lum < 0.25 else accent_text
         placeholder = self._placeholder_color(app_text)
-        cog_bg = app_accent
-        cog_fg = accent_text
+        cog_bg = app_surface
+        cog_fg = app_text
         cog_border = app_border
         cog_hover = app_accent
-        cog_pressed = app_accent
+        cog_pressed = app_border
         cog_focus = app_border
         list_border = app_border
         search_fg = app_text
@@ -3332,28 +3818,51 @@ class MainWindow(QMainWindow):
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
-            + "    min-width: 30px;\n"
-            + "    max-width: 30px;\n"
-            + "    min-height: 30px;\n"
-            + "    max-height: 30px;\n"
-            + f"    background-color: {cog_bg};\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
+            + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
-            + f"    border: 1px solid {cog_border};\n"
-            + "    border-radius: 5px;\n"
+            + "    border: none;\n"
+            + "    border-radius: 0px;\n"
             + "    padding: 0px;\n"
-            + "    font-size: 14px;\n"
+            + "    font-size: 15px;\n"
+            + "    font-weight: 400;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
             + "QPushButton#settingsCogButton:hover {\n"
-            + f"    background-color: {cog_hover};\n"
+            + f"    color: {accent_text};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:pressed {\n"
-            + f"    background-color: {cog_pressed};\n"
+            + f"    color: {cog_pressed};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:focus {\n"
             + "    outline: none;\n"
-            + f"    border: 1px solid {cog_focus};\n"
+            + "    border: none;\n"
+            + "}\n"
+            + "QToolButton#refreshIconButton {\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
+            + "    background-color: transparent;\n"
+            + f"    color: {cog_fg};\n"
+            + "    border: none;\n"
+            + "    border-radius: 0px;\n"
+            + "    padding: 0px;\n"
+            + "    font-size: 15px;\n"
+            + "    font-weight: 400;\n"
+            + "    margin: 0px;\n"
+            + "    text-align: center;\n"
+            + "}\n"
+            + "QToolButton#refreshIconButton:hover {\n"
+            + f"    color: {accent_text};\n"
+            + "}\n"
+            + "QToolButton#refreshIconButton:focus {\n"
+            + "    outline: none;\n"
+            + "    border: none;\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
@@ -3384,8 +3893,14 @@ class MainWindow(QMainWindow):
             + "}\n"
             + "QPushButton {\n"
             + f"    background-color: {app_accent};\n"
-            + f"    color: {accent_text};\n"
+            + f"    color: {button_text};\n"
             + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QPushButton:hover {\n"
+            + f"    background-color: {app_hover};\n"
+            + "}\n"
+            + "QPushButton:pressed {\n"
+            + f"    background-color: {app_accent};\n"
             + "}\n"
             + "QPushButton:disabled {\n"
             + f"    background-color: {app_surface};\n"
@@ -3396,6 +3911,20 @@ class MainWindow(QMainWindow):
             + f"    background-color: {app_surface};\n"
             + f"    color: {app_text};\n"
             + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QComboBox {\n"
+            + "    padding-right: 24px;\n"
+            + "}\n"
+            + "QComboBox::drop-down {\n"
+            + "    subcontrol-origin: padding;\n"
+            + "    subcontrol-position: top right;\n"
+            + "    width: 20px;\n"
+            + f"    border-left: 1px solid {app_border};\n"
+            + f"    background-color: {app_surface};\n"
+            + "}\n"
+            + "QComboBox QAbstractItemView {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_text};\n"
             + "}\n"
             + "QTabWidget::pane {\n"
             + f"    border: 1px solid {app_border};\n"
@@ -3425,6 +3954,224 @@ class MainWindow(QMainWindow):
         self._apply_title_bar_theme()
         if self._tray_menu:
             self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
+        # Delay icon refresh to ensure stylesheet is fully applied
+        QTimer.singleShot(10, self._refresh_icon_buttons)
+
+    def refresh_ui(self):
+        """Force a refresh of UI styling and list visuals."""
+        QTimer.singleShot(0, self._perform_refresh_ui)
+
+    def _perform_refresh_ui(self):
+        self._apply_theme()
+        self.refresh_account_list()
+        self._set_refresh_icon_normal()
+
+    def _configure_icon_buttons(self):
+        self._icon_buttons = {
+            self._settings_button: "settings",
+        }
+        self._settings_icon_latched = False
+        self._set_refresh_icon_normal()
+        self._refresh_button.setCursor(Qt.PointingHandCursor)
+        self._refresh_button.installEventFilter(self)
+        for button in self._icon_buttons:
+            button.setText("")
+            button.setIconSize(QSize(24, 24))
+            button.setFocusPolicy(Qt.NoFocus)
+            button.setCursor(Qt.PointingHandCursor)
+            button.installEventFilter(self)
+        # Set initial icons
+        for button in self._icon_buttons:
+            self._set_icon_state(button, "normal")
+
+    def _set_refresh_icon_normal(self):
+        icon = self._build_custom_icon("refresh", self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR), 24)
+        if icon:
+            self._refresh_button.setPixmap(icon.pixmap(24, 24))
+
+    def _set_refresh_icon_hover(self):
+        icon = self._build_custom_icon("refresh", self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR), 24)
+        if icon:
+            self._refresh_button.setPixmap(icon.pixmap(24, 24))
+
+    def _refresh_icon_buttons(self):
+        self._set_refresh_icon_normal()
+        for button in getattr(self, "_icon_buttons", {}):
+            if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+                self._set_icon_state(button, "pressed")
+            else:
+                self._set_icon_state(button, "hover" if button.underMouse() else "normal")
+        # Clean stylesheet for icon buttons
+        self._refresh_button.setStyleSheet("background-color: transparent; border: none; padding: 0px; margin: 0px;")
+        self._settings_button.setStyleSheet(
+            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+        )
+
+    def _sync_icon_button_state(self, button: QPushButton):
+        if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+            self._set_icon_state(button, "pressed")
+            return
+        self._set_icon_state(button, "hover" if button.underMouse() else "normal")
+
+    def _sync_refresh_button_state(self):
+        self._set_icon_state(self._refresh_button, "normal")
+
+    def _set_icon_state(self, button: QPushButton, state: str):
+        icon_type = self._icon_buttons.get(button)
+        if not icon_type:
+            return
+        
+        app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+        app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
+        app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
+        
+        if state == "pressed" and button is self._settings_button:
+            color = app_border
+        elif state == "hover":
+            color = app_accent
+        else:
+            color = app_text
+        
+        icon = self._build_custom_icon(icon_type, color, 24)
+        if icon:
+            if hasattr(button, "setPixmap"):
+                button.setPixmap(icon.pixmap(24, 24))
+            else:
+                button.setIcon(icon)
+
+    def _build_custom_icon(self, icon_type: str, color_hex: str, size: int) -> Optional[QIcon]:
+        """Build minimalistic custom icons using Qt painting."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        
+        color = QColor(color_hex)
+        painter.setBrush(color)
+        
+        if icon_type == "refresh":
+            # Draw circular arrow (refresh icon)
+            self._draw_refresh_icon(painter, size, color)
+        elif icon_type == "settings":
+            # Draw gear (settings icon)
+            self._draw_settings_icon(painter, size, color)
+        
+        painter.end()
+        return QIcon(pixmap)
+    
+    def _draw_refresh_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic refresh/reload icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        
+        center_x = size / 2
+        center_y = size / 2
+        radius = size / 3.5
+        line_width = size / 8
+        
+        # Draw circular arrow
+        pen = QPen(color, line_width, Qt.SolidLine)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        
+        # Draw curved path (3/4 of circle)
+        path = QPainterPath()
+        angle_start = 45
+        angle_span = 270
+        arc_rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
+        path.arcMoveTo(arc_rect, angle_start)
+        path.arcTo(arc_rect, angle_start, angle_span)
+        painter.drawPath(path)
+        
+        # Draw arrow head
+        arrow_size = size / 5
+        arrow_angle = 315  # degrees
+        arrow_x = center_x + radius * math.cos(math.radians(arrow_angle))
+        arrow_y = center_y + radius * math.sin(math.radians(arrow_angle))
+        
+        arrow_path = QPainterPath()
+        arrow_path.moveTo(arrow_x, arrow_y)
+        arrow_path.lineTo(arrow_x - arrow_size/2, arrow_y - arrow_size/2)
+        arrow_path.lineTo(arrow_x - arrow_size/3, arrow_y + arrow_size/3)
+        arrow_path.closeSubpath()
+        
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(arrow_path)
+    
+    def _draw_settings_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic settings/gear icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        
+        center_x = size / 2
+        center_y = size / 2
+        outer_radius = size / 2.5
+        inner_radius = size / 5
+        tooth_depth = size / 6
+        num_teeth = 8
+        
+        # Draw gear teeth
+        path = QPainterPath()
+        
+        for i in range(num_teeth * 2):
+            angle = (i * 360 / (num_teeth * 2)) * math.pi / 180
+            if i % 2 == 0:
+                # Outer tooth
+                r = outer_radius
+            else:
+                # Inner gap
+                r = outer_radius - tooth_depth
+            
+            x = center_x + r * math.cos(angle)
+            y = center_y + r * math.sin(angle)
+            
+            if i == 0:
+                path.moveTo(x, y)
+            else:
+                path.lineTo(x, y)
+        
+        path.closeSubpath()
+        painter.drawPath(path)
+        
+        # Draw center circle
+        center_circle = QPainterPath()
+        center_circle.addEllipse(QRectF(
+            center_x - inner_radius,
+            center_y - inner_radius,
+            inner_radius * 2,
+            inner_radius * 2
+        ))
+        
+        painter.setBrush(QColor("#1e1e2e"))  # Background color
+        painter.drawPath(center_circle)
+
+    def eventFilter(self, obj, event):
+        if obj is self._refresh_button:
+            if event.type() == QEvent.Enter:
+                self._set_refresh_icon_hover()
+            elif event.type() == QEvent.Leave:
+                self._set_refresh_icon_normal()
+            elif event.type() == QEvent.MouseButtonRelease:
+                self._set_refresh_icon_hover() if self._refresh_button.underMouse() else self._set_refresh_icon_normal()
+            return super().eventFilter(obj, event)
+
+        if obj in getattr(self, "_icon_buttons", {}):
+            if event.type() == QEvent.MouseButtonPress:
+                if obj is self._settings_button:
+                    self._set_icon_state(obj, "pressed")
+            elif event.type() == QEvent.MouseButtonRelease:
+                self._sync_icon_button_state(obj)
+            elif event.type() == QEvent.Enter:
+                if obj is self._settings_button and getattr(self, "_settings_icon_latched", False):
+                    self._set_icon_state(obj, "pressed")
+                elif not obj.isDown():
+                    self._set_icon_state(obj, "hover")
+            elif event.type() == QEvent.Leave:
+                self._sync_icon_button_state(obj)
+        return super().eventFilter(obj, event)
 
     def _apply_filter_input_palette(self):
         """Apply stable text/placeholder colors for filter controls."""
@@ -3470,16 +4217,36 @@ class MainWindow(QMainWindow):
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
+        original_settings = dict(self._settings)
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
-        dialog = SettingsDialog(self, settings=dialog_settings, apply_callback=self._apply_settings_values)
-        if dialog.exec_() != QDialog.Accepted:
-            return
+        preview_was_applied = [False]
 
-        values = dialog.get_values()
-        self._apply_settings_values(values)
+        def _preview_callback(values):
+            preview_was_applied[0] = True
+            self._apply_settings_values(values, persist=False)
 
-    def _apply_settings_values(self, values: dict):
+        dialog = SettingsDialog(
+            self,
+            settings=dialog_settings,
+            apply_callback=self._apply_settings_values,
+            preview_callback=_preview_callback,
+        )
+        self._settings_icon_latched = True
+        self._set_icon_state(self._settings_button, "pressed")
+        try:
+            if dialog.exec_() != QDialog.Accepted:
+                if preview_was_applied[0]:
+                    self._apply_settings_values(original_settings, persist=False)
+                return
+
+            values = dialog.get_values()
+            self._apply_settings_values(values, persist=True)
+        finally:
+            self._settings_icon_latched = False
+            self._sync_icon_button_state(self._settings_button)
+
+    def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
         self._settings.update(values)
         self._start_minimized_to_tray = bool(values.get('start_minimized_to_tray', self._start_minimized_to_tray))
@@ -3505,6 +4272,7 @@ class MainWindow(QMainWindow):
         self._app_border_color = str(values.get('app_border_color', self._app_border_color) or self._app_border_color)
         self._app_text_color = str(values.get('app_text_color', self._app_text_color) or self._app_text_color)
         self._app_accent_color = str(values.get('app_accent_color', self._app_accent_color) or self._app_accent_color)
+        self._app_hover_color = str(values.get('app_hover_color', self._app_hover_color) or self._app_hover_color)
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
         self._hover_highlight_color_setting = str(
             values.get('hover_highlight_color', self._hover_highlight_color_setting)
@@ -3547,7 +4315,8 @@ class MainWindow(QMainWindow):
         if not self._remember_password_24h:
             self._clear_password_grace()
 
-        save_settings(self._settings)
+        if persist:
+            save_settings(self._settings)
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
@@ -4456,64 +5225,68 @@ QMenu#trayQuickMenu::separator {
     
     def refresh_account_list(self):
         """Refresh the account list display"""
-        self.account_list.clear()
-        
-        if not self.account_manager:
-            return
-        
-        accounts = self.account_manager.get_all_accounts()
-        accounts = self._sorted_accounts(accounts)
-        self._rebuild_tag_filter_options(accounts)
-        filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
-        
-        if not accounts:
-            item = QListWidgetItem()
-            item.setText("No accounts saved. Click 'Add Account' to get started.")
-            item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
-            self.account_list.addItem(item)
-            self.launch_btn.setEnabled(False)
-            self.edit_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
-        elif not filtered_accounts:
-            item = QListWidgetItem()
-            item.setText("No accounts match current filters.")
-            item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
-            self.account_list.addItem(item)
-            self.launch_btn.setEnabled(False)
-            self.edit_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
-        else:
-            row_gap = 6
-            for account in filtered_accounts:
-                row_height = self._account_row_height()
-                item = QListWidgetItem()
-                item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, row_height + row_gap))
-                self.account_list.addItem(item)
-                
-                # Create custom widget
-                widget = AccountListItem(
-                    account,
-                    show_ranks=self._show_ranks,
-                    show_rank_images=self._show_rank_images,
-                    show_tags=self._show_tags,
-                    tag_size=self._tag_size,
-                    tag_chip_style=self._tag_chip_style,
-                    logged_in_gradient_color=self._logged_in_gradient_color,
-                    hover_highlight_color=self._hover_highlight_color,
-                    logged_in_gradient_intensity=self._logged_in_gradient_intensity,
-                    logged_in_border_width=self._logged_in_border_width,
-                    logged_in_border_opacity=self._logged_in_border_opacity,
-                    row_density=self._row_density,
-                    rank_icon_size=self._rank_icon_size,
-                    rank_text_brightness=self._rank_text_brightness,
-                )
-                widget.setFixedHeight(row_height)
-                self.account_list.setItemWidget(item, widget)
+        self.account_list.setUpdatesEnabled(False)
+        try:
+            self.account_list.clear()
 
-            self.update_account_item_states()
-            if self._show_ranks:
-                self._start_rank_fetches()
+            if not self.account_manager:
+                return
+
+            accounts = self.account_manager.get_all_accounts()
+            accounts = self._sorted_accounts(accounts)
+            self._rebuild_tag_filter_options(accounts)
+            filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
+
+            if not accounts:
+                item = QListWidgetItem()
+                item.setText("No accounts saved. Click 'Add Account' to get started.")
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.account_list.addItem(item)
+                self.launch_btn.setEnabled(False)
+                self.edit_btn.setEnabled(False)
+                self.delete_btn.setEnabled(False)
+            elif not filtered_accounts:
+                item = QListWidgetItem()
+                item.setText("No accounts match current filters.")
+                item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                self.account_list.addItem(item)
+                self.launch_btn.setEnabled(False)
+                self.edit_btn.setEnabled(False)
+                self.delete_btn.setEnabled(False)
+            else:
+                row_gap = 6
+                for account in filtered_accounts:
+                    row_height = self._account_row_height()
+                    item = QListWidgetItem()
+                    item.setData(Qt.UserRole, account.username)
+                    item.setSizeHint(QSize(0, row_height + row_gap))
+                    self.account_list.addItem(item)
+
+                    # Create custom widget
+                    widget = AccountListItem(
+                        account,
+                        show_ranks=self._show_ranks,
+                        show_rank_images=self._show_rank_images,
+                        show_tags=self._show_tags,
+                        tag_size=self._tag_size,
+                        tag_chip_style=self._tag_chip_style,
+                        logged_in_gradient_color=self._logged_in_gradient_color,
+                        hover_highlight_color=self._hover_highlight_color,
+                        logged_in_gradient_intensity=self._logged_in_gradient_intensity,
+                        logged_in_border_width=self._logged_in_border_width,
+                        logged_in_border_opacity=self._logged_in_border_opacity,
+                        row_density=self._row_density,
+                        rank_icon_size=self._rank_icon_size,
+                        rank_text_brightness=self._rank_text_brightness,
+                    )
+                    widget.setFixedHeight(row_height)
+                    self.account_list.setItemWidget(item, widget)
+
+                self.update_account_item_states()
+                if self._show_ranks:
+                    self._start_rank_fetches()
+        finally:
+            self.account_list.setUpdatesEnabled(True)
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
@@ -5308,6 +6081,10 @@ QMenu::separator {
         dev_label = QLabel("Developer: jtmb")
         dev_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(dev_label)
+
+        version_label = QLabel(f"Version: {APP_VERSION}")
+        version_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(version_label)
 
         repo_label = QLabel('<a href="https://github.com/jtmb/lol-account-manager">github.com/jtmb/lol-account-manager</a>')
         repo_label.setAlignment(Qt.AlignCenter)
