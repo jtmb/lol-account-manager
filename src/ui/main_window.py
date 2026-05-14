@@ -27,6 +27,11 @@ import re
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
+try:
+    import qtawesome as qta
+except Exception:
+    qta = None
+
 if sys.platform.startswith("win"):
     import winreg
 
@@ -3164,7 +3169,7 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._refresh_button = QPushButton("↻")
+        self._refresh_button = QPushButton("")
         self._refresh_button.setObjectName("refreshIconButton")
         self._refresh_button.setFixedSize(26, 26)
         self._refresh_button.setAutoDefault(False)
@@ -3173,7 +3178,7 @@ class MainWindow(QMainWindow):
         self._refresh_button.clicked.connect(self.refresh_ui)
         top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
 
-        self._settings_button = QPushButton("⚙")
+        self._settings_button = QPushButton("")
         self._settings_button.setObjectName("settingsCogButton")
         self._settings_button.setFixedSize(26, 26)
         self._settings_button.setAutoDefault(False)
@@ -3273,6 +3278,8 @@ class MainWindow(QMainWindow):
         self._apply_account_list_background()
         
         central_widget.setLayout(layout)
+
+        self._configure_icon_buttons()
 
     @staticmethod
     def _champion_splash_url(champion_id: str, skin_num: int = 0) -> str:
@@ -3559,11 +3566,66 @@ class MainWindow(QMainWindow):
         self._apply_title_bar_theme()
         if self._tray_menu:
             self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
+        self._refresh_icon_buttons()
 
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
         self._apply_theme()
         self.refresh_account_list()
+
+    def _configure_icon_buttons(self):
+        self._icon_buttons = {
+            self._refresh_button: ["fa6s.arrows-rotate", "fa5s.sync-alt"],
+            self._settings_button: ["fa6s.gear", "fa5s.cog"],
+        }
+        for button in self._icon_buttons:
+            button.setText("")
+            button.setIconSize(QSize(16, 16))
+            button.installEventFilter(self)
+            button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
+            button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
+
+    def _refresh_icon_buttons(self):
+        for button in getattr(self, "_icon_buttons", {}):
+            self._set_icon_state(button, "hover" if button.underMouse() else "normal")
+
+    def _set_icon_state(self, button: QPushButton, state: str):
+        if not qta:
+            button.setText("?")
+            return
+        names = self._icon_buttons.get(button, [])
+        if not names:
+            return
+        app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+        app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
+        app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
+        if state == "pressed":
+            color = app_border
+        elif state == "hover":
+            color = app_accent
+        else:
+            color = app_text
+        icon = self._build_fa_icon(names, color)
+        if icon:
+            button.setIcon(icon)
+
+    def _build_fa_icon(self, names: list[str], color: str) -> Optional[QIcon]:
+        if not qta:
+            return None
+        for name in names:
+            try:
+                return qta.icon(name, color=color)
+            except Exception:
+                continue
+        return None
+
+    def eventFilter(self, obj, event):
+        if obj in getattr(self, "_icon_buttons", {}):
+            if event.type() == QEvent.Enter:
+                self._set_icon_state(obj, "hover")
+            elif event.type() == QEvent.Leave:
+                self._set_icon_state(obj, "normal")
+        return super().eventFilter(obj, event)
 
     def _apply_filter_input_palette(self):
         """Apply stable text/placeholder colors for filter controls."""
