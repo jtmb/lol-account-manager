@@ -4251,7 +4251,9 @@ class MainWindow(QMainWindow):
                     self._apply_settings_values(original_settings, persist=False)
                 return
             # Settings were already applied by _save_and_close while the dialog was
-            # covering the main window — nothing left to do here.
+            # covering the main window. Start rank fetches now that the modal is gone.
+            if self._show_ranks:
+                QTimer.singleShot(0, self._start_rank_fetches)
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
@@ -5301,6 +5303,12 @@ QMenu#trayQuickMenu::separator {
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
         if not self._show_ranks:
+            return
+
+        # Starting native threads while a modal dialog is active causes the terminal
+        # window (parent process) to briefly flash to the foreground on Linux.
+        # Bail out silently; the caller is responsible for re-scheduling after close.
+        if QApplication.activeModalWidget():
             return
 
         # Stop leftover threads from a previous refresh
