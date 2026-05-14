@@ -32,7 +32,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "auto_open_ingame_page": True,
         "tag_size": "medium",
         "tag_chip_style": "vibrant",
-        "logged_in_gradient_color": "#6b7280",
+        "logged_in_gradient_color": "#32c46d",
         "hover_highlight_color": "__theme__",
         "champion_splash_enabled": False,
         "champion_splash_champion": "__none__",
@@ -50,8 +50,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "app_surface_color": "#181825",
         "app_border_color": "#313244",
         "app_text_color": "#cdd6f4",
-        "app_accent_color": "#313244",
-        "app_hover_color": "#45475a"
+        "app_accent_color": "#313244"
     }
 }
 
