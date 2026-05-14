@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
 from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
 from pathlib import Path
 from typing import Optional, Callable
@@ -154,7 +154,7 @@ class AccountListBackgroundFrame(QFrame):
         rect = self.rect()
         radius = 6.0
         path = QPainterPath()
-        path.addRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius)
+        path.addRoundedRect(QRectF(rect.adjusted(1, 1, -1, -1)), radius, radius)
         painter.setClipPath(path)
 
         base_color = QColor("#181b2b") if self._dark_mode else QColor("#ededf0")
