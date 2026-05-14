@@ -1456,6 +1456,27 @@ class SettingsDialog(QDialog):
             "app_text_color": "#d8e7df",
             "app_accent_color": "#34c38f",
         }),
+        ("Blurple Night", {
+            "app_bg_color": "#1e1f22",
+            "app_surface_color": "#2b2d31",
+            "app_border_color": "#3f4147",
+            "app_text_color": "#dbdee1",
+            "app_accent_color": "#5865f2",
+        }),
+        ("Industrial Graphite", {
+            "app_bg_color": "#0b0e14",
+            "app_surface_color": "#141a24",
+            "app_border_color": "#283245",
+            "app_text_color": "#c7d0df",
+            "app_accent_color": "#66c0f4",
+        }),
+        ("Creator Noir", {
+            "app_bg_color": "#0f0f0f",
+            "app_surface_color": "#1a1a1a",
+            "app_border_color": "#2c2c2c",
+            "app_text_color": "#f1f1f1",
+            "app_accent_color": "#ff3b30",
+        }),
         ("Crimson Night", {
             "app_bg_color": "#1b0f12",
             "app_surface_color": "#2a171c",
