@@ -75,15 +75,64 @@ class RiotClientIntegration:
 
         The endpoint is only available while the game process is in-match.
         """
+        probe = RiotClientIntegration.probe_live_client_api(timeout_seconds=timeout_seconds)
+        return bool(probe.get("in_game", False))
+
+    @staticmethod
+    def probe_live_client_api(timeout_seconds: float = 1.5) -> dict:
+        """Return diagnostics for local Live Client API reachability and game state."""
+        url = "https://127.0.0.1:2999/liveclientdata/allgamedata"
+        result = {
+            "timestamp": time.time(),
+            "url": url,
+            "timeout_seconds": float(timeout_seconds),
+            "status": "unreachable",
+            "status_code": None,
+            "response_bytes": 0,
+            "in_game": False,
+            "summary": "No response",
+            "error": "",
+        }
+
         try:
-            response = requests.get(
-                "https://127.0.0.1:2999/liveclientdata/allgamedata",
-                timeout=timeout_seconds,
-                verify=False,
-            )
-            return response.status_code == 200 and bool(response.text.strip())
-        except requests.RequestException:
-            return False
+            response = requests.get(url, timeout=timeout_seconds, verify=False)
+            body = response.text or ""
+            body_nonempty = bool(body.strip())
+            status_code = int(response.status_code)
+            in_game = status_code == 200 and body_nonempty
+
+            if in_game:
+                status = "in_game"
+                summary = "In game (200 with payload)"
+            elif status_code == 200:
+                status = "idle"
+                summary = "200 response but empty payload"
+            else:
+                status = "idle"
+                summary = f"HTTP {status_code}"
+
+            result.update({
+                "status": status,
+                "status_code": status_code,
+                "response_bytes": len(body.encode("utf-8", errors="ignore")),
+                "in_game": in_game,
+                "summary": summary,
+            })
+            return result
+        except requests.Timeout:
+            result.update({
+                "status": "timeout",
+                "summary": "Timeout contacting Live Client API",
+                "error": "timeout",
+            })
+            return result
+        except requests.RequestException as exc:
+            result.update({
+                "status": "unreachable",
+                "summary": "Live Client API unavailable",
+                "error": str(exc),
+            })
+            return result
 
     @staticmethod
     def _get_riot_lockfile_path() -> Optional[Path]:

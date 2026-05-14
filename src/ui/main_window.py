@@ -583,6 +583,7 @@ class InGameWatcherThread(QThread):
     """Poll Live Client API and emit once for each newly started match."""
 
     ingame_detected = pyqtSignal(str)  # op.gg url
+    status_updated = pyqtSignal(object)  # probe diagnostics dict
 
     def __init__(self, opgg_url: str, timeout_seconds: int = 21600, poll_interval_seconds: float = 3.0):
         super().__init__()
@@ -599,7 +600,12 @@ class InGameWatcherThread(QThread):
             if self.isInterruptionRequested():
                 return
 
-            in_game = RiotClientIntegration.is_in_active_game(timeout_seconds=1.5)
+            probe = RiotClientIntegration.probe_live_client_api(timeout_seconds=1.5)
+            probe["watcher_active"] = True
+            probe["opgg_url"] = self._opgg_url
+            self.status_updated.emit(probe)
+
+            in_game = bool(probe.get("in_game", False))
 
             if in_game:
                 consecutive_out_of_game_polls = 0
@@ -614,6 +620,140 @@ class InGameWatcherThread(QThread):
                     opened_for_current_game = False
 
             self.msleep(max(200, int(self._poll_interval_seconds * 1000)))
+
+
+class InGameDiagnosticsDialog(QDialog):
+    """Live diagnostics panel for in-game detection polling."""
+
+    def __init__(self, status_provider: Callable[[], dict], test_callback: Callable[[], dict], parent=None):
+        super().__init__(parent)
+        self._status_provider = status_provider
+        self._test_callback = test_callback
+        self._last_test_result = "No manual test run yet"
+        self.setWindowTitle("In-Game Detection Diagnostics")
+        self.setModal(False)
+        self.setMinimumSize(520, 330)
+
+        dark_mode = bool(getattr(parent, "_dark_mode", True))
+        if dark_mode:
+            self.setStyleSheet(
+                "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
+                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #e2e8f0; }"
+                "QLabel#diagValue { color: #dbe4ff; }"
+                "QPushButton {"
+                "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
+                "border-radius: 6px; padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #45475a; }"
+            )
+        else:
+            self.setStyleSheet(
+                "QDialog { background-color: #f8fafc; color: #111827; }"
+                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #111827; }"
+                "QLabel#diagValue { color: #1f2937; }"
+                "QPushButton {"
+                "background-color: #f3f4f6; color: #111827; border: 1px solid #d1d5db;"
+                "border-radius: 6px; padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #e5e7eb; }"
+            )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        header = QLabel("Watcher diagnostics")
+        header.setObjectName("diagHeader")
+        layout.addWidget(header)
+
+        self.watcher_state_value = QLabel("-")
+        self.watcher_state_value.setObjectName("diagValue")
+        self.last_poll_value = QLabel("-")
+        self.last_poll_value.setObjectName("diagValue")
+        self.api_status_value = QLabel("-")
+        self.api_status_value.setObjectName("diagValue")
+        self.response_value = QLabel("-")
+        self.response_value.setObjectName("diagValue")
+        self.error_value = QLabel("-")
+        self.error_value.setObjectName("diagValue")
+        self.error_value.setWordWrap(True)
+        self.last_test_value = QLabel(self._last_test_result)
+        self.last_test_value.setObjectName("diagValue")
+        self.last_test_value.setWordWrap(True)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(6)
+        grid.addWidget(QLabel("Watcher state:"), 0, 0)
+        grid.addWidget(self.watcher_state_value, 0, 1)
+        grid.addWidget(QLabel("Last poll:"), 1, 0)
+        grid.addWidget(self.last_poll_value, 1, 1)
+        grid.addWidget(QLabel("Live API status:"), 2, 0)
+        grid.addWidget(self.api_status_value, 2, 1)
+        grid.addWidget(QLabel("Response details:"), 3, 0)
+        grid.addWidget(self.response_value, 3, 1)
+        grid.addWidget(QLabel("Last error:"), 4, 0)
+        grid.addWidget(self.error_value, 4, 1)
+        grid.addWidget(QLabel("Manual test:"), 5, 0)
+        grid.addWidget(self.last_test_value, 5, 1)
+        layout.addLayout(grid)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        test_btn = QPushButton("Test detection now")
+        test_btn.setAutoDefault(False)
+        test_btn.setDefault(False)
+        test_btn.clicked.connect(self._on_test_clicked)
+        button_row.addWidget(test_btn)
+        close_btn = QPushButton("Close")
+        close_btn.setAutoDefault(False)
+        close_btn.setDefault(False)
+        close_btn.clicked.connect(self.close)
+        button_row.addWidget(close_btn)
+        layout.addLayout(button_row)
+
+        self._status_timer = QTimer(self)
+        self._status_timer.setInterval(1000)
+        self._status_timer.timeout.connect(self.refresh_status)
+        self._status_timer.start()
+        self.refresh_status()
+
+    def _on_test_clicked(self):
+        result = self._test_callback() or {}
+        status = str(result.get("status", "unknown"))
+        summary = str(result.get("summary", "No summary"))
+        self._last_test_result = f"{status}: {summary}"
+        self.last_test_value.setText(self._last_test_result)
+        self.refresh_status()
+
+    def refresh_status(self):
+        state = self._status_provider() or {}
+
+        watcher_active = bool(state.get("watcher_active", False))
+        watcher_state = "Polling" if watcher_active else "Idle"
+        self.watcher_state_value.setText(watcher_state)
+
+        timestamp = float(state.get("timestamp", 0) or 0)
+        if timestamp > 0:
+            self.last_poll_value.setText(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp)))
+        else:
+            self.last_poll_value.setText("No poll yet")
+
+        status = str(state.get("status", "unknown"))
+        summary = str(state.get("summary", "No summary"))
+        self.api_status_value.setText(f"{status} - {summary}")
+
+        status_code = state.get("status_code")
+        response_bytes = int(state.get("response_bytes", 0) or 0)
+        code_text = "none" if status_code is None else str(status_code)
+        self.response_value.setText(f"status_code={code_text}, bytes={response_bytes}")
+
+        error = str(state.get("error", "") or "None")
+        self.error_value.setText(error)
+
+    def closeEvent(self, event):
+        self._status_timer.stop()
+        super().closeEvent(event)
 
 
 class MasterPasswordDialog(QDialog):
@@ -1232,6 +1372,11 @@ class SettingsDialog(QDialog):
         mw = self.parent()
         open_logs_btn.clicked.connect(lambda: mw.open_logs_folder() if mw else None)
         diagnostics_row.addWidget(open_logs_btn)
+        watcher_diag_btn = QPushButton("Watcher diagnostics")
+        watcher_diag_btn.setAutoDefault(False)
+        watcher_diag_btn.setDefault(False)
+        watcher_diag_btn.clicked.connect(lambda: mw.open_ingame_diagnostics() if mw and hasattr(mw, "open_ingame_diagnostics") else None)
+        diagnostics_row.addWidget(watcher_diag_btn)
         diagnostics_row.addStretch()
         general_layout.addLayout(diagnostics_row)
 
@@ -2220,8 +2365,10 @@ class MainWindow(QMainWindow):
         self.account_manager: Optional[AccountManager] = None
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
+        self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
+        self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
         self._close_behavior: str = str(self._settings.get('close_behavior', 'tray'))
@@ -2281,6 +2428,20 @@ class MainWindow(QMainWindow):
         self._unlock_prompt_active = False
         self._quitting_to_exit = False
         self._tray_icon: Optional[QSystemTrayIcon] = None
+        self._tray_launch_last_action: Optional[QAction] = None
+        self._tray_lock_action: Optional[QAction] = None
+        self._tray_settings_action: Optional[QAction] = None
+        self._tray_watcher_diag_action: Optional[QAction] = None
+        self._tray_watcher_status_action: Optional[QAction] = None
+        self._ingame_watch_status: dict = {
+            "watcher_active": False,
+            "status": "idle",
+            "summary": "Watcher idle",
+            "timestamp": 0,
+            "status_code": None,
+            "response_bytes": 0,
+            "error": "",
+        }
         self._suppress_window_size_persistence = False
         self.init_ui()
         app = QApplication.instance()
@@ -2656,14 +2817,33 @@ class MainWindow(QMainWindow):
         tray_menu = QMenu(self)
         show_action = QAction("Show", self)
         show_action.triggered.connect(self._show_from_tray)
+        self._tray_launch_last_action = QAction("Launch last account", self)
+        self._tray_launch_last_action.triggered.connect(self._launch_last_account_from_tray)
+        self._tray_lock_action = QAction("Lock app", self)
+        self._tray_lock_action.triggered.connect(self._lock_from_tray)
+        self._tray_settings_action = QAction("Open settings", self)
+        self._tray_settings_action.triggered.connect(self._open_settings_from_tray)
+        self._tray_watcher_diag_action = QAction("Watcher diagnostics", self)
+        self._tray_watcher_diag_action.triggered.connect(self.open_ingame_diagnostics)
+        self._tray_watcher_status_action = QAction("Watcher: idle", self)
+        self._tray_watcher_status_action.setEnabled(False)
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self._quit_from_tray)
+
         tray_menu.addAction(show_action)
+        tray_menu.addAction(self._tray_launch_last_action)
+        tray_menu.addAction(self._tray_lock_action)
+        tray_menu.addAction(self._tray_settings_action)
+        tray_menu.addAction(self._tray_watcher_diag_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(self._tray_watcher_status_action)
         tray_menu.addSeparator()
         tray_menu.addAction(quit_action)
         self._tray_icon.setContextMenu(tray_menu)
         self._tray_icon.activated.connect(self._on_tray_activated)
         self._tray_icon.show()
+        self._update_tray_actions_state()
+        self._update_tray_watcher_status()
 
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
@@ -2671,8 +2851,72 @@ class MainWindow(QMainWindow):
 
     def _show_from_tray(self):
         self.showNormal()
+        if not self.account_manager:
+            unlocked = self.request_master_password(fatal_on_fail=False)
+            if not unlocked:
+                self.hide()
+                return
         self.raise_()
         self.activateWindow()
+
+    def _open_settings_from_tray(self):
+        self._show_from_tray()
+        if self.isVisible():
+            self.open_settings_dialog()
+
+    def _lock_from_tray(self):
+        self._lock_application(hide_window=True)
+
+    def _launch_last_account_from_tray(self):
+        if not self._last_launched_username:
+            QMessageBox.information(self, "Tray", "No previous account launch found yet.")
+            return
+
+        self._show_from_tray()
+        if not self.account_manager:
+            return
+
+        account = self.account_manager.get_account(self._last_launched_username)
+        if not account:
+            QMessageBox.warning(
+                self,
+                "Tray",
+                f"Saved last account '{self._last_launched_username}' is no longer available.",
+            )
+            return
+
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if item.data(Qt.UserRole) == account.username:
+                self.account_list.setCurrentItem(item)
+                break
+
+        self.launch_account()
+
+    def _lock_application(self, hide_window: bool = False):
+        """Force app to locked state so master password is required again."""
+        self._clear_password_grace()
+        self._stop_ingame_watcher()
+        self.account_manager = None
+        self._logged_in_username = None
+        self._session_miss_count = 0
+        self.refresh_account_list()
+        self.launch_btn.setEnabled(False)
+        self.edit_btn.setEnabled(False)
+        self.delete_btn.setEnabled(False)
+
+        if hide_window:
+            self.hide()
+
+        if self._tray_icon and self._tray_icon.isVisible():
+            self._tray_icon.showMessage(
+                "League Account Manager",
+                "Application locked. Enter master password to unlock.",
+                QSystemTrayIcon.Information,
+                2500,
+            )
+
+        self._update_tray_actions_state()
 
     def _quit_from_tray(self):
         self._quitting_to_exit = True
@@ -2689,6 +2933,60 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         super().closeEvent(event)
+
+    def _update_tray_actions_state(self):
+        if self._tray_launch_last_action:
+            if self._last_launched_username:
+                self._tray_launch_last_action.setText(f"Launch last account ({self._last_launched_username})")
+                self._tray_launch_last_action.setEnabled(True)
+            else:
+                self._tray_launch_last_action.setText("Launch last account")
+                self._tray_launch_last_action.setEnabled(False)
+
+    def _update_tray_watcher_status(self):
+        if not self._tray_watcher_status_action:
+            return
+
+        status = self._ingame_watch_status or {}
+        watcher_active = bool(status.get("watcher_active", False))
+        summary = str(status.get("summary", "Watcher idle") or "Watcher idle")
+        if watcher_active:
+            self._tray_watcher_status_action.setText(f"Watcher: {summary}")
+        else:
+            self._tray_watcher_status_action.setText("Watcher: idle")
+
+    def _on_ingame_watch_status(self, status: object):
+        if not isinstance(status, dict):
+            return
+        next_status = dict(status)
+        next_status["watcher_active"] = bool(
+            self.ingame_watch_thread and self.ingame_watch_thread.isRunning()
+        )
+        self._ingame_watch_status = next_status
+        self._update_tray_watcher_status()
+        if self.ingame_diag_dialog:
+            self.ingame_diag_dialog.refresh_status()
+
+    def _run_ingame_detection_test(self) -> dict:
+        result = RiotClientIntegration.probe_live_client_api(timeout_seconds=1.5)
+        result["watcher_active"] = bool(self.ingame_watch_thread and self.ingame_watch_thread.isRunning())
+        self._ingame_watch_status = dict(result)
+        self._update_tray_watcher_status()
+        return result
+
+    def _get_ingame_diagnostics_status(self) -> dict:
+        return dict(self._ingame_watch_status)
+
+    def open_ingame_diagnostics(self):
+        if not self.ingame_diag_dialog:
+            self.ingame_diag_dialog = InGameDiagnosticsDialog(
+                status_provider=self._get_ingame_diagnostics_status,
+                test_callback=self._run_ingame_detection_test,
+                parent=self,
+            )
+        self.ingame_diag_dialog.show()
+        self.ingame_diag_dialog.raise_()
+        self.ingame_diag_dialog.activateWindow()
 
     def _check_for_updates(self):
         """Check latest GitHub release tag and notify if changed."""
@@ -2868,6 +3166,7 @@ class MainWindow(QMainWindow):
         self.account_manager = AccountManager(password)
         self.refresh_account_list()
         self._reset_auto_lock_timer()
+        self._update_tray_actions_state()
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
@@ -3359,6 +3658,10 @@ QMenu::separator {
         self._stop_ingame_watcher()
 
         self.current_launch_username = account.username
+        self._last_launched_username = account.username
+        self._settings["last_launched_username"] = account.username
+        save_settings(self._settings)
+        self._update_tray_actions_state()
         
         # Show cancellable progress dialog
         self.launch_progress = LaunchProgressDialog(
@@ -3441,7 +3744,19 @@ QMenu::separator {
         """Start watching for active-game state and open op.gg once detected."""
         self._stop_ingame_watcher()
         opgg_url = self._build_opgg_ingame_url(account)
+        self._ingame_watch_status = {
+            "watcher_active": True,
+            "status": "starting",
+            "summary": "Waiting for active match",
+            "timestamp": time.time(),
+            "status_code": None,
+            "response_bytes": 0,
+            "error": "",
+            "opgg_url": opgg_url,
+        }
+        self._update_tray_watcher_status()
         self.ingame_watch_thread = InGameWatcherThread(opgg_url)
+        self.ingame_watch_thread.status_updated.connect(self._on_ingame_watch_status)
         self.ingame_watch_thread.ingame_detected.connect(self._open_ingame_webpage)
         self.ingame_watch_thread.finished.connect(self._clear_ingame_watcher)
         self.ingame_watch_thread.start()
@@ -3459,6 +3774,7 @@ QMenu::separator {
         self.ingame_watch_thread = None  # clear first so deferred finished signals don't clobber new watcher
         if watcher:
             try:
+                watcher.status_updated.disconnect()
                 watcher.ingame_detected.disconnect()
                 watcher.finished.disconnect()
             except Exception:
@@ -3466,10 +3782,34 @@ QMenu::separator {
             if watcher.isRunning():
                 watcher.requestInterruption()
                 watcher.wait(1200)
+        self._ingame_watch_status = {
+            "watcher_active": False,
+            "status": "idle",
+            "summary": "Watcher stopped",
+            "timestamp": time.time(),
+            "status_code": None,
+            "response_bytes": 0,
+            "error": "",
+        }
+        self._update_tray_watcher_status()
+        if self.ingame_diag_dialog:
+            self.ingame_diag_dialog.refresh_status()
 
     def _clear_ingame_watcher(self):
         """Clear completed watcher thread reference."""
         self.ingame_watch_thread = None
+        self._ingame_watch_status = {
+            "watcher_active": False,
+            "status": "idle",
+            "summary": "Watcher idle",
+            "timestamp": time.time(),
+            "status_code": None,
+            "response_bytes": 0,
+            "error": "",
+        }
+        self._update_tray_watcher_status()
+        if self.ingame_diag_dialog:
+            self.ingame_diag_dialog.refresh_status()
 
     def _dismiss_launch_progress(self):
         """Close and clear launch progress UI if it exists."""
