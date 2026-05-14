@@ -2773,7 +2773,6 @@ class AccountListItem(QFrame):
                     f"stop:0.18 {mid_active},"
                     "stop:1 rgba(37, 41, 61, 170));"
                     "border: 1px solid transparent;"
-                    f"border-left: {left_border_width}px solid {border_active};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -2787,7 +2786,6 @@ class AccountListItem(QFrame):
                     f"stop:0.16 {mid_idle},"
                     "stop:1 rgba(25, 30, 47, 95));"
                     "border: 1px solid transparent;"
-                    f"border-left: {left_border_width}px solid {border_idle};"
                     "border-radius: 10px;"
                     "}"
                 )
@@ -2836,7 +2834,6 @@ class AccountListItem(QFrame):
                 f"stop:0.30 {mid_active},"
                 "stop:1 rgba(236, 231, 223, 95));"
                 "border: 1px solid transparent;"
-                f"border-left: {left_border_width}px solid {border_active};"
                 "border-radius: 10px;"
                 "}"
             )
@@ -2850,7 +2847,6 @@ class AccountListItem(QFrame):
                 f"stop:0.30 {mid_idle},"
                 "stop:1 rgba(223, 216, 205, 78));"
                 "border: 1px solid transparent;"
-                f"border-left: {left_border_width}px solid {border_idle};"
                 "border-radius: 10px;"
                 "}"
             )
