@@ -3962,8 +3962,13 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._perform_refresh_ui)
 
     def _perform_refresh_ui(self):
-        self._apply_theme()
-        self.refresh_account_list()
+        self.setUpdatesEnabled(False)
+        try:
+            self._apply_theme()
+            self.refresh_account_list()
+        finally:
+            self.setUpdatesEnabled(True)
+            self.update()
         self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
@@ -4230,11 +4235,12 @@ class MainWindow(QMainWindow):
         self._set_icon_state(self._settings_button, "pressed")
         try:
             if dialog.exec_() != QDialog.Accepted:
-                self._apply_settings_values(original_settings, persist=False)
+                _restore = dict(original_settings)
+                QTimer.singleShot(0, lambda: self._apply_settings_values(_restore, persist=False))
                 return
 
             values = dialog.get_values()
-            self._apply_settings_values(values, persist=True)
+            QTimer.singleShot(0, lambda: self._apply_settings_values(values, persist=True))
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
@@ -4313,13 +4319,8 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        self.setUpdatesEnabled(False)
-        try:
-            self._apply_theme()
-            self.refresh_account_list()
-        finally:
-            self.setUpdatesEnabled(True)
-            self.update()
+        self._apply_theme()
+        self.refresh_account_list()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
