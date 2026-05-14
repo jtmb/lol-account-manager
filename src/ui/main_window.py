@@ -3068,7 +3068,7 @@ class MainWindow(QMainWindow):
         account_list_layout.setSpacing(0)
         self.account_list = QListWidget()
         self.account_list.setObjectName("accountListWidget")
-        self.account_list.setSpacing(0)
+        self.account_list.setSpacing(6)
         self.account_list.setViewportMargins(0, 0, 0, 0)
         self.account_list.setFrameShape(QFrame.NoFrame)
         self.account_list.setContentsMargins(0, 0, 0, 0)
@@ -4461,8 +4461,6 @@ QMenu#trayQuickMenu::separator {
 
     def update_account_item_states(self):
         """Refresh hover/selected visuals for account rows."""
-        row_height = self._account_row_height()
-        highlight_gap = 6
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             widget = self.account_list.itemWidget(item)
@@ -4472,8 +4470,6 @@ QMenu#trayQuickMenu::separator {
                 widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
                 widget.set_logged_in(is_logged_in)
-                is_highlighted = item.isSelected() or is_logged_in
-                item.setSizeHint(QSize(0, row_height + (highlight_gap if is_highlighted else 0)))
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
