@@ -356,7 +356,7 @@ QTabBar::tab:hover:!selected {
 
 LIGHT_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
-    background-color: #fafafa;
+    background-color: #e7e8ec;
     color: #2e2d2a;
 }
 QListWidget {
@@ -488,7 +488,7 @@ QTabWidget::pane {
     border: 1px solid #c7c1b6;
     border-radius: 8px;
     top: -1px;
-    background-color: #fafafa;
+    background-color: #e7e8ec;
 }
 QTabBar::tab {
     background-color: #e7e8ee;
@@ -501,7 +501,7 @@ QTabBar::tab {
     margin-right: 4px;
 }
 QTabBar::tab:selected {
-    background-color: #fafafa;
+    background-color: #e7e8ec;
     color: #2e2d2a;
 }
 QTabBar::tab:hover:!selected {
@@ -2649,7 +2649,7 @@ class MainWindow(QMainWindow):
         cog_pressed = "#585b70" if dark_mode else "#bebfc8"
         cog_focus = "#6c7086" if dark_mode else "#a8a8a8"
         search_fg = "#dbe4ff" if dark_mode else "#2e2d2a"
-        search_bg = "#171a2a" if dark_mode else "#fafafa"
+        search_bg = "#171a2a" if dark_mode else "#f2f3f6"
         search_border = "#3f4b71" if dark_mode else "#d0d0d6"
         search_placeholder = "#a8b4d6" if dark_mode else "#7c756b"
         return (
@@ -2736,10 +2736,10 @@ class MainWindow(QMainWindow):
             combo_palette.setColor(QPalette.Text, QColor("#cdd6f4"))
             combo_palette.setColor(QPalette.ButtonText, QColor("#cdd6f4"))
         else:
-            search_palette.setColor(QPalette.Base, QColor("#fafafa"))
+            search_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
             search_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
             search_palette.setColor(QPalette.PlaceholderText, QColor("#7c756b"))
-            combo_palette.setColor(QPalette.Base, QColor("#fafafa"))
+            combo_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
             combo_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
             combo_palette.setColor(QPalette.ButtonText, QColor("#2e2d2a"))
 
