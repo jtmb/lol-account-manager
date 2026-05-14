@@ -3400,17 +3400,47 @@ QMenu#trayQuickMenu::separator {
             notes = str(payload.get("body") or "").strip()
             note_preview = self._build_release_notes_preview(notes)
             prompt = (
-                f"Update available: {latest_tag}\n"
-                f"Current version: {APP_VERSION}\n\n"
-                "Update now?\nThe app will restart to finish the update."
+                "<div style='margin-bottom: 10px;'>"
+                f"<div style='font-size: 15px; font-weight: 700; color: #f4f7ff;'>Update available: {latest_tag}</div>"
+                f"<div style='margin-top: 2px; color: #aeb6cc;'>Current version: {APP_VERSION}</div>"
+                "</div>"
+                "<div style='padding: 10px 12px; border: 1px solid #2f3650; border-radius: 8px; "
+                "background-color: #151b2d; color: #dbe3ff;'>"
+                "<b>Update now?</b><br/>"
+                "The app will restart to finish the update."
+                "</div>"
             )
+            notes_html = ""
             if note_preview:
-                prompt += f"\n\nRelease notes:\n{note_preview}"
+                escaped_notes = _escape_html(note_preview).replace("\n", "<br/>")
+                notes_html = (
+                    "<div style='margin-top: 12px; padding: 10px 12px; border: 1px solid #3a435f; "
+                    "border-radius: 8px; background-color: #101525;'>"
+                    "<div style='font-weight: 700; color: #cad5f5; margin-bottom: 6px;'>Release notes</div>"
+                    f"<div style='color: #e7ecff;'>{escaped_notes}</div>"
+                    "</div>"
+                )
 
             box = QMessageBox(self)
             box.setIcon(QMessageBox.Information)
             box.setWindowTitle("Update Available")
+            box.setTextFormat(Qt.RichText)
             box.setText(prompt)
+            if notes_html:
+                box.setInformativeText(notes_html)
+            box.setStyleSheet(
+                "QMessageBox { background-color: #0f1424; }"
+                "QMessageBox QLabel { color: #eef3ff; font-size: 12px; min-width: 320px; }"
+                "QPushButton {"
+                "  background-color: #252b40;"
+                "  color: #f2f5ff;"
+                "  border: 1px solid #3c4665;"
+                "  border-radius: 6px;"
+                "  padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #2c3550; }"
+                "QPushButton:pressed { background-color: #1f2638; }"
+            )
             install_btn = box.addButton("Install Update", QMessageBox.AcceptRole)
             skip_btn = box.addButton("Skip This Version", QMessageBox.DestructiveRole)
             later_btn = box.addButton("Later", QMessageBox.RejectRole)
