@@ -55,6 +55,8 @@ DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 SPLASH_THEME_AUTO = "__none__"
+LOCKED_CHAMPION_SPLASH_EDGE_FADE = 80
+LOCKED_CHAMPION_SPLASH_INNER_FADE = 75
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -1318,22 +1320,6 @@ class SettingsDialog(QDialog):
         ("Bold (70%)", 70),
     ]
 
-    CHAMPION_SPLASH_EDGE_FADE_OPTIONS = [
-        ("None (0%)", 0),
-        ("Light (25%)", 25),
-        ("Balanced (45%)", 45),
-        ("Strong (65%)", 65),
-        ("Heavy (80%)", 80),
-    ]
-
-    CHAMPION_SPLASH_INNER_FADE_OPTIONS = [
-        ("None (0%)", 0),
-        ("Light (20%)", 20),
-        ("Balanced (35%)", 35),
-        ("Strong (55%)", 55),
-        ("Heavy (75%)", 75),
-    ]
-
     LOGGED_IN_INTENSITY_OPTIONS = [
         ("Ultra Subtle (5%)", 5),
         ("Very Soft (10%)", 10),
@@ -1820,43 +1806,11 @@ class SettingsDialog(QDialog):
         splash_opacity_row.addStretch()
         appearance_layout.addLayout(splash_opacity_row)
 
-        splash_edge_row = QHBoxLayout()
-        splash_edge_row.addWidget(QLabel("Splash edge fade:"))
-        self.champion_splash_edge_fade_combo = QComboBox()
-        for label, value in self.CHAMPION_SPLASH_EDGE_FADE_OPTIONS:
-            self.champion_splash_edge_fade_combo.addItem(label, value)
-        current_splash_edge = int(self._settings.get("champion_splash_edge_fade", 80))
-        splash_edge_index = self.champion_splash_edge_fade_combo.findData(current_splash_edge)
-        if splash_edge_index < 0:
-            splash_edge_index = self.champion_splash_edge_fade_combo.findData(80)
-        self.champion_splash_edge_fade_combo.setCurrentIndex(max(0, splash_edge_index))
-        splash_edge_row.addWidget(self.champion_splash_edge_fade_combo)
-        splash_edge_row.addStretch()
-        appearance_layout.addLayout(splash_edge_row)
-
-        splash_inner_row = QHBoxLayout()
-        splash_inner_row.addWidget(QLabel("Splash inner fade:"))
-        self.champion_splash_inner_fade_combo = QComboBox()
-        for label, value in self.CHAMPION_SPLASH_INNER_FADE_OPTIONS:
-            self.champion_splash_inner_fade_combo.addItem(label, value)
-        current_splash_inner = int(self._settings.get("champion_splash_inner_fade", 75))
-        splash_inner_index = self.champion_splash_inner_fade_combo.findData(current_splash_inner)
-        if splash_inner_index < 0:
-            splash_inner_index = self.champion_splash_inner_fade_combo.findData(75)
-        self.champion_splash_inner_fade_combo.setCurrentIndex(max(0, splash_inner_index))
-        splash_inner_row.addWidget(self.champion_splash_inner_fade_combo)
-        splash_inner_row.addStretch()
-        appearance_layout.addLayout(splash_inner_row)
-
         self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_combo.setEnabled)
         self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_opacity_combo.setEnabled)
-        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_edge_fade_combo.setEnabled)
-        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_inner_fade_combo.setEnabled)
         splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
         self.champion_splash_combo.setEnabled(splash_enabled)
         self.champion_splash_opacity_combo.setEnabled(splash_enabled)
-        self.champion_splash_edge_fade_combo.setEnabled(splash_enabled)
-        self.champion_splash_inner_fade_combo.setEnabled(splash_enabled)
 
         gradient_intensity_row = QHBoxLayout()
         gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
@@ -2090,8 +2044,6 @@ class SettingsDialog(QDialog):
             "champion_splash_enabled": self.champion_splash_enabled_checkbox.isChecked(),
             "champion_splash_champion": str(champion_splash_value),
             "champion_splash_opacity": int(self.champion_splash_opacity_combo.currentData()),
-            "champion_splash_edge_fade": int(self.champion_splash_edge_fade_combo.currentData()),
-            "champion_splash_inner_fade": int(self.champion_splash_inner_fade_combo.currentData()),
             "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
             "logged_in_border_width": int(self.logged_in_border_width_combo.currentData()),
             "logged_in_border_opacity": int(self.logged_in_border_opacity_combo.currentData()),
@@ -2857,8 +2809,8 @@ class MainWindow(QMainWindow):
             self._settings.get('champion_splash_champion', SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO
         )
         self._champion_splash_opacity: int = int(self._settings.get('champion_splash_opacity', 70))
-        self._champion_splash_edge_fade: int = int(self._settings.get('champion_splash_edge_fade', 80))
-        self._champion_splash_inner_fade: int = int(self._settings.get('champion_splash_inner_fade', 75))
+        self._champion_splash_edge_fade: int = LOCKED_CHAMPION_SPLASH_EDGE_FADE
+        self._champion_splash_inner_fade: int = LOCKED_CHAMPION_SPLASH_INNER_FADE
         self._champion_splash_pixmap_cache: dict[str, QPixmap] = {}
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
@@ -3297,8 +3249,8 @@ class MainWindow(QMainWindow):
         self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
         self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
         self._champion_splash_opacity = int(values.get('champion_splash_opacity', self._champion_splash_opacity))
-        self._champion_splash_edge_fade = int(values.get('champion_splash_edge_fade', self._champion_splash_edge_fade))
-        self._champion_splash_inner_fade = int(values.get('champion_splash_inner_fade', self._champion_splash_inner_fade))
+        self._champion_splash_edge_fade = LOCKED_CHAMPION_SPLASH_EDGE_FADE
+        self._champion_splash_inner_fade = LOCKED_CHAMPION_SPLASH_INNER_FADE
         self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
         self._logged_in_border_width = int(values.get('logged_in_border_width', self._logged_in_border_width))
         self._logged_in_border_opacity = int(values.get('logged_in_border_opacity', self._logged_in_border_opacity))
