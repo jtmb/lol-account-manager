@@ -3767,6 +3767,13 @@ class MainWindow(QMainWindow):
         app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         accent_text = self._contrast_text_color(app_accent)
+        # When the accent is very dark, app_text (cool-tinted) contrasts better than
+        # pure #ffffff, which appears warm/yellow next to cool-tinted labels.
+        accent_color_obj = QColor(app_accent)
+        accent_lum = (0.2126 * accent_color_obj.redF()
+                      + 0.7152 * accent_color_obj.greenF()
+                      + 0.0722 * accent_color_obj.blueF())
+        button_text = app_text if accent_lum < 0.25 else accent_text
         placeholder = self._placeholder_color(app_text)
         cog_bg = app_surface
         cog_fg = app_text
@@ -3869,7 +3876,7 @@ class MainWindow(QMainWindow):
             + "}\n"
             + "QPushButton {\n"
             + f"    background-color: {app_accent};\n"
-            + f"    color: {accent_text};\n"
+            + f"    color: {button_text};\n"
             + f"    border: 1px solid {app_border};\n"
             + "}\n"
             + "QPushButton:disabled {\n"
