@@ -3164,9 +3164,9 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._settings_button = QPushButton("⚙ Settings")
+        self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
-        self._settings_button.setFixedSize(118, 30)
+        self._settings_button.setFixedSize(30, 30)
         self._settings_button.setAutoDefault(False)
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
@@ -3417,30 +3417,29 @@ class MainWindow(QMainWindow):
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
-            + "    min-width: 96px;\n"
-            + "    max-width: 96px;\n"
+            + "    min-width: 30px;\n"
+            + "    max-width: 30px;\n"
             + "    min-height: 30px;\n"
             + "    max-height: 30px;\n"
-            + f"    background-color: {cog_bg};\n"
+            + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
             + "    border: none;\n"
-            + "    border-radius: 8px;\n"
-            + "    padding: 0px 10px;\n"
-            + "    font-size: 12px;\n"
-            + "    font-weight: 600;\n"
+            + "    border-radius: 0px;\n"
+            + "    padding: 0px;\n"
+            + "    font-size: 16px;\n"
+            + "    font-weight: 500;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
             + "QPushButton#settingsCogButton:hover {\n"
-            + f"    background-color: {cog_hover};\n"
             + f"    color: {accent_text};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:pressed {\n"
-            + f"    background-color: {cog_pressed};\n"
+            + f"    color: {cog_pressed};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:focus {\n"
             + "    outline: none;\n"
-            + f"    border: 1px solid {cog_focus};\n"
+            + "    border: none;\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
