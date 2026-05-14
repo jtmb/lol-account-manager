@@ -2503,7 +2503,7 @@ class SettingsDialog(QDialog):
         save_btn.setFixedWidth(100)
         save_btn.setAutoDefault(False)
         save_btn.setDefault(False)
-        save_btn.clicked.connect(self.accept)
+        save_btn.clicked.connect(self._save_and_close)
         button_row.addWidget(save_btn)
         layout.addLayout(button_row)
 
@@ -2669,18 +2669,19 @@ class SettingsDialog(QDialog):
             ],
         }
 
+    def _save_and_close(self):
+        """Apply settings while dialog still covers the main window, then close.
+        By applying before accept(), the main window already has the new theme
+        when it is revealed — no double-paint flash.
+        """
+        if self._apply_callback:
+            self._apply_callback(self.get_values())
+        self.accept()
+
     def apply_settings(self):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
-            # Freeze the dialog so the parent setStyleSheet() cascade doesn't flash it
-            self.setUpdatesEnabled(False)
-            try:
-                self._apply_callback(self.get_values())
-                # Absorb the new parent stylesheet so we repaint once with final colors
-                if self.parent() and self.parent().styleSheet():
-                    self.setStyleSheet(self.parent().styleSheet())
-            finally:
-                self.setUpdatesEnabled(True)
+            self._apply_callback(self.get_values())
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -4249,15 +4250,8 @@ class MainWindow(QMainWindow):
                 if preview_was_applied[0]:
                     self._apply_settings_values(original_settings, persist=False)
                 return
-
-            values = dialog.get_values()
-            # Freeze main window so the post-close apply is a single paint, not a flash
-            self.setUpdatesEnabled(False)
-            try:
-                self._apply_settings_values(values, persist=True)
-            finally:
-                self.setUpdatesEnabled(True)
-                self.update()
+            # Settings were already applied by _save_and_close while the dialog was
+            # covering the main window — nothing left to do here.
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
