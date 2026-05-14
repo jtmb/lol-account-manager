@@ -1428,100 +1428,70 @@ class SettingsDialog(QDialog):
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
     APP_COLOR_PRESETS = [
-        ("Custom", {}),
-        ("Default Dark", {
-            "app_bg_color": DEFAULT_APP_BG_COLOR,
-            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+        ("Midnight Slate", {
+            "app_bg_color": "#0f111a",
+            "app_surface_color": "#171a26",
+            "app_border_color": "#2a3142",
+            "app_text_color": "#d7dbea",
+            "app_accent_color": "#4f7cff",
         }),
-        ("Discord Dark", {
-            "app_bg_color": "#1e1f22",
-            "app_surface_color": "#2b2d31",
-            "app_border_color": "#3f4147",
-            "app_text_color": "#dbdee1",
-            "app_accent_color": "#5865f2",
+        ("Deep Ocean", {
+            "app_bg_color": "#0b1b2b",
+            "app_surface_color": "#11273d",
+            "app_border_color": "#23405e",
+            "app_text_color": "#d4e6ff",
+            "app_accent_color": "#22a3ff",
         }),
-        ("Slack Dark", {
-            "app_bg_color": "#1a1d21",
-            "app_surface_color": "#222529",
-            "app_border_color": "#3d3f43",
-            "app_text_color": "#e8e8e8",
-            "app_accent_color": "#4a154b",
+        ("Forest Dusk", {
+            "app_bg_color": "#0f1a14",
+            "app_surface_color": "#16251c",
+            "app_border_color": "#2b3f33",
+            "app_text_color": "#d8e7df",
+            "app_accent_color": "#34c38f",
         }),
-        ("GitHub Dark", {
-            "app_bg_color": "#0d1117",
-            "app_surface_color": "#161b22",
-            "app_border_color": "#30363d",
-            "app_text_color": "#c9d1d9",
-            "app_accent_color": "#2f81f7",
+        ("Crimson Night", {
+            "app_bg_color": "#1b0f12",
+            "app_surface_color": "#2a171c",
+            "app_border_color": "#443039",
+            "app_text_color": "#f0d7db",
+            "app_accent_color": "#e85d8a",
         }),
-        ("Nord", {
-            "app_bg_color": "#2e3440",
-            "app_surface_color": "#3b4252",
-            "app_border_color": "#4c566a",
-            "app_text_color": "#eceff4",
-            "app_accent_color": "#88c0d0",
+        ("Cloud Mist", {
+            "app_bg_color": "#f3f4f6",
+            "app_surface_color": "#ffffff",
+            "app_border_color": "#d1d5db",
+            "app_text_color": "#1f2937",
+            "app_accent_color": "#4f7cff",
         }),
-        ("Dracula", {
-            "app_bg_color": "#282a36",
-            "app_surface_color": "#303545",
-            "app_border_color": "#44475a",
-            "app_text_color": "#f8f8f2",
-            "app_accent_color": "#bd93f9",
+        ("Warm Sand", {
+            "app_bg_color": "#f6f1ea",
+            "app_surface_color": "#ffffff",
+            "app_border_color": "#d8cfc3",
+            "app_text_color": "#3a2f2a",
+            "app_accent_color": "#f5a623",
         }),
-        ("Solarized Dark", {
-            "app_bg_color": "#002b36",
-            "app_surface_color": "#073642",
-            "app_border_color": "#586e75",
-            "app_text_color": "#eee8d5",
-            "app_accent_color": "#268bd2",
+        ("Soft Lavender", {
+            "app_bg_color": "#f3f2fb",
+            "app_surface_color": "#ffffff",
+            "app_border_color": "#d5d2ea",
+            "app_text_color": "#2b2a3a",
+            "app_accent_color": "#8b5cf6",
+        }),
+        ("Skyline", {
+            "app_bg_color": "#eef3fb",
+            "app_surface_color": "#ffffff",
+            "app_border_color": "#c9d7ea",
+            "app_text_color": "#1d2a3a",
+            "app_accent_color": "#22a3ff",
+        }),
+        ("Classic Light", {
+            "app_bg_color": "#e7e8ec",
+            "app_surface_color": "#ededf0",
+            "app_border_color": "#c4c6cf",
+            "app_text_color": "#2e2d2a",
+            "app_accent_color": "#d2d3db",
         }),
     ]
-
-    APP_COLOR_OPTIONS = {
-        "app_bg_color": [
-            ("Default Dark", DEFAULT_APP_BG_COLOR),
-            ("Discord Dark", "#1e1f22"),
-            ("GitHub Dark", "#0d1117"),
-            ("Deep Navy", "#111827"),
-            ("Charcoal", "#1f2937"),
-            ("Midnight", "#0f172a"),
-        ],
-        "app_surface_color": [
-            ("Default Surface", DEFAULT_APP_SURFACE_COLOR),
-            ("Discord Surface", "#2b2d31"),
-            ("GitHub Surface", "#161b22"),
-            ("Slate", "#273043"),
-            ("Graphite", "#20242f"),
-            ("Blue Gray", "#222c3c"),
-        ],
-        "app_border_color": [
-            ("Default Border", DEFAULT_APP_BORDER_COLOR),
-            ("Muted Slate", "#3b4052"),
-            ("Graphite", "#2b2f3f"),
-            ("Cool Gray", "#434a5e"),
-            ("Nord Border", "#4c566a"),
-        ],
-        "app_text_color": [
-            ("Default Text", DEFAULT_APP_TEXT_COLOR),
-            ("Soft White", "#e5e7eb"),
-            ("Cool Gray", "#cbd5f5"),
-            ("Warm Gray", "#d6d3d1"),
-            ("Silver", "#d1d5db"),
-        ],
-        "app_accent_color": [
-            ("Default Accent", DEFAULT_APP_ACCENT_COLOR),
-            ("Discord Blurple", "#5865f2"),
-            ("Slack Purple", "#4a154b"),
-            ("GitHub Blue", "#2f81f7"),
-            ("Emerald", "#10b981"),
-            ("Amber", "#f59e0b"),
-            ("Rose", "#f43f5e"),
-            ("Cyan", "#22d3ee"),
-        ],
-    }
 
     def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
         super().__init__(parent)
