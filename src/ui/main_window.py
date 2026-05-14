@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
-from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
+from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
 from pathlib import Path
 from typing import Optional, Callable
 import sys
