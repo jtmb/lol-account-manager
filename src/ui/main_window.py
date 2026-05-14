@@ -3175,18 +3175,21 @@ class MainWindow(QMainWindow):
             h = self.account_list_background.height()
             if w <= 0 or h <= 0:
                 return
-            
-            # Create a bitmap mask with rounded corners
-            mask_pixmap = QPixmap(w, h)
+
+            # Create a bitmap mask with rounded corners, honoring device pixel ratio.
+            dpr = max(1.0, self.account_list_background.devicePixelRatioF())
+            mask_pixmap = QPixmap(int(w * dpr), int(h * dpr))
+            mask_pixmap.setDevicePixelRatio(dpr)
             mask_pixmap.fill(Qt.color0)
-            
+
             painter = QPainter(mask_pixmap)
             painter.setRenderHint(QPainter.Antialiasing, True)
             painter.setBrush(Qt.color1)
             painter.setPen(Qt.NoPen)
-            painter.drawRoundedRect(0, 0, w, h, 10, 10)
+            rect = QRectF(0.5, 0.5, w - 1.0, h - 1.0)
+            painter.drawRoundedRect(rect, 10.0, 10.0)
             painter.end()
-            
+
             # Apply as mask to background frame itself (not viewport)
             self.account_list_background.setMask(QBitmap(mask_pixmap))
         
