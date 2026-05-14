@@ -2662,6 +2662,7 @@ class SettingsDialog(QDialog):
             "app_border_color": str(theme_creator_colors.get("app_border_color", self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR))),
             "app_text_color": str(theme_creator_colors.get("app_text_color", self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR))),
             "app_accent_color": str(theme_creator_colors.get("app_accent_color", self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR))),
+            "app_hover_color": str(theme_creator_colors.get("app_hover_color", self._selected_app_preset().get("app_hover_color", DEFAULT_APP_HOVER_COLOR))),
             "custom_theme_presets": [
                 {"name": label, "colors": preset}
                 for label, preset in self._custom_theme_presets
