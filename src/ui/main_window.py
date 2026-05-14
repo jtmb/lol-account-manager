@@ -3185,17 +3185,17 @@ class MainWindow(QMainWindow):
             painter.drawRoundedRect(0, 0, w, h, 10, 10)
             painter.end()
             
-            # Apply as mask to viewport
-            self.account_list.viewport().setMask(QBitmap(mask_pixmap))
+            # Apply as mask to background frame itself (not viewport)
+            self.account_list_background.setMask(QBitmap(mask_pixmap))
         
-        # Apply initial mask
-        apply_clipping_mask()
+        # Defer mask application until layout is finalized
+        QTimer.singleShot(100, apply_clipping_mask)
         
         # Re-apply mask on container resize
         original_resize = self.account_list_background.resizeEvent
         def resize_with_mask(event):
             original_resize(event)
-            apply_clipping_mask()
+            QTimer.singleShot(50, apply_clipping_mask)
         self.account_list_background.resizeEvent = resize_with_mask
 
     def _apply_account_list_background(self):
