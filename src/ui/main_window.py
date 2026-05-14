@@ -1624,6 +1624,12 @@ class SettingsDialog(QDialog):
         self.auto_backup_keep_combo.setEnabled(self.auto_backup_checkbox.isChecked())
 
     def _reset_to_defaults(self):
+        self._confirm_reset_btn = getattr(self, "_confirm_reset_btn", None)
+        if self._confirm_reset_btn is not None:
+            self._confirm_reset_btn.setDown(False)
+        QTimer.singleShot(0, self._confirm_reset_to_defaults)
+
+    def _confirm_reset_to_defaults(self):
         result = QMessageBox.question(
             self,
             "Reset Settings",
@@ -2233,11 +2239,11 @@ class SettingsDialog(QDialog):
         layout.addSpacing(2)
 
         button_row = QHBoxLayout()
-        reset_btn = QPushButton("Reset to Defaults")
-        reset_btn.setAutoDefault(False)
-        reset_btn.setDefault(False)
-        reset_btn.clicked.connect(self._reset_to_defaults)
-        button_row.addWidget(reset_btn)
+        self._confirm_reset_btn = QPushButton("Reset to Defaults")
+        self._confirm_reset_btn.setAutoDefault(False)
+        self._confirm_reset_btn.setDefault(False)
+        self._confirm_reset_btn.clicked.connect(self._reset_to_defaults)
+        button_row.addWidget(self._confirm_reset_btn)
         button_row.addStretch()
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setFixedWidth(100)
@@ -3718,7 +3724,7 @@ class MainWindow(QMainWindow):
             self._set_icon_state(button, "normal")
 
     def _reset_refresh_button_state(self):
-        self._set_icon_state(self._refresh_button, "hover" if self._refresh_button.underMouse() else "normal")
+        self._set_icon_state(self._refresh_button, "normal")
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
@@ -3743,7 +3749,7 @@ class MainWindow(QMainWindow):
         self._set_icon_state(button, "hover" if button.underMouse() else "normal")
 
     def _sync_refresh_button_state(self):
-        self._set_icon_state(self._refresh_button, "hover" if self._refresh_button.underMouse() else "normal")
+        self._set_icon_state(self._refresh_button, "normal")
 
     def _set_icon_state(self, button: QPushButton, state: str):
         icon_type = self._icon_buttons.get(button)
