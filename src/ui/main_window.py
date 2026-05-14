@@ -3705,17 +3705,13 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
-            self._refresh_button: "refresh",
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
+        self._set_refresh_icon_normal()
         for button in self._icon_buttons:
             button.setText("")
-            if hasattr(button, "setPixmap"):
-                button.setFixedSize(26, 26)
-                button.setAlignment(Qt.AlignCenter)
-            else:
-                button.setIconSize(QSize(24, 24))
+            button.setIconSize(QSize(24, 24))
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
             button.installEventFilter(self)
@@ -3723,21 +3719,20 @@ class MainWindow(QMainWindow):
         for button in self._icon_buttons:
             self._set_icon_state(button, "normal")
 
-    def _reset_refresh_button_state(self):
-        self._set_icon_state(self._refresh_button, "normal")
+    def _set_refresh_icon_normal(self):
+        icon = self._build_custom_icon("refresh", self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR), 24)
+        if icon:
+            self._refresh_button.setPixmap(icon.pixmap(24, 24))
 
     def _refresh_icon_buttons(self):
+        self._set_refresh_icon_normal()
         for button in getattr(self, "_icon_buttons", {}):
             if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
                 self._set_icon_state(button, "pressed")
             else:
                 self._set_icon_state(button, "hover" if button.underMouse() else "normal")
         # Clean stylesheet for icon buttons
-        self._refresh_button.setStyleSheet(
-            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
-            "QPushButton:hover { background-color: transparent; border: none; }"
-            "QPushButton:pressed { background-color: transparent; border: none; }"
-        )
+        self._refresh_button.setStyleSheet("background-color: transparent; border: none; padding: 0px; margin: 0px;")
         self._settings_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
         )
@@ -3889,9 +3884,6 @@ class MainWindow(QMainWindow):
                 if obj is self._settings_button:
                     self._set_icon_state(obj, "pressed")
             elif event.type() == QEvent.MouseButtonRelease:
-                if obj is self._refresh_button:
-                    self._reset_refresh_button_state()
-                    return super().eventFilter(obj, event)
                 self._sync_icon_button_state(obj)
             elif event.type() == QEvent.Enter:
                 if obj is self._settings_button and getattr(self, "_settings_icon_latched", False):
