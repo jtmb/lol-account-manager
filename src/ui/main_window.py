@@ -49,6 +49,7 @@ from src import __version__ as APP_VERSION
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
+DDRAGON_VERSION = "14.24.1"
 DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#9ca3af"
 DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#9ca3af"
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
@@ -121,6 +122,7 @@ CHAMPION_SPLASH_OPTIONS = [
     ('Yorick', 'Yorick'), ('Yuumi', 'Yuumi'), ('Zac', 'Zac'), ('Zed', 'Zed'),
     ('Zeri', 'Zeri'), ('Ziggs', 'Ziggs'), ('Zilean', 'Zilean'), ('Zoe', 'Zoe'), ('Zyra', 'Zyra'),
 ]
+CHAMPION_NAME_BY_ID = {champ_id: name for name, champ_id in CHAMPION_SPLASH_OPTIONS}
 
 
 class AccountListBackgroundFrame(QFrame):
@@ -1309,6 +1311,7 @@ class SettingsDialog(QDialog):
     ]
 
     CHAMPION_SPLASH_OPTIONS = CHAMPION_SPLASH_OPTIONS
+    CHAMPION_SKIN_CACHE: dict[str, list[tuple[str, int]]] = {}
 
     CHAMPION_SPLASH_OPACITY_OPTIONS = [
         ("Off (0%)", 0),
@@ -1792,6 +1795,21 @@ class SettingsDialog(QDialog):
         splash_champion_row.addStretch()
         appearance_layout.addLayout(splash_champion_row)
 
+        splash_skin_row = QHBoxLayout()
+        splash_skin_row.addWidget(QLabel("Splash skin:"))
+        self.champion_splash_skin_combo = QComboBox()
+        self.champion_splash_skin_combo.setEditable(True)
+        self.champion_splash_skin_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.champion_splash_skin_combo.setToolTip(
+            "Choose a skin variant for the selected champion splash."
+        )
+        splash_skin_row.addWidget(self.champion_splash_skin_combo)
+        splash_skin_row.addStretch()
+        appearance_layout.addLayout(splash_skin_row)
+
+        self._refresh_champion_skin_options(initial=True)
+        self.champion_splash_combo.currentIndexChanged.connect(self._refresh_champion_skin_options)
+
         splash_opacity_row = QHBoxLayout()
         splash_opacity_row.addWidget(QLabel("Splash opacity:"))
         self.champion_splash_opacity_combo = QComboBox()
@@ -1807,9 +1825,11 @@ class SettingsDialog(QDialog):
         appearance_layout.addLayout(splash_opacity_row)
 
         self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_combo.setEnabled)
+        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_skin_combo.setEnabled)
         self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_opacity_combo.setEnabled)
         splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
         self.champion_splash_combo.setEnabled(splash_enabled)
+        self.champion_splash_skin_combo.setEnabled(splash_enabled and self.champion_splash_combo.currentData() != SPLASH_THEME_AUTO)
         self.champion_splash_opacity_combo.setEnabled(splash_enabled)
 
         gradient_intensity_row = QHBoxLayout()
@@ -2004,6 +2024,94 @@ class SettingsDialog(QDialog):
 
         self.setLayout(layout)
 
+    def _fetch_champion_skin_options(self, champion_id: str) -> list[tuple[str, int]]:
+        champ = str(champion_id or "").strip()
+        if not champ or champ == SPLASH_THEME_AUTO:
+            return [("Base (Default)", 0)]
+        cached = self.CHAMPION_SKIN_CACHE.get(champ)
+        if cached is not None:
+            return cached
+
+        options: list[tuple[str, int]] = [("Base (Default)", 0)]
+        try:
+            req = Request(
+                f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VERSION}/data/en_US/champion/{champ}.json",
+                headers={"User-Agent": "lol-account-manager"},
+            )
+            with urlopen(req, timeout=6) as resp:
+                payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            skins = (payload.get("data") or {}).get(champ, {}).get("skins") or []
+            parsed: list[tuple[str, int]] = []
+            for skin in skins:
+                num = int(skin.get("num", 0))
+                raw_name = str(skin.get("name") or "Default")
+                label = "Base (Default)" if num == 0 or raw_name.strip().lower() == "default" else raw_name.strip()
+                parsed.append((label, num))
+            if parsed:
+                options = parsed
+        except Exception:
+            logging.debug("Failed loading skin metadata for %s", champ, exc_info=True)
+
+        self.CHAMPION_SKIN_CACHE[champ] = options
+        return options
+
+    def _refresh_champion_skin_options(self, *_args, initial: bool = False):
+        champion_id = str(self.champion_splash_combo.currentData() or SPLASH_THEME_AUTO)
+        options = self._fetch_champion_skin_options(champion_id)
+
+        if initial:
+            target_skin = int(self._settings.get("champion_splash_skin", 0))
+        else:
+            current_data = self.champion_splash_skin_combo.currentData()
+            target_skin = int(current_data) if current_data is not None else 0
+
+        self.champion_splash_skin_combo.blockSignals(True)
+        self.champion_splash_skin_combo.clear()
+        for label, skin_num in options:
+            self.champion_splash_skin_combo.addItem(label, skin_num)
+        skin_index = self.champion_splash_skin_combo.findData(target_skin)
+        if skin_index < 0:
+            skin_index = self.champion_splash_skin_combo.findData(0)
+        self.champion_splash_skin_combo.setCurrentIndex(max(0, skin_index))
+        self.champion_splash_skin_combo.blockSignals(False)
+
+        skin_line_edit = self.champion_splash_skin_combo.lineEdit()
+        if skin_line_edit:
+            skin_line_edit.setPlaceholderText("Type skin name")
+            skin_line_edit.setClearButtonEnabled(True)
+
+        dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
+        if dark_mode:
+            popup_bg = "#151b2d"
+            popup_fg = "#e9efff"
+            popup_border = "#3f4b71"
+            popup_sel_bg = "#2d3d62"
+            popup_sel_fg = "#ffffff"
+        else:
+            popup_bg = "#ffffff"
+            popup_fg = "#273247"
+            popup_border = "#cfd6e6"
+            popup_sel_bg = "#e2e8f5"
+            popup_sel_fg = "#13233f"
+
+        skin_completer = QCompleter(self.champion_splash_skin_combo.model(), self)
+        skin_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        skin_completer.setCompletionMode(QCompleter.PopupCompletion)
+        try:
+            skin_completer.setFilterMode(Qt.MatchContains)
+        except Exception:
+            pass
+        self.champion_splash_skin_combo.setCompleter(skin_completer)
+        skin_completer.popup().setStyleSheet(
+            f"QListView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; padding: 1px; outline: none; }}"
+            f"QListView::item {{ padding: 4px 8px; min-height: 20px; border-radius: 6px; }}"
+            f"QListView::item:selected {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
+            f"QListView::item:hover {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
+        )
+
+        splash_enabled = bool(self.champion_splash_enabled_checkbox.isChecked())
+        self.champion_splash_skin_combo.setEnabled(splash_enabled and champion_id != SPLASH_THEME_AUTO)
+
     def get_values(self) -> dict:
         """Collect validated settings values."""
         window_size_mode = "custom" if self.window_size_combo.currentData() == self.CUSTOM_SIZE_VALUE else "static"
@@ -2017,6 +2125,16 @@ class SettingsDialog(QDialog):
                     break
         if champion_splash_value is None:
             champion_splash_value = SPLASH_THEME_AUTO
+
+        skin_typed = self.champion_splash_skin_combo.currentText().strip().casefold()
+        champion_splash_skin = self.champion_splash_skin_combo.currentData()
+        if skin_typed:
+            for label, skin_num in self._fetch_champion_skin_options(str(champion_splash_value)):
+                if skin_typed == label.casefold():
+                    champion_splash_skin = skin_num
+                    break
+        if champion_splash_skin is None:
+            champion_splash_skin = 0
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -2043,6 +2161,7 @@ class SettingsDialog(QDialog):
             "hover_highlight_color": str(self.hover_highlight_color_combo.currentData()),
             "champion_splash_enabled": self.champion_splash_enabled_checkbox.isChecked(),
             "champion_splash_champion": str(champion_splash_value),
+            "champion_splash_skin": int(champion_splash_skin),
             "champion_splash_opacity": int(self.champion_splash_opacity_combo.currentData()),
             "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
             "logged_in_border_width": int(self.logged_in_border_width_combo.currentData()),
@@ -2808,6 +2927,7 @@ class MainWindow(QMainWindow):
         self._champion_splash_champion: str = str(
             self._settings.get('champion_splash_champion', SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO
         )
+        self._champion_splash_skin: int = int(self._settings.get('champion_splash_skin', 0))
         self._champion_splash_opacity: int = int(self._settings.get('champion_splash_opacity', 70))
         self._champion_splash_edge_fade: int = LOCKED_CHAMPION_SPLASH_EDGE_FADE
         self._champion_splash_inner_fade: int = LOCKED_CHAMPION_SPLASH_INNER_FADE
@@ -3008,27 +3128,30 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
 
     @staticmethod
-    def _champion_splash_url(champion_id: str) -> str:
-        return f"https://ddragon.leagueoflegends.com/cdn/img/champion/splash/{champion_id}_0.jpg"
+    def _champion_splash_url(champion_id: str, skin_num: int = 0) -> str:
+        skin = max(0, int(skin_num))
+        return f"https://ddragon.leagueoflegends.com/cdn/img/champion/splash/{champion_id}_{skin}.jpg"
 
-    def _load_champion_splash_pixmap(self, champion_id: str) -> Optional[QPixmap]:
+    def _load_champion_splash_pixmap(self, champion_id: str, skin_num: int = 0) -> Optional[QPixmap]:
         champ = str(champion_id or "").strip()
         if not champ or champ == SPLASH_THEME_AUTO:
             return None
-        cached = self._champion_splash_pixmap_cache.get(champ)
+        skin = max(0, int(skin_num))
+        cache_key = f"{champ}:{skin}"
+        cached = self._champion_splash_pixmap_cache.get(cache_key)
         if cached is not None:
             return cached
         try:
-            req = Request(self._champion_splash_url(champ), headers={"User-Agent": "lol-account-manager"})
+            req = Request(self._champion_splash_url(champ, skin), headers={"User-Agent": "lol-account-manager"})
             with urlopen(req, timeout=6) as resp:
                 raw = resp.read()
             pix = QPixmap()
             if pix.loadFromData(raw):
-                self._champion_splash_pixmap_cache[champ] = pix
+                self._champion_splash_pixmap_cache[cache_key] = pix
                 return pix
         except Exception:
-            logging.debug("Failed loading champion splash for %s", champ, exc_info=True)
-        self._champion_splash_pixmap_cache[champ] = QPixmap()
+            logging.debug("Failed loading champion splash for %s skin %s", champ, skin, exc_info=True)
+        self._champion_splash_pixmap_cache[cache_key] = QPixmap()
         return None
 
     def _apply_account_list_background(self):
@@ -3037,7 +3160,7 @@ class MainWindow(QMainWindow):
         self.account_list_background.set_dark_mode(self._dark_mode)
         pixmap = None
         if self._champion_splash_enabled:
-            pixmap = self._load_champion_splash_pixmap(self._champion_splash_champion)
+            pixmap = self._load_champion_splash_pixmap(self._champion_splash_champion, self._champion_splash_skin)
         self.account_list_background.set_background(
             enabled=self._champion_splash_enabled and bool(pixmap and not pixmap.isNull()),
             pixmap=pixmap,
@@ -3248,6 +3371,7 @@ class MainWindow(QMainWindow):
         )
         self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
         self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
+        self._champion_splash_skin = int(values.get('champion_splash_skin', self._champion_splash_skin))
         self._champion_splash_opacity = int(values.get('champion_splash_opacity', self._champion_splash_opacity))
         self._champion_splash_edge_fade = LOCKED_CHAMPION_SPLASH_EDGE_FADE
         self._champion_splash_inner_fade = LOCKED_CHAMPION_SPLASH_INNER_FADE
