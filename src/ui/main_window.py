@@ -538,12 +538,12 @@ QTabBar::tab:hover:!selected {
 
 LIGHT_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
-    background-color: #e7e8ec;
-    color: #2e2d2a;
+    background-color: #f2f3f5;
+    color: #2e3338;
 }
 QListWidget {
-    background-color: #ededf0;
-    border: 1px solid #c4c6cf;
+    background-color: #ebedef;
+    border: 1px solid #c7ccd4;
     border-radius: 6px;
     padding: 0px;
 }
@@ -562,19 +562,19 @@ QListWidget::item:hover {
     border: none;
 }
 QScrollBar:vertical {
-    background: #dfdcd6;
+    background: #dfe1e7;
     width: 12px;
     margin: 2px;
-    border: 1px solid #c4beb4;
+    border: 1px solid #c7ccd4;
     border-radius: 6px;
 }
 QScrollBar::handle:vertical {
-    background: #9b9489;
+    background: #8b93a5;
     min-height: 26px;
     border-radius: 5px;
 }
 QScrollBar::handle:vertical:hover {
-    background: #847c72;
+    background: #6b73a0;
 }
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical {
@@ -586,19 +586,19 @@ QScrollBar::sub-page:vertical {
     background: transparent;
 }
 QScrollBar:horizontal {
-    background: #dfdcd6;
+    background: #dfe1e7;
     height: 12px;
     margin: 2px;
-    border: 1px solid #c4beb4;
+    border: 1px solid #c7ccd4;
     border-radius: 6px;
 }
 QScrollBar::handle:horizontal {
-    background: #9b9489;
+    background: #8b93a5;
     min-width: 26px;
     border-radius: 5px;
 }
 QScrollBar::handle:horizontal:hover {
-    background: #847c72;
+    background: #6b73a0;
 }
 QScrollBar::add-line:horizontal,
 QScrollBar::sub-line:horizontal {
@@ -610,27 +610,27 @@ QScrollBar::sub-page:horizontal {
     background: transparent;
 }
 QPushButton {
-    background-color: #d2d3db;
-    color: #2e2d2a;
-    border: 1px solid #c4c6cf;
+    background-color: #5865f2;
+    color: #ffffff;
+    border: none;
     border-radius: 5px;
     padding: 5px 10px;
 }
 QPushButton:hover {
-    background-color: #c8c9d1;
+    background-color: #4752c4;
 }
 QPushButton:pressed {
-    background-color: #bebfc8;
+    background-color: #3c45a5;
 }
 QPushButton:disabled {
-    background-color: #ececf0;
-    color: #9a9a9a;
-    border: 1px solid #d8d9e1;
+    background-color: #d0d3e0;
+    color: #8e91a0;
+    border: none;
 }
 QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
-    background-color: #fafafa;
-    color: #2e2d2a;
-    border: 1px solid #d0d0d6;
+    background-color: #ffffff;
+    color: #2e3338;
+    border: 1px solid #c7ccd4;
     border-radius: 4px;
     padding: 4px;
 }
@@ -641,41 +641,41 @@ QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
     width: 20px;
-    border-left: 1px solid #c4c6cf;
-    background-color: #d2d3db;
+    border-left: 1px solid #c7ccd4;
+    background-color: #e3e5e8;
     border-top-right-radius: 4px;
     border-bottom-right-radius: 4px;
 }
 QSpinBox::up-button, QSpinBox::down-button {
     subcontrol-origin: border;
-    background-color: #d2d3db;
-    border-left: 1px solid #c4c6cf;
+    background-color: #e3e5e8;
+    border-left: 1px solid #c7ccd4;
     width: 16px;
 }
 QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #c8c9d1;
+    background-color: #d0d3e0;
 }
 QComboBox QAbstractItemView {
-    background-color: #fafafa;
-    color: #2e2d2a;
-    selection-background-color: #e7e8ee;
+    background-color: #ffffff;
+    color: #2e3338;
+    selection-background-color: #e8eaf6;
 }
 QLabel {
-    color: #2e2d2a;
+    color: #2e3338;
 }
 QLineEdit::placeholder {
-    color: #7c756b;
+    color: #8e91a0;
 }
 QTabWidget::pane {
-    border: 1px solid #c7c1b6;
+    border: 1px solid #c7ccd4;
     border-radius: 8px;
     top: -1px;
-    background-color: #e7e8ec;
+    background-color: #f2f3f5;
 }
 QTabBar::tab {
-    background-color: #e7e8ee;
-    color: #4a4742;
-    border: 1px solid #d0d0d6;
+    background-color: #e8eaf2;
+    color: #4e5058;
+    border: 1px solid #c7ccd4;
     border-bottom: none;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
@@ -683,11 +683,11 @@ QTabBar::tab {
     margin-right: 4px;
 }
 QTabBar::tab:selected {
-    background-color: #e7e8ec;
-    color: #2e2d2a;
+    background-color: #f2f3f5;
+    color: #2e3338;
 }
 QTabBar::tab:hover:!selected {
-    background-color: #d2d3db;
+    background-color: #dde0f0;
 }
 """
 
@@ -3256,17 +3256,17 @@ class MainWindow(QMainWindow):
     def _theme_with_text_zoom(self, base: str, dark_mode: bool) -> str:
         """Merge base theme with text zoom scaling."""
         point_size = max(8, int(round(9 * self._text_zoom_percent / 100)))
-        cog_bg = "#313244" if dark_mode else "#d2d3db"
-        cog_fg = "#cdd6f4" if dark_mode else "#2e2d2a"
-        cog_border = "#45475a" if dark_mode else "#c4c6cf"
-        cog_hover = "#45475a" if dark_mode else "#c8c9d1"
-        cog_pressed = "#585b70" if dark_mode else "#bebfc8"
-        cog_focus = "#6c7086" if dark_mode else "#a8a8a8"
-        list_border = "#45475a" if dark_mode else "#c4c6cf"
-        search_fg = "#dbe4ff" if dark_mode else "#2e2d2a"
-        search_bg = "#171a2a" if dark_mode else "#f2f3f6"
-        search_border = "#3f4b71" if dark_mode else "#d0d0d6"
-        search_placeholder = "#a8b4d6" if dark_mode else "#7c756b"
+        cog_bg = "#313244" if dark_mode else "#5865f2"
+        cog_fg = "#cdd6f4" if dark_mode else "#ffffff"
+        cog_border = "#45475a" if dark_mode else "#4752c4"
+        cog_hover = "#45475a" if dark_mode else "#4752c4"
+        cog_pressed = "#585b70" if dark_mode else "#3c45a5"
+        cog_focus = "#6c7086" if dark_mode else "#8b9cf4"
+        list_border = "#45475a" if dark_mode else "#c7ccd4"
+        search_fg = "#dbe4ff" if dark_mode else "#2e3338"
+        search_bg = "#171a2a" if dark_mode else "#ffffff"
+        search_border = "#3f4b71" if dark_mode else "#c7ccd4"
+        search_placeholder = "#a8b4d6" if dark_mode else "#8e91a0"
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -3361,12 +3361,12 @@ class MainWindow(QMainWindow):
             combo_palette.setColor(QPalette.Text, QColor("#cdd6f4"))
             combo_palette.setColor(QPalette.ButtonText, QColor("#cdd6f4"))
         else:
-            search_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
-            search_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
-            search_palette.setColor(QPalette.PlaceholderText, QColor("#7c756b"))
-            combo_palette.setColor(QPalette.Base, QColor("#f2f3f6"))
-            combo_palette.setColor(QPalette.Text, QColor("#2e2d2a"))
-            combo_palette.setColor(QPalette.ButtonText, QColor("#2e2d2a"))
+            search_palette.setColor(QPalette.Base, QColor("#ffffff"))
+            search_palette.setColor(QPalette.Text, QColor("#2e3338"))
+            search_palette.setColor(QPalette.PlaceholderText, QColor("#8e91a0"))
+            combo_palette.setColor(QPalette.Base, QColor("#ffffff"))
+            combo_palette.setColor(QPalette.Text, QColor("#2e3338"))
+            combo_palette.setColor(QPalette.ButtonText, QColor("#2e3338"))
 
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
