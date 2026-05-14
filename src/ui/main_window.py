@@ -57,8 +57,8 @@ LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 DDRAGON_VERSION = "14.24.1"
-DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#32c46d"))
-DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#32c46d"))
+DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
@@ -1463,7 +1463,7 @@ class SettingsDialog(QDialog):
             "app_surface_color": "#11273d",
             "app_border_color": "#23405e",
             "app_text_color": "#d4e6ff",
-            "app_accent_color": "#22a3ff",
+            "app_accent_color": "#1a7fc8",
         }),
         ("Forest Dusk", {
             "app_bg_color": "#0f1a14",
@@ -1477,7 +1477,7 @@ class SettingsDialog(QDialog):
             "app_surface_color": "#2b2d31",
             "app_border_color": "#3f4147",
             "app_text_color": "#dbdee1",
-            "app_accent_color": "#5865f2",
+            "app_accent_color": "#4b57c8",
         }),
         ("Industrial Graphite", {
             "app_bg_color": "#0b0e14",
@@ -1499,20 +1499,6 @@ class SettingsDialog(QDialog):
             "app_border_color": "#443039",
             "app_text_color": "#f0d7db",
             "app_accent_color": "#e85d8a",
-        }),
-        ("Warm Sand", {
-            "app_bg_color": "#f6f1ea",
-            "app_surface_color": "#ffffff",
-            "app_border_color": "#d8cfc3",
-            "app_text_color": "#3a2f2a",
-            "app_accent_color": "#f5a623",
-        }),
-        ("Soft Lavender", {
-            "app_bg_color": "#f3f2fb",
-            "app_surface_color": "#ffffff",
-            "app_border_color": "#d5d2ea",
-            "app_text_color": "#2b2a3a",
-            "app_accent_color": "#8b5cf6",
         }),
         ("Skyline", {
             "app_bg_color": "#eef3fb",

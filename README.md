@@ -106,6 +106,20 @@ Application data is stored in:
 - `%APPDATA%\LoLAccountManager\master.key`
 - `%APPDATA%\LoLAccountManager\settings.json`
 
+## Color Defaults
+
+The app's default color definitions live in [app_config.json](app_config.json). Current defaults are:
+
+| Setting | Name | Value |
+| --- | --- | --- |
+| `logged_in_gradient_color` | Cool Gray | `#6b7280` |
+| `hover_highlight_color` | Theme auto | `__theme__` |
+| `app_bg_color` | Dark surface | `#1e1e2e` |
+| `app_surface_color` | Panel surface | `#181825` |
+| `app_border_color` | Border | `#313244` |
+| `app_text_color` | Text | `#cdd6f4` |
+| `app_accent_color` | Accent | `#313244` |
+
 ## Requirements
 
 - Windows

@@ -32,7 +32,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "auto_open_ingame_page": True,
         "tag_size": "medium",
         "tag_chip_style": "vibrant",
-        "logged_in_gradient_color": "#32c46d",
+        "logged_in_gradient_color": "#6b7280",
         "hover_highlight_color": "__theme__",
         "champion_splash_enabled": False,
         "champion_splash_champion": "__none__",
