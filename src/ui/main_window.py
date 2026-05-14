@@ -22,6 +22,7 @@ import tempfile
 import subprocess
 import shutil
 import zipfile
+import hashlib
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
@@ -3186,7 +3187,12 @@ QMenu#trayQuickMenu::separator {
 
         return None
 
-    def _find_executable_in_zip(self, zip_path: Path, extract_dir: Path) -> Optional[Path]:
+    def _find_executable_in_zip(
+        self,
+        zip_path: Path,
+        extract_dir: Path,
+        preferred_name: str = "",
+    ) -> Optional[Path]:
         """Extract zip and return best executable candidate for self-update."""
         with zipfile.ZipFile(zip_path) as zf:
             zf.extractall(extract_dir)
@@ -3207,9 +3213,25 @@ QMenu#trayQuickMenu::separator {
         if not candidates:
             return None
 
-        # Prefer shorter paths first (likely the primary app binary).
-        candidates.sort(key=lambda p: (len(p.parts), p.name.lower()))
+        preferred_lower = preferred_name.lower().strip()
+        # Prefer matching executable name, then shallower paths.
+        candidates.sort(
+            key=lambda p: (
+                0 if preferred_lower and p.name.lower() == preferred_lower else 1,
+                len(p.parts),
+                p.name.lower(),
+            )
+        )
         return candidates[0]
+
+    @staticmethod
+    def _file_sha256(path: Path) -> str:
+        """Compute SHA-256 checksum for update identity checks."""
+        digest = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def _stage_windows_binary_swap_and_restart(self, new_executable: Path):
         """Replace current .exe after exit, then restart app."""
@@ -3235,34 +3257,76 @@ QMenu#trayQuickMenu::separator {
         script_path.write_text(script, encoding="utf-8")
         subprocess.Popen(["cmd", "/c", str(script_path)])
 
+    def _stage_windows_directory_update_and_restart(self, source_dir: Path):
+        """Copy extracted onedir build over current app directory after exit."""
+        current_exe = Path(sys.executable).resolve()
+        current_dir = current_exe.parent
+        script_path = source_dir.parent / f"apply-update-{int(time.time())}.bat"
+
+        script = (
+            "@echo off\n"
+            "setlocal\n"
+            f"set \"SRC={source_dir}\"\n"
+            f"set \"DST={current_dir}\"\n"
+            f"set \"EXE={current_exe.name}\"\n"
+            "for /l %%i in (1,1,120) do (\n"
+            "  xcopy \"%SRC%\\*\" \"%DST%\\\" /E /I /Y >nul 2>nul\n"
+            "  if exist \"%DST%\\%EXE%\" goto launch\n"
+            "  ping -n 2 127.0.0.1 >nul\n"
+            ")\n"
+            "goto done\n"
+            ":launch\n"
+            "start \"\" \"%DST%\\%EXE%\"\n"
+            ":done\n"
+            "del \"%~f0\"\n"
+        )
+        script_path.write_text(script, encoding="utf-8")
+        subprocess.Popen(["cmd", "/c", str(script_path)])
+
     def _replace_binary_and_restart(self, downloaded_asset: Path, latest_tag: str):
         """Directly replace portable app binary and restart when possible."""
         is_frozen = bool(getattr(sys, "frozen", False))
         if not is_frozen:
             raise RuntimeError("Direct self-update is only available in the packaged app.")
 
+        current_exe = Path(sys.executable).resolve()
         candidate = downloaded_asset
+        extracted_root: Optional[Path] = None
         asset_name = downloaded_asset.name.lower()
         if asset_name.endswith(".zip"):
             extract_dir = downloaded_asset.parent / f"extract-{latest_tag.strip().lstrip('vV') or 'latest'}"
             if extract_dir.exists():
                 shutil.rmtree(extract_dir, ignore_errors=True)
             extract_dir.mkdir(parents=True, exist_ok=True)
-            candidate = self._find_executable_in_zip(downloaded_asset, extract_dir)
+            candidate = self._find_executable_in_zip(
+                downloaded_asset,
+                extract_dir,
+                preferred_name=current_exe.name,
+            )
             if not candidate:
                 raise RuntimeError("Downloaded zip does not contain an executable app binary.")
+            extracted_root = candidate.parent
+
+        if candidate.exists() and current_exe.exists():
+            if self._file_sha256(candidate) == self._file_sha256(current_exe):
+                raise RuntimeError(
+                    "Downloaded build is identical to your current app build. "
+                    "Upload a freshly built release asset for this version."
+                )
 
         if sys.platform.startswith("win"):
             if candidate.suffix.lower() != ".exe":
                 raise RuntimeError("Windows update asset must provide a .exe binary.")
-            self._stage_windows_binary_swap_and_restart(candidate)
+            if extracted_root is not None and extracted_root.exists():
+                self._stage_windows_directory_update_and_restart(extracted_root)
+            else:
+                self._stage_windows_binary_swap_and_restart(candidate)
             self._settings["last_seen_release_tag"] = latest_tag
             save_settings(self._settings)
             self._quitting_to_exit = True
             QApplication.quit()
             return
 
-        current_exe = Path(sys.executable).resolve()
         shutil.copy2(candidate, current_exe)
         os.chmod(str(current_exe), 0o755)
         self._settings["last_seen_release_tag"] = latest_tag
@@ -3357,10 +3421,10 @@ QMenu#trayQuickMenu::separator {
                 return
 
             self._download_and_install_update(chosen_asset, latest_tag)
-        except Exception:
+        except Exception as exc:
             logging.debug("Update check/install failed", exc_info=True)
             if force:
-                QMessageBox.warning(self, "Update", "Could not check or install update right now.")
+                QMessageBox.warning(self, "Update", f"Could not check or install update right now.\n\n{exc}")
 
     def _update_rank_refresh_timer(self):
         mode = str(self._rank_refresh_mode or "manual")
