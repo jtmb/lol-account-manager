@@ -1606,10 +1606,14 @@ class SettingsDialog(QDialog):
         value = self._theme_color_values.get(key, "")
         if swatch is None:
             return
-        palette = swatch.palette()
-        palette.setColor(QPalette.Background, QColor(value))
-        swatch.setPalette(palette)
-        swatch.setAutoFillBackground(True)
+        object_name = f"theme_swatch_{key}"
+        swatch.setStyleSheet(
+            f"#{object_name} {{"
+            f"background-color: {value};"
+            "border: 1px solid #666;"
+            "border-radius: 4px;"
+            "}"
+        )
         swatch.setToolTip(value)
 
     def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
@@ -2257,6 +2261,7 @@ class SettingsDialog(QDialog):
             swatch = ClickableIconLabel("")
             swatch.setFixedSize(48, 22)
             swatch.setCursor(Qt.PointingHandCursor)
+            swatch.setObjectName(f"theme_swatch_{key}")
             swatch.clicked.connect(lambda k=key: self._pick_theme_color(k))
             self._theme_color_swatches[key] = swatch
             self._theme_color_values[key] = self._sanitize_theme_color(
