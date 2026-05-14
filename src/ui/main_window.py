@@ -2777,8 +2777,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(18)
-                self._shadow.setColor(QColor(30, 60, 110, 110))
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
             elif self._logged_in:
                 self.setStyleSheet(
                     "#accountListItem {"
@@ -2791,8 +2791,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(14)
-                self._shadow.setColor(QColor(30, 60, 110, 90))
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
             elif active:
                 hover_bg = self._rgba(self._hover_highlight_color, 170)
                 hover_border = self._rgba(self._hover_highlight_color, 118)
@@ -2840,8 +2840,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(10)
-            self._shadow.setColor(QColor(15, 23, 42, 30))
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
         elif self._logged_in:
             self.setStyleSheet(
                 "#accountListItem {"
@@ -2854,8 +2854,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(8)
-            self._shadow.setColor(QColor(15, 23, 42, 20))
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
         elif active:
             hover_bg = self._rgba(self._hover_highlight_color, 145)
             hover_border = self._rgba(self._hover_highlight_color, 128)
