@@ -2369,7 +2369,6 @@ class AccountListItem(QFrame):
         self._hovered = False
         self._logged_in = False
         self._dark_mode = True
-        self._is_first_row = False
         self._tag_chip_labels: list[QLabel] = []
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setOffset(0, 3)
@@ -2731,11 +2730,6 @@ class AccountListItem(QFrame):
         self._hover_highlight_color = str(color or self._hover_highlight_color)
         self._update_visual_state()
 
-    def set_is_first_row(self, is_first: bool):
-        """Mark this row as the first row (square top corners to align with container)."""
-        self._is_first_row = bool(is_first)
-        self._update_visual_state()
-
     def set_logged_in(self, logged_in: bool):
         self._logged_in = logged_in
         self.logged_in_label.setVisible(logged_in)
@@ -2758,8 +2752,6 @@ class AccountListItem(QFrame):
 
     def _update_visual_state(self):
         active = self._selected or self._hovered
-        radius = "0px 0px 10px 10px" if self._is_first_row else "10px"
-
         if self._dark_mode:
             t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
             left_active = self._rgba(self._logged_in_gradient_color, int(26 + 74 * t))
@@ -2780,7 +2772,7 @@ class AccountListItem(QFrame):
                     f"stop:0.18 {mid_active},"
                     "stop:1 rgba(37, 41, 61, 170));"
                     "border: 1px solid transparent;"
-                    f"border-radius: {radius};"
+                    "border-radius: 10px;"
                     "}"
                 )
                 self._shadow.setBlurRadius(0)
@@ -2793,7 +2785,7 @@ class AccountListItem(QFrame):
                     f"stop:0.16 {mid_idle},"
                     "stop:1 rgba(25, 30, 47, 95));"
                     "border: 1px solid transparent;"
-                    f"border-radius: {radius};"
+                    "border-radius: 10px;"
                     "}"
                 )
                 self._shadow.setBlurRadius(0)
@@ -2805,7 +2797,7 @@ class AccountListItem(QFrame):
                     "#accountListItem {"
                     f"background-color: {hover_bg};"
                     f"border: 1px solid {hover_border};"
-                    f"border-radius: {radius};"
+                    "border-radius: 10px;"
                     "}"
                 )
                 self._shadow.setBlurRadius(22)
@@ -2841,7 +2833,7 @@ class AccountListItem(QFrame):
                 f"stop:0.30 {mid_active},"
                 "stop:1 rgba(236, 231, 223, 95));"
                 "border: 1px solid transparent;"
-                f"border-radius: {radius};"
+                "border-radius: 10px;"
                 "}"
             )
             self._shadow.setBlurRadius(0)
@@ -2854,7 +2846,7 @@ class AccountListItem(QFrame):
                 f"stop:0.30 {mid_idle},"
                 "stop:1 rgba(223, 216, 205, 78));"
                 "border: 1px solid transparent;"
-                f"border-radius: {radius};"
+                "border-radius: 10px;"
                 "}"
             )
             self._shadow.setBlurRadius(0)
@@ -2866,7 +2858,7 @@ class AccountListItem(QFrame):
                 "#accountListItem {"
                 f"background-color: {hover_bg};"
                 f"border: 1px solid {hover_border};"
-                f"border-radius: {radius};"
+                "border-radius: 10px;"
                 "}"
             )
             self._shadow.setBlurRadius(14)
@@ -4388,7 +4380,7 @@ QMenu#trayQuickMenu::separator {
             self.edit_btn.setEnabled(False)
             self.delete_btn.setEnabled(False)
         else:
-            for index, account in enumerate(filtered_accounts):
+            for account in filtered_accounts:
                 row_height = self._account_row_height()
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
@@ -4412,8 +4404,6 @@ QMenu#trayQuickMenu::separator {
                     rank_icon_size=self._rank_icon_size,
                     rank_text_brightness=self._rank_text_brightness,
                 )
-                if index == 0:
-                    widget.set_is_first_row(True)
                 widget.setFixedHeight(row_height)
                 self.account_list.setItemWidget(item, widget)
 
