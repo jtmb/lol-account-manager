@@ -4339,9 +4339,10 @@ QMenu#trayQuickMenu::separator {
             self.delete_btn.setEnabled(False)
         else:
             for account in filtered_accounts:
+                row_height = self._account_row_height()
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, account.username)
-                item.setSizeHint(QSize(0, self._account_row_height()))
+                item.setSizeHint(QSize(0, row_height))
                 self.account_list.addItem(item)
                 
                 # Create custom widget
@@ -4361,6 +4362,7 @@ QMenu#trayQuickMenu::separator {
                     rank_icon_size=self._rank_icon_size,
                     rank_text_brightness=self._rank_text_brightness,
                 )
+                widget.setFixedHeight(row_height)
                 self.account_list.setItemWidget(item, widget)
 
             self.update_account_item_states()
