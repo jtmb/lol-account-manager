@@ -2996,68 +2996,6 @@ class AccountListItem(QFrame):
 
     def _update_visual_state(self):
         active = self._selected or self._hovered
-        if self._dark_mode:
-            t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
-            left_active = self._rgba(self._logged_in_gradient_color, int(26 + 74 * t))
-            mid_active = self._rgba(self._logged_in_gradient_color, int(14 + 50 * t))
-            left_idle = self._rgba(self._logged_in_gradient_color, int(18 + 56 * t))
-            mid_idle = self._rgba(self._logged_in_gradient_color, int(10 + 40 * t))
-            border_scale = self._logged_in_border_opacity / 100.0
-            border_active = self._rgba(self._logged_in_gradient_color, int((90 + 90 * t) * border_scale))
-            border_idle = self._rgba(self._logged_in_gradient_color, int((70 + 70 * t) * border_scale))
-            border_width = max(1, self._logged_in_border_width - 2)
-            left_border_width = self._logged_in_border_width
-
-            if self._logged_in and active:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_active},"
-                    f"stop:0.18 {mid_active},"
-                    "stop:1 rgba(37, 41, 61, 170));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
-            elif self._logged_in:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_idle},"
-                    f"stop:0.16 {mid_idle},"
-                    "stop:1 rgba(25, 30, 47, 95));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
-            elif active:
-                hover_bg = self._rgba(self._hover_highlight_color, 170)
-                hover_border = self._rgba(self._hover_highlight_color, 118)
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    f"background-color: {hover_bg};"
-                    f"border: 1px solid {hover_border};"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                self._shadow.setBlurRadius(22)
-                self._shadow.setColor(QColor(0, 0, 0, 120))
-            else:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background-color: transparent;"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
-            return
-
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         left_active = self._rgba(self._logged_in_gradient_color, int(36 + 72 * t))
         mid_active = self._rgba(self._logged_in_gradient_color, int(24 + 56 * t))
