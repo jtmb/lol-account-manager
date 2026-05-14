@@ -163,7 +163,11 @@ class AccountListBackgroundFrame(QFrame):
         if self._enabled and self._pixmap and not self._pixmap.isNull():
             target = rect.adjusted(1, 1, -1, -1)
             scaled = self._pixmap.scaled(target.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            x = max(0, (scaled.width() - target.width()) // 2)
+            if self._dark_mode:
+                x = max(0, (scaled.width() - target.width()) // 2)
+            else:
+                # In light mode, keep visual focus to the right so account text remains cleaner on the left.
+                x = max(0, int((scaled.width() - target.width()) * 0.68))
             y = max(0, (scaled.height() - target.height()) // 2)
             crop = scaled.copy(x, y, target.width(), target.height())
             effective_opacity = self._opacity
@@ -174,11 +178,19 @@ class AccountListBackgroundFrame(QFrame):
             painter.drawPixmap(target.topLeft(), crop)
             painter.setOpacity(1.0)
 
-            edge_alpha_base = 230 if self._dark_mode else 170
+            if not self._dark_mode:
+                # Add a subtle veil across the left content area for text readability.
+                readability = QLinearGradient(rect.left(), 0, rect.left() + int(rect.width() * 0.68), 0)
+                readability.setColorAt(0.0, QColor(236, 240, 246, 125))
+                readability.setColorAt(0.55, QColor(236, 240, 246, 70))
+                readability.setColorAt(1.0, QColor(236, 240, 246, 10))
+                painter.fillRect(rect, readability)
+
+            edge_alpha_base = 230 if self._dark_mode else 135
             edge_alpha = int(edge_alpha_base * (self._edge_fade / 100.0))
             if edge_alpha > 0:
                 edge_color = base_color if self._dark_mode else QColor("#c8ccd6")
-                fade_ratio = 0.20 if self._dark_mode else 0.28
+                fade_ratio = 0.20 if self._dark_mode else 0.22
                 fade_width = max(24, int(min(rect.width(), rect.height()) * fade_ratio))
                 left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
                 left_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
@@ -200,7 +212,7 @@ class AccountListBackgroundFrame(QFrame):
                 bottom_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.bottom() - fade_width, rect.width(), fade_width, bottom_grad)
 
-            inner_alpha_base = 120 if self._dark_mode else 170
+            inner_alpha_base = 120 if self._dark_mode else 110
             inner_alpha = int(inner_alpha_base * (self._inner_fade / 100.0))
             if inner_alpha > 0:
                 radial = QRadialGradient(rect.center(), max(rect.width(), rect.height()) * 0.45)
