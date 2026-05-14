@@ -53,6 +53,7 @@ DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#4f7cff"
 DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#d2d3db"
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
+HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -63,6 +64,14 @@ def _default_logged_in_highlight(dark_mode: bool) -> str:
 def _default_row_hover_highlight(dark_mode: bool) -> str:
     """Return theme-appropriate default hover/selection row highlight color."""
     return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK if dark_mode else DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT
+
+
+def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
+    """Resolve effective hover color from saved setting or theme auto mode."""
+    value = str(setting_value or HOVER_HIGHLIGHT_THEME_AUTO).strip()
+    if value == HOVER_HIGHLIGHT_THEME_AUTO:
+        return _default_row_hover_highlight(dark_mode)
+    return value
 
 
 def _escape_html(text: str) -> str:
@@ -1135,6 +1144,7 @@ class SettingsDialog(QDialog):
     ]
 
     HOVER_HIGHLIGHT_COLOR_OPTIONS = [
+        ("Global Theme (Auto)", HOVER_HIGHLIGHT_THEME_AUTO),
         ("Theme Gray (Button Hover)", "#c8c9d1"),
         ("Charcoal (Dark Hover)", "#45475a"),
         ("Soft Silver", "#c6ccd8"),
@@ -1532,13 +1542,15 @@ class SettingsDialog(QDialog):
         for label, value in self.HOVER_HIGHLIGHT_COLOR_OPTIONS:
             self.hover_highlight_color_combo.addItem(label, value)
         self.hover_highlight_color_combo.setToolTip(
-            "Choose the color used when hovering or selecting an account row."
+            "Global Theme follows light/dark mode automatically. Pick a color here to override it."
         )
-        default_hover_color = _default_row_hover_highlight(parent_dark_mode)
+        default_hover_color = HOVER_HIGHLIGHT_THEME_AUTO
         current_hover_color = str(
             self._settings.get("hover_highlight_color", default_hover_color) or default_hover_color
         )
         hover_color_index = self.hover_highlight_color_combo.findData(current_hover_color)
+        if hover_color_index < 0:
+            hover_color_index = self.hover_highlight_color_combo.findData(HOVER_HIGHLIGHT_THEME_AUTO)
         self.hover_highlight_color_combo.setCurrentIndex(max(0, hover_color_index))
         hover_color_row.addWidget(self.hover_highlight_color_combo)
         hover_color_row.addStretch()
@@ -2508,9 +2520,12 @@ class MainWindow(QMainWindow):
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
         )
-        default_hover_color = _default_row_hover_highlight(self._dark_mode)
-        self._hover_highlight_color: str = str(
-            self._settings.get('hover_highlight_color', default_hover_color) or default_hover_color
+        self._hover_highlight_color_setting: str = str(
+            self._settings.get('hover_highlight_color', HOVER_HIGHLIGHT_THEME_AUTO) or HOVER_HIGHLIGHT_THEME_AUTO
+        )
+        self._hover_highlight_color: str = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
         )
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
@@ -2724,8 +2739,10 @@ class MainWindow(QMainWindow):
         self._dark_mode = not self._dark_mode
         if 'logged_in_gradient_color' not in self._settings:
             self._logged_in_gradient_color = _default_logged_in_highlight(self._dark_mode)
-        if 'hover_highlight_color' not in self._settings:
-            self._hover_highlight_color = _default_row_hover_highlight(self._dark_mode)
+        self._hover_highlight_color = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
+        )
         self._apply_theme()
         self._settings['dark_mode'] = self._dark_mode
         save_settings(self._settings)
@@ -2870,7 +2887,13 @@ class MainWindow(QMainWindow):
         self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
         self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
-        self._hover_highlight_color = str(values.get('hover_highlight_color', self._hover_highlight_color))
+        self._hover_highlight_color_setting = str(
+            values.get('hover_highlight_color', self._hover_highlight_color_setting)
+        )
+        self._hover_highlight_color = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
+        )
         self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
         self._logged_in_border_width = int(values.get('logged_in_border_width', self._logged_in_border_width))
         self._logged_in_border_opacity = int(values.get('logged_in_border_opacity', self._logged_in_border_opacity))
