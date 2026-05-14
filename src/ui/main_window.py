@@ -2672,7 +2672,15 @@ class SettingsDialog(QDialog):
     def apply_settings(self):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
-            self._apply_callback(self.get_values())
+            # Freeze the dialog so the parent setStyleSheet() cascade doesn't flash it
+            self.setUpdatesEnabled(False)
+            try:
+                self._apply_callback(self.get_values())
+                # Absorb the new parent stylesheet so we repaint once with final colors
+                if self.parent() and self.parent().styleSheet():
+                    self.setStyleSheet(self.parent().styleSheet())
+            finally:
+                self.setUpdatesEnabled(True)
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -4232,6 +4240,8 @@ class MainWindow(QMainWindow):
             apply_callback=self._apply_settings_values,
             preview_callback=_preview_callback,
         )
+        # Give the dialog an explicit stylesheet so parent cascade doesn't flash it on open
+        dialog.setStyleSheet(self.styleSheet())
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
         try:
@@ -4241,7 +4251,13 @@ class MainWindow(QMainWindow):
                 return
 
             values = dialog.get_values()
-            self._apply_settings_values(values, persist=True)
+            # Freeze main window so the post-close apply is a single paint, not a flash
+            self.setUpdatesEnabled(False)
+            try:
+                self._apply_settings_values(values, persist=True)
+            finally:
+                self.setUpdatesEnabled(True)
+                self.update()
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
