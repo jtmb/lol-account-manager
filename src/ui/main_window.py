@@ -3159,7 +3159,7 @@ class MainWindow(QMainWindow):
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
         self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
-        default_gradient_color = _default_logged_in_highlight(self._dark_mode)
+        default_gradient_color = _default_logged_in_highlight()
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
         )
