@@ -1562,49 +1562,16 @@ class SettingsDialog(QDialog):
         appearance_layout.addWidget(self.text_zoom_combo)
 
         appearance_layout.addWidget(QLabel("Application colors:"))
-        self.app_color_combos: dict[str, QComboBox] = {}
 
         theme_row = QHBoxLayout()
         theme_row.addWidget(QLabel("Theme preset:"))
         self.app_theme_combo = QComboBox()
         for label, preset in self.APP_COLOR_PRESETS:
             self.app_theme_combo.addItem(label, preset)
-        self.app_theme_combo.setCurrentIndex(1)
+        self.app_theme_combo.setCurrentIndex(self._find_app_theme_preset_index())
         theme_row.addWidget(self.app_theme_combo)
         theme_row.addStretch()
         appearance_layout.addLayout(theme_row)
-
-        def add_color_row(label: str, setting_key: str):
-            row = QHBoxLayout()
-            row.addWidget(QLabel(label))
-            combo = QComboBox()
-            for option_label, option_value in self.APP_COLOR_OPTIONS.get(setting_key, []):
-                combo.addItem(option_label, option_value)
-            current = str(self._settings.get(setting_key, "") or "").strip()
-            default_color = {
-                "app_bg_color": DEFAULT_APP_BG_COLOR,
-                "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
-                "app_border_color": DEFAULT_APP_BORDER_COLOR,
-                "app_text_color": DEFAULT_APP_TEXT_COLOR,
-                "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
-            }.get(setting_key, DEFAULT_APP_BG_COLOR)
-            if not current:
-                current = default_color
-            idx = combo.findData(current)
-            combo.setCurrentIndex(max(0, idx))
-            combo.currentIndexChanged.connect(self._mark_app_theme_custom)
-            row.addWidget(combo)
-            row.addStretch()
-            appearance_layout.addLayout(row)
-            self.app_color_combos[setting_key] = combo
-
-        add_color_row("Background", "app_bg_color")
-        add_color_row("Surface", "app_surface_color")
-        add_color_row("Border", "app_border_color")
-        add_color_row("Text", "app_text_color")
-        add_color_row("Accent", "app_accent_color")
-        self.app_theme_combo.currentIndexChanged.connect(self._apply_selected_app_theme)
-        self._sync_app_theme_preset()
 
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
@@ -2294,11 +2261,11 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
-            "app_bg_color": str(self.app_color_combos.get("app_bg_color").currentData() or DEFAULT_APP_BG_COLOR),
-            "app_surface_color": str(self.app_color_combos.get("app_surface_color").currentData() or DEFAULT_APP_SURFACE_COLOR),
-            "app_border_color": str(self.app_color_combos.get("app_border_color").currentData() or DEFAULT_APP_BORDER_COLOR),
-            "app_text_color": str(self.app_color_combos.get("app_text_color").currentData() or DEFAULT_APP_TEXT_COLOR),
-            "app_accent_color": str(self.app_color_combos.get("app_accent_color").currentData() or DEFAULT_APP_ACCENT_COLOR),
+            "app_bg_color": str(self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
         }
 
     def apply_settings(self):
@@ -2306,49 +2273,25 @@ class SettingsDialog(QDialog):
         if self._apply_callback:
             self._apply_callback(self.get_values())
 
-    def _mark_app_theme_custom(self):
+    def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
-            return
-        current = self.app_theme_combo.currentIndex()
-        if current != 0:
-            self.app_theme_combo.blockSignals(True)
-            self.app_theme_combo.setCurrentIndex(0)
-            self.app_theme_combo.blockSignals(False)
-
-    def _apply_selected_app_theme(self):
-        if not hasattr(self, "app_theme_combo"):
-            return
+            return {}
         preset = self.app_theme_combo.currentData() or {}
-        if not preset:
-            return
-        for key, value in preset.items():
-            combo = self.app_color_combos.get(key)
-            if not combo:
-                continue
-            idx = combo.findData(value)
-            if idx >= 0:
-                combo.blockSignals(True)
-                combo.setCurrentIndex(idx)
-                combo.blockSignals(False)
+        return preset if isinstance(preset, dict) else {}
 
-    def _sync_app_theme_preset(self):
-        if not hasattr(self, "app_theme_combo"):
-            return
-        current_values = {
-            key: str(combo.currentData())
-            for key, combo in self.app_color_combos.items()
+    def _find_app_theme_preset_index(self) -> int:
+        current = {
+            "app_bg_color": str(self._settings.get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(self._settings.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(self._settings.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(self._settings.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(self._settings.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
         }
-        matched_index = 0
-        for index in range(self.app_theme_combo.count()):
-            preset = self.app_theme_combo.itemData(index) or {}
-            if not preset:
-                continue
-            if all(current_values.get(k) == v for k, v in preset.items()):
-                matched_index = index
-                break
-        self.app_theme_combo.blockSignals(True)
-        self.app_theme_combo.setCurrentIndex(matched_index)
-        self.app_theme_combo.blockSignals(False)
+        for index in range(len(self.APP_COLOR_PRESETS)):
+            preset = self.APP_COLOR_PRESETS[index][1]
+            if all(current.get(k) == v for k, v in preset.items()):
+                return index
+        return 0
 
     def eventFilter(self, obj, event):
         if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
