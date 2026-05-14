@@ -2820,6 +2820,9 @@ class MainWindow(QMainWindow):
 
         tray_menu = QMenu(self)
         tray_menu.setObjectName("trayQuickMenu")
+        tray_menu.setWindowFlags(tray_menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        tray_menu.setAttribute(Qt.WA_TranslucentBackground, True)
+        tray_menu.setContentsMargins(0, 0, 0, 0)
         tray_menu.setStyleSheet(self._tray_menu_stylesheet())
         show_action = QAction("Show", self)
         show_action.triggered.connect(self._show_from_tray)
@@ -2857,69 +2860,71 @@ class MainWindow(QMainWindow):
         if self._dark_mode:
             return """
 QMenu#trayQuickMenu {
-    background-color: #131a2b;
-    border: 1px solid #2e3a5b;
-    border-radius: 9px;
+    background-color: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 11px;
     padding: 4px;
-    font-size: 10pt;
+    font-size: 9pt;
+    margin: 0px;
 }
 QMenu#trayQuickMenu::item {
-    color: #d9e2ff;
+    color: #cdd6f4;
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
     margin: 1px 0px;
-    padding: 6px 10px;
-    min-height: 18px;
+    padding: 5px 9px;
+    min-height: 16px;
 }
 QMenu#trayQuickMenu::item:selected {
-    background-color: #263f82;
-    border: 1px solid #3f65c6;
+    background-color: #313244;
+    border: 1px solid #585b70;
     color: #ffffff;
 }
 QMenu#trayQuickMenu::item:disabled {
     background-color: transparent;
     border: 1px solid transparent;
-    color: #7d89b2;
+    color: #7f849c;
 }
 QMenu#trayQuickMenu::separator {
     height: 1px;
-    background: #33405f;
-    margin: 5px 8px;
+    background: #45475a;
+    margin: 5px 7px;
 }
 """
 
         return """
 QMenu#trayQuickMenu {
-    background-color: #f6f9ff;
-    border: 1px solid #c8d3ee;
-    border-radius: 9px;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 11px;
     padding: 4px;
-    font-size: 10pt;
+    font-size: 9pt;
+    margin: 0px;
 }
 QMenu#trayQuickMenu::item {
-    color: #21314f;
+    color: #111827;
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
     margin: 1px 0px;
-    padding: 6px 10px;
-    min-height: 18px;
+    padding: 5px 9px;
+    min-height: 16px;
 }
 QMenu#trayQuickMenu::item:selected {
-    background-color: #d6e5ff;
-    border: 1px solid #8baaf0;
-    color: #102349;
+    background-color: #e5e7eb;
+    border: 1px solid #d1d5db;
+    color: #111827;
 }
 QMenu#trayQuickMenu::item:disabled {
     background-color: transparent;
     border: 1px solid transparent;
-    color: #7b8aaa;
+    color: #9ca3af;
 }
 QMenu#trayQuickMenu::separator {
     height: 1px;
-    background: #d1daec;
-    margin: 5px 8px;
+    background: #e5e7eb;
+    margin: 5px 7px;
 }
 """
 
