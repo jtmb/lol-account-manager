@@ -3178,8 +3178,9 @@ class MainWindow(QMainWindow):
             painter.setRenderHint(QPainter.Antialiasing, True)
             painter.setBrush(Qt.color1)
             painter.setPen(Qt.NoPen)
-            rect = QRectF(0.5, 0.5, w - 1.0, h - 1.0)
-            painter.drawRoundedRect(rect, 10.0, 10.0)
+            inset = 1.0
+            rect = QRectF(0.5 + inset, 0.5 + inset, w - (2 * inset) - 1.0, h - (2 * inset) - 1.0)
+            painter.drawRoundedRect(rect, 9.0, 9.0)
             painter.end()
 
             # Apply as mask to background frame itself (not viewport)
