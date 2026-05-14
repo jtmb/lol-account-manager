@@ -3705,7 +3705,11 @@ class MainWindow(QMainWindow):
         self._settings_icon_latched = False
         for button in self._icon_buttons:
             button.setText("")
-            button.setIconSize(QSize(24, 24))
+            if hasattr(button, "setPixmap"):
+                button.setFixedSize(26, 26)
+                button.setAlignment(Qt.AlignCenter)
+            else:
+                button.setIconSize(QSize(24, 24))
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
             button.installEventFilter(self)
