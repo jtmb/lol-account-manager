@@ -49,6 +49,13 @@ from src import __version__ as APP_VERSION
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
+DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = "#4f7cff"
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#d2d3db"
+
+
+def _default_logged_in_highlight(dark_mode: bool) -> str:
+    """Return theme-appropriate default logged-in highlight color."""
+    return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK if dark_mode else DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT
 
 
 def _escape_html(text: str) -> str:
@@ -1108,6 +1115,10 @@ class SettingsDialog(QDialog):
     ]
 
     LOGGED_IN_COLOR_OPTIONS = [
+        ("Theme Gray (Light Button)", "#d2d3db"),
+        ("Soft Silver", "#c6ccd8"),
+        ("Cool Gray", "#9ca3af"),
+        ("Slate", "#6b7280"),
         ("Blue", "#4f7cff"),
         ("Cyan", "#27b5f7"),
         ("Green", "#32c46d"),
@@ -1476,14 +1487,18 @@ class SettingsDialog(QDialog):
         self.tag_style_combo.setEnabled(self.show_tags_checkbox.isChecked())
 
         gradient_color_row = QHBoxLayout()
-        gradient_color_row.addWidget(QLabel("Logged-in gradient color:"))
+        gradient_color_row.addWidget(QLabel("Logged-in highlight color:"))
         self.logged_in_gradient_color_combo = QComboBox()
         for label, value in self.LOGGED_IN_COLOR_OPTIONS:
             self.logged_in_gradient_color_combo.addItem(label, value)
         self.logged_in_gradient_color_combo.setToolTip(
-            "Choose the accent color used for the logged-in row highlight."
+            "Choose the color used for the logged-in row highlight."
         )
-        current_gradient_color = str(self._settings.get("logged_in_gradient_color", "#27b5f7"))
+        parent_dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
+        default_gradient_color = _default_logged_in_highlight(parent_dark_mode)
+        current_gradient_color = str(
+            self._settings.get("logged_in_gradient_color", default_gradient_color) or default_gradient_color
+        )
         gradient_color_index = self.logged_in_gradient_color_combo.findData(current_gradient_color)
         self.logged_in_gradient_color_combo.setCurrentIndex(max(0, gradient_color_index))
         gradient_color_row.addWidget(self.logged_in_gradient_color_combo)
@@ -1810,7 +1825,7 @@ class AccountListItem(QFrame):
         show_rank_images: bool = True,
         show_tags: bool = True,
         tag_size: str = "small",
-        logged_in_gradient_color: str = "#27b5f7",
+        logged_in_gradient_color: str = DEFAULT_LOGGED_IN_HIGHLIGHT_DARK,
         logged_in_gradient_intensity: int = 20,
         logged_in_border_width: int = 2,
         logged_in_border_opacity: int = 60,
@@ -1825,7 +1840,7 @@ class AccountListItem(QFrame):
         self._show_rank_images = show_rank_images
         self._show_tags = show_tags
         self._tag_size = tag_size
-        self._logged_in_gradient_color = logged_in_gradient_color or "#4f7cff"
+        self._logged_in_gradient_color = logged_in_gradient_color or DEFAULT_LOGGED_IN_HIGHLIGHT_DARK
         self._logged_in_gradient_intensity = max(5, min(100, int(logged_in_gradient_intensity)))
         self._logged_in_border_width = max(2, min(5, int(logged_in_border_width)))
         self._logged_in_border_opacity = max(60, min(120, int(logged_in_border_opacity)))
@@ -2443,7 +2458,10 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
-        self._logged_in_gradient_color: str = str(self._settings.get('logged_in_gradient_color', '#27b5f7'))
+        default_gradient_color = _default_logged_in_highlight(self._dark_mode)
+        self._logged_in_gradient_color: str = str(
+            self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
+        )
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
         self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 60))
@@ -2654,6 +2672,8 @@ class MainWindow(QMainWindow):
     def toggle_theme(self):
         """Toggle between dark and light mode."""
         self._dark_mode = not self._dark_mode
+        if 'logged_in_gradient_color' not in self._settings:
+            self._logged_in_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._apply_theme()
         self._settings['dark_mode'] = self._dark_mode
         save_settings(self._settings)
