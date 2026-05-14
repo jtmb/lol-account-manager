@@ -1440,7 +1440,7 @@ class SettingsDialog(QDialog):
             "app_surface_color": "#171a26",
             "app_border_color": "#2a3142",
             "app_text_color": "#d7dbea",
-            "app_accent_color": "#4f7cff",
+            "app_accent_color": "#8b5cf6",
         }),
         ("Deep Ocean", {
             "app_bg_color": "#0b1b2b",
@@ -1483,13 +1483,6 @@ class SettingsDialog(QDialog):
             "app_border_color": "#443039",
             "app_text_color": "#f0d7db",
             "app_accent_color": "#e85d8a",
-        }),
-        ("Cloud Mist", {
-            "app_bg_color": "#f3f4f6",
-            "app_surface_color": "#ffffff",
-            "app_border_color": "#d1d5db",
-            "app_text_color": "#1f2937",
-            "app_accent_color": "#4f7cff",
         }),
         ("Warm Sand", {
             "app_bg_color": "#f6f1ea",
@@ -3171,9 +3164,9 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._settings_button = QPushButton("⚙")
+        self._settings_button = QPushButton("Settings")
         self._settings_button.setObjectName("settingsCogButton")
-        self._settings_button.setFixedSize(30, 30)
+        self._settings_button.setFixedSize(96, 30)
         self._settings_button.setAutoDefault(False)
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
@@ -3398,11 +3391,11 @@ class MainWindow(QMainWindow):
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         accent_text = self._contrast_text_color(app_accent)
         placeholder = self._placeholder_color(app_text)
-        cog_bg = app_accent
-        cog_fg = accent_text
+        cog_bg = app_surface
+        cog_fg = app_text
         cog_border = app_border
         cog_hover = app_accent
-        cog_pressed = app_accent
+        cog_pressed = app_border
         cog_focus = app_border
         list_border = app_border
         search_fg = app_text
@@ -3424,21 +3417,23 @@ class MainWindow(QMainWindow):
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
-            + "    min-width: 30px;\n"
-            + "    max-width: 30px;\n"
+            + "    min-width: 96px;\n"
+            + "    max-width: 96px;\n"
             + "    min-height: 30px;\n"
             + "    max-height: 30px;\n"
             + f"    background-color: {cog_bg};\n"
             + f"    color: {cog_fg};\n"
-            + f"    border: 1px solid {cog_border};\n"
-            + "    border-radius: 5px;\n"
-            + "    padding: 0px;\n"
-            + "    font-size: 14px;\n"
+            + "    border: none;\n"
+            + "    border-radius: 8px;\n"
+            + "    padding: 0px 10px;\n"
+            + "    font-size: 12px;\n"
+            + "    font-weight: 600;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
             + "QPushButton#settingsCogButton:hover {\n"
             + f"    background-color: {cog_hover};\n"
+            + f"    color: {accent_text};\n"
             + "}\n"
             + "QPushButton#settingsCogButton:pressed {\n"
             + f"    background-color: {cog_pressed};\n"
