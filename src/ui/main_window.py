@@ -3693,7 +3693,6 @@ class MainWindow(QMainWindow):
         self._refresh_button.released.connect(self._reset_refresh_button_state)
         for button in self._icon_buttons:
             button.setText("")
-            button.setFlat(True)
             button.setIconSize(QSize(24, 24))
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
