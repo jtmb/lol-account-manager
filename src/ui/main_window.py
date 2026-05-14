@@ -3719,6 +3719,8 @@ class MainWindow(QMainWindow):
         # Clean stylesheet for icon buttons
         self._refresh_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+            "QPushButton:hover { background-color: transparent; border: none; }"
+            "QPushButton:pressed { background-color: transparent; border: none; }"
         )
         self._settings_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
@@ -3742,6 +3744,9 @@ class MainWindow(QMainWindow):
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         
+        if button is self._refresh_button:
+            state = "hover" if button.underMouse() else "normal"
+
         if state == "pressed" and button is self._settings_button:
             color = app_border
         elif state == "hover":
