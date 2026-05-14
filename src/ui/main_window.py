@@ -3859,6 +3859,8 @@ class MainWindow(QMainWindow):
             if event.type() == QEvent.MouseButtonPress:
                 self._set_icon_state(obj, "pressed")
             elif event.type() == QEvent.MouseButtonRelease:
+                if obj is self._refresh_button:
+                    obj.setDown(False)
                 self._sync_icon_button_state(obj)
             elif event.type() == QEvent.Enter:
                 if obj is self._settings_button and getattr(self, "_settings_icon_latched", False):
