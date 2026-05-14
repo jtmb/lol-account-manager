@@ -18,6 +18,10 @@ import webbrowser
 import logging
 import json
 import os
+import tempfile
+import subprocess
+import shutil
+import zipfile
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
@@ -38,6 +42,7 @@ from src.config.paths import (
     load_settings,
     save_settings,
 )
+from src import __version__ as APP_VERSION
 
 LOGS_DIR = BACKUPS_DIR.parent / "logs"
 LOG_FILE = LOGS_DIR / "app.log"
@@ -1390,6 +1395,16 @@ class SettingsDialog(QDialog):
         self.auto_check_updates_checkbox = QCheckBox("Auto-check updates on startup")
         self.auto_check_updates_checkbox.setChecked(bool(self._settings.get("auto_check_updates", True)))
         general_layout.addWidget(self.auto_check_updates_checkbox)
+
+        update_row = QHBoxLayout()
+        update_row.addWidget(QLabel("Update:"))
+        check_updates_btn = QPushButton("Check for updates now")
+        check_updates_btn.setAutoDefault(False)
+        check_updates_btn.setDefault(False)
+        check_updates_btn.clicked.connect(lambda: mw.check_for_updates_now() if mw and hasattr(mw, "check_for_updates_now") else None)
+        update_row.addWidget(check_updates_btn)
+        update_row.addStretch()
+        general_layout.addLayout(update_row)
 
         paths_row = QHBoxLayout()
         paths_row.addWidget(QLabel("League client path:"))
@@ -3111,9 +3126,172 @@ QMenu#trayQuickMenu::separator {
         self.ingame_diag_dialog.raise_()
         self.ingame_diag_dialog.activateWindow()
 
-    def _check_for_updates(self):
-        """Check latest GitHub release tag and notify if changed."""
-        if not self._auto_check_updates:
+    @staticmethod
+    def _version_tuple(value: str) -> tuple[int, ...]:
+        cleaned = str(value or "").strip().lstrip("vV")
+        if not cleaned:
+            return (0,)
+        core = cleaned.split("-", 1)[0]
+        parts = []
+        for token in core.split("."):
+            try:
+                parts.append(int(token))
+            except ValueError:
+                parts.append(0)
+        return tuple(parts) if parts else (0,)
+
+    def _is_newer_release(self, latest_tag: str) -> bool:
+        return self._version_tuple(latest_tag) > self._version_tuple(APP_VERSION)
+
+    def check_for_updates_now(self):
+        """User-triggered update check."""
+        self._check_for_updates(force=True)
+
+    def _pick_release_asset(self, assets: list[dict]) -> Optional[dict]:
+        """Choose best portable asset for current platform."""
+        if not assets:
+            return None
+
+        def _matches(name: str, exts: tuple[str, ...]) -> bool:
+            low = name.lower()
+            return any(low.endswith(ext) for ext in exts)
+
+        def _is_installer(name: str) -> bool:
+            low = name.lower()
+            return "installer" in low or "setup" in low
+
+        if sys.platform.startswith("win"):
+            preferred_exts = (".exe", ".zip")
+        elif sys.platform == "darwin":
+            preferred_exts = (".app", ".dmg", ".zip")
+        else:
+            preferred_exts = (".appimage", ".deb", ".rpm", ".tar.gz", ".zip")
+
+        for asset in assets:
+            name = str(asset.get("name") or "")
+            if _is_installer(name):
+                continue
+            if _matches(name, preferred_exts):
+                return asset
+
+        for asset in assets:
+            name = str(asset.get("name") or "")
+            if _matches(name, preferred_exts):
+                return asset
+
+        for asset in assets:
+            name = str(asset.get("name") or "")
+            if not _is_installer(name):
+                return asset
+
+        return None
+
+    def _find_executable_in_zip(self, zip_path: Path, extract_dir: Path) -> Optional[Path]:
+        """Extract zip and return best executable candidate for self-update."""
+        with zipfile.ZipFile(zip_path) as zf:
+            zf.extractall(extract_dir)
+
+        if sys.platform.startswith("win"):
+            candidates = [
+                p
+                for p in extract_dir.rglob("*.exe")
+                if p.is_file() and "unins" not in p.name.lower()
+            ]
+        else:
+            candidates = [
+                p
+                for p in extract_dir.rglob("*")
+                if p.is_file() and os.access(str(p), os.X_OK)
+            ]
+
+        if not candidates:
+            return None
+
+        # Prefer shorter paths first (likely the primary app binary).
+        candidates.sort(key=lambda p: (len(p.parts), p.name.lower()))
+        return candidates[0]
+
+    def _stage_windows_binary_swap_and_restart(self, new_executable: Path):
+        """Replace current .exe after exit, then restart app."""
+        current_exe = Path(sys.executable).resolve()
+        updates_dir = new_executable.parent
+        script_path = updates_dir / f"apply-update-{int(time.time())}.bat"
+
+        script = (
+            "@echo off\n"
+            "setlocal\n"
+            f"set \"SRC={new_executable}\"\n"
+            f"set \"DST={current_exe}\"\n"
+            "for /l %%i in (1,1,120) do (\n"
+            "  move /Y \"%SRC%\" \"%DST%\" >nul 2>nul && goto launch\n"
+            "  ping -n 2 127.0.0.1 >nul\n"
+            ")\n"
+            "goto done\n"
+            ":launch\n"
+            "start \"\" \"%DST%\"\n"
+            ":done\n"
+            "del \"%~f0\"\n"
+        )
+        script_path.write_text(script, encoding="utf-8")
+        subprocess.Popen(["cmd", "/c", str(script_path)])
+
+    def _replace_binary_and_restart(self, downloaded_asset: Path, latest_tag: str):
+        """Directly replace portable app binary and restart when possible."""
+        is_frozen = bool(getattr(sys, "frozen", False))
+        if not is_frozen:
+            raise RuntimeError("Direct self-update is only available in the packaged app.")
+
+        candidate = downloaded_asset
+        asset_name = downloaded_asset.name.lower()
+        if asset_name.endswith(".zip"):
+            extract_dir = downloaded_asset.parent / f"extract-{latest_tag.strip().lstrip('vV') or 'latest'}"
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir, ignore_errors=True)
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            candidate = self._find_executable_in_zip(downloaded_asset, extract_dir)
+            if not candidate:
+                raise RuntimeError("Downloaded zip does not contain an executable app binary.")
+
+        if sys.platform.startswith("win"):
+            if candidate.suffix.lower() != ".exe":
+                raise RuntimeError("Windows update asset must provide a .exe binary.")
+            self._stage_windows_binary_swap_and_restart(candidate)
+            self._settings["last_seen_release_tag"] = latest_tag
+            save_settings(self._settings)
+            self._quitting_to_exit = True
+            QApplication.quit()
+            return
+
+        current_exe = Path(sys.executable).resolve()
+        shutil.copy2(candidate, current_exe)
+        os.chmod(str(current_exe), 0o755)
+        self._settings["last_seen_release_tag"] = latest_tag
+        save_settings(self._settings)
+        subprocess.Popen([str(current_exe)])
+        self._quitting_to_exit = True
+        QApplication.quit()
+
+    def _download_and_install_update(self, asset: dict, latest_tag: str):
+        """Download selected release asset and directly update app binary."""
+        download_url = str(asset.get("browser_download_url") or "").strip()
+        asset_name = str(asset.get("name") or "update-package").strip() or "update-package"
+        if not download_url:
+            raise RuntimeError("Release asset is missing a download URL.")
+
+        temp_dir = Path(tempfile.gettempdir()) / "lol-account-manager-updates"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        target = temp_dir / asset_name
+
+        req = Request(download_url, headers={"User-Agent": "lol-account-manager"})
+        with urlopen(req, timeout=30) as resp:
+            data = resp.read()
+        target.write_bytes(data)
+
+        self._replace_binary_and_restart(target, latest_tag)
+
+    def _check_for_updates(self, force: bool = False):
+        """Check latest GitHub release and optionally self-update directly."""
+        if not force and not self._auto_check_updates:
             return
         try:
             req = Request(GITHUB_RELEASES_API, headers={"User-Agent": "lol-account-manager"})
@@ -3122,17 +3300,67 @@ QMenu#trayQuickMenu::separator {
             latest_tag = str(payload.get("tag_name") or "").strip()
             if not latest_tag:
                 return
-            seen_tag = str(self._settings.get("last_seen_release_tag", "")).strip()
-            if latest_tag != seen_tag:
-                self._settings["last_seen_release_tag"] = latest_tag
+            if not self._is_newer_release(latest_tag):
+                if force:
+                    QMessageBox.information(
+                        self,
+                        "Update Check",
+                        f"You're up to date.\n\nCurrent version: {APP_VERSION}\nLatest version: {latest_tag}",
+                    )
+                return
+
+            skipped_tag = str(self._settings.get("skipped_update_tag", "")).strip()
+            if not force and skipped_tag == latest_tag:
+                return
+
+            assets = payload.get("assets") or []
+            chosen_asset = self._pick_release_asset(assets)
+            notes = str(payload.get("body") or "").strip()
+            note_preview = notes[:400] + ("..." if len(notes) > 400 else "")
+            prompt = (
+                f"Update available: {latest_tag}\n"
+                f"Current version: {APP_VERSION}\n\n"
+                "Update now?\nThe app will restart to finish the update."
+            )
+            if note_preview:
+                prompt += f"\n\nRelease notes:\n{note_preview}"
+
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Update Available")
+            box.setText(prompt)
+            install_btn = box.addButton("Install Update", QMessageBox.AcceptRole)
+            skip_btn = box.addButton("Skip This Version", QMessageBox.DestructiveRole)
+            later_btn = box.addButton("Later", QMessageBox.RejectRole)
+            box.setDefaultButton(install_btn)
+            box.exec_()
+
+            clicked = box.clickedButton()
+            if clicked == skip_btn:
+                self._settings["skipped_update_tag"] = latest_tag
                 save_settings(self._settings)
-                QMessageBox.information(
+                return
+            if clicked == later_btn:
+                return
+            if clicked != install_btn:
+                return
+
+            if not chosen_asset:
+                release_url = str(payload.get("html_url") or "").strip()
+                if release_url:
+                    webbrowser.open(release_url)
+                QMessageBox.warning(
                     self,
-                    "Update Check",
-                    f"Latest release: {latest_tag}\n\nOpen the project page to download updates.",
+                    "Update",
+                    "No downloadable asset found for this release. Opened GitHub release page instead.",
                 )
+                return
+
+            self._download_and_install_update(chosen_asset, latest_tag)
         except Exception:
-            logging.debug("Update check failed", exc_info=True)
+            logging.debug("Update check/install failed", exc_info=True)
+            if force:
+                QMessageBox.warning(self, "Update", "Could not check or install update right now.")
 
     def _update_rank_refresh_timer(self):
         mode = str(self._rank_refresh_mode or "manual")
