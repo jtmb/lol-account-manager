@@ -1428,6 +1428,13 @@ class SettingsDialog(QDialog):
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
     APP_COLOR_PRESETS = [
+        ("Default Dark", {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+        }),
         ("Midnight Slate", {
             "app_bg_color": "#0f111a",
             "app_surface_color": "#171a26",
