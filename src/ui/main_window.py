@@ -3090,6 +3090,7 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
+        self._settings_dialog_open: bool = False
         self._pending_settings_refresh: bool = False
         self._app_bg_color: str = str(self._settings.get('app_bg_color', DEFAULT_APP_BG_COLOR) or DEFAULT_APP_BG_COLOR)
         self._app_surface_color: str = str(self._settings.get('app_surface_color', DEFAULT_APP_SURFACE_COLOR) or DEFAULT_APP_SURFACE_COLOR)
@@ -3621,7 +3622,7 @@ class MainWindow(QMainWindow):
 
     def _flush_pending_settings_refresh(self):
         """Run any queued settings refresh after a modal dialog closes."""
-        if not self._pending_settings_refresh:
+        if self._settings_dialog_open or not self._pending_settings_refresh:
             return
         self._pending_settings_refresh = False
         self._apply_theme()
@@ -3629,7 +3630,7 @@ class MainWindow(QMainWindow):
 
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
-        if QApplication.activeModalWidget():
+        if self._settings_dialog_open or QApplication.activeModalWidget():
             self._pending_settings_refresh = True
             return
         QTimer.singleShot(0, self._perform_refresh_ui)
@@ -3909,6 +3910,7 @@ class MainWindow(QMainWindow):
         dialog.setStyleSheet(self.styleSheet())
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
+        self._settings_dialog_open = True
         try:
             if dialog.exec_() != QDialog.Accepted:
                 if preview_was_applied[0]:
@@ -3920,6 +3922,7 @@ class MainWindow(QMainWindow):
             if self._pending_settings_refresh:
                 QTimer.singleShot(0, self._flush_pending_settings_refresh)
         finally:
+            self._settings_dialog_open = False
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
 
@@ -3994,7 +3997,7 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        if QApplication.activeModalWidget():
+        if self._settings_dialog_open or QApplication.activeModalWidget():
             self._pending_settings_refresh = True
             return
 
@@ -4896,7 +4899,7 @@ QMenu#trayQuickMenu::separator {
     
     def refresh_account_list(self):
         """Refresh the account list display"""
-        if QApplication.activeModalWidget():
+        if self._settings_dialog_open or QApplication.activeModalWidget():
             self._pending_settings_refresh = True
             return
 
