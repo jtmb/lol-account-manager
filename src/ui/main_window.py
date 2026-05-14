@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
-from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon
+from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
 from pathlib import Path
 from typing import Optional, Callable
 import sys
@@ -24,6 +24,7 @@ import shutil
 import zipfile
 import hashlib
 import re
+import math
 from urllib.request import Request, urlopen
 from urllib.parse import quote
 
@@ -3576,26 +3577,25 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
-            self._refresh_button: ["fa5s.sync-alt"],
-            self._settings_button: ["fa5s.cog"],
+            self._refresh_button: "refresh",
+            self._settings_button: "settings",
         }
         for button in self._icon_buttons:
             button.setText("")
-            button.setIconSize(QSize(22, 22))
+            button.setIconSize(QSize(24, 24))
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
             button.installEventFilter(self)
             button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
             button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
-        # Set initial icons immediately and via timer
+        # Set initial icons immediately
         for button in self._icon_buttons:
             self._set_icon_state(button, "normal")
-        QTimer.singleShot(50, self._refresh_icon_buttons)
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
             self._set_icon_state(button, "hover" if button.underMouse() else "normal")
-        # Ensure icon buttons have minimal stylesheet to not interfere with icons
+        # Clean stylesheet for icon buttons
         self._refresh_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
         )
@@ -3604,37 +3604,133 @@ class MainWindow(QMainWindow):
         )
 
     def _set_icon_state(self, button: QPushButton, state: str):
-        if not qta:
+        icon_type = self._icon_buttons.get(button)
+        if not icon_type:
             return
-        names = self._icon_buttons.get(button, [])
-        if not names:
-            return
+        
         app_text = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
+        
         if state == "pressed":
             color = app_border
         elif state == "hover":
             color = app_accent
         else:
             color = app_text
-        icon = self._build_fa_icon(names, color)
+        
+        icon = self._build_custom_icon(icon_type, color, 24)
         if icon:
-            button.setText("")
             button.setIcon(icon)
 
-    def _build_fa_icon(self, names: list[str], color: str) -> Optional[QIcon]:
-        if not qta:
-            return None
-        for name in names:
-            try:
-                icon = qta.icon(name, color=color, scale_factor=1.2)
-                if icon and not icon.isNull():
-                    return icon
-            except Exception as e:
-                logging.debug(f"Failed to load icon '{name}': {e}")
-                continue
-        return None
+    def _build_custom_icon(self, icon_type: str, color_hex: str, size: int) -> Optional[QIcon]:
+        """Build minimalistic custom icons using Qt painting."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        
+        color = QColor(color_hex)
+        painter.setBrush(color)
+        
+        if icon_type == "refresh":
+            # Draw circular arrow (refresh icon)
+            self._draw_refresh_icon(painter, size, color)
+        elif icon_type == "settings":
+            # Draw gear (settings icon)
+            self._draw_settings_icon(painter, size, color)
+        
+        painter.end()
+        return QIcon(pixmap)
+    
+    def _draw_refresh_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic refresh/reload icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        
+        center_x = size / 2
+        center_y = size / 2
+        radius = size / 3.5
+        line_width = size / 8
+        
+        # Draw circular arrow
+        pen = QPen(color, line_width, Qt.SolidLine)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        
+        # Draw curved path (3/4 of circle)
+        path = QPainterPath()
+        angle_start = 45
+        angle_span = 270
+        arc_rect = QRectF(center_x - radius, center_y - radius, radius * 2, radius * 2)
+        path.arcMoveTo(arc_rect, angle_start)
+        path.arcTo(arc_rect, angle_start, angle_span)
+        painter.drawPath(path)
+        
+        # Draw arrow head
+        arrow_size = size / 5
+        arrow_angle = 315  # degrees
+        arrow_x = center_x + radius * math.cos(math.radians(arrow_angle))
+        arrow_y = center_y + radius * math.sin(math.radians(arrow_angle))
+        
+        arrow_path = QPainterPath()
+        arrow_path.moveTo(arrow_x, arrow_y)
+        arrow_path.lineTo(arrow_x - arrow_size/2, arrow_y - arrow_size/2)
+        arrow_path.lineTo(arrow_x - arrow_size/3, arrow_y + arrow_size/3)
+        arrow_path.closeSubpath()
+        
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(arrow_path)
+    
+    def _draw_settings_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic settings/gear icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        
+        center_x = size / 2
+        center_y = size / 2
+        outer_radius = size / 2.5
+        inner_radius = size / 5
+        tooth_depth = size / 6
+        num_teeth = 8
+        
+        # Draw gear teeth
+        path = QPainterPath()
+        
+        for i in range(num_teeth * 2):
+            angle = (i * 360 / (num_teeth * 2)) * math.pi / 180
+            if i % 2 == 0:
+                # Outer tooth
+                r = outer_radius
+            else:
+                # Inner gap
+                r = outer_radius - tooth_depth
+            
+            x = center_x + r * math.cos(angle)
+            y = center_y + r * math.sin(angle)
+            
+            if i == 0:
+                path.moveTo(x, y)
+            else:
+                path.lineTo(x, y)
+        
+        path.closeSubpath()
+        painter.drawPath(path)
+        
+        # Draw center circle
+        center_circle = QPainterPath()
+        center_circle.addEllipse(QRectF(
+            center_x - inner_radius,
+            center_y - inner_radius,
+            inner_radius * 2,
+            inner_radius * 2
+        ))
+        
+        painter.setBrush(QColor("#1e1e2e"))  # Background color
+        painter.drawPath(center_circle)
 
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_icon_buttons", {}):
