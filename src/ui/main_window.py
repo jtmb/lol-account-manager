@@ -3164,9 +3164,9 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
-        self._refresh_button = QPushButton("⟳")
+        self._refresh_button = QPushButton("↻")
         self._refresh_button.setObjectName("refreshIconButton")
-        self._refresh_button.setFixedSize(30, 30)
+        self._refresh_button.setFixedSize(26, 26)
         self._refresh_button.setAutoDefault(False)
         self._refresh_button.setDefault(False)
         self._refresh_button.setToolTip("Refresh UI")
@@ -3175,7 +3175,7 @@ class MainWindow(QMainWindow):
 
         self._settings_button = QPushButton("⚙")
         self._settings_button.setObjectName("settingsCogButton")
-        self._settings_button.setFixedSize(30, 30)
+        self._settings_button.setFixedSize(26, 26)
         self._settings_button.setAutoDefault(False)
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
@@ -3426,17 +3426,17 @@ class MainWindow(QMainWindow):
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
-            + "    min-width: 30px;\n"
-            + "    max-width: 30px;\n"
-            + "    min-height: 30px;\n"
-            + "    max-height: 30px;\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
             + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
             + "    border: none;\n"
             + "    border-radius: 0px;\n"
             + "    padding: 0px;\n"
-            + "    font-size: 16px;\n"
-            + "    font-weight: 500;\n"
+            + "    font-size: 15px;\n"
+            + "    font-weight: 400;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
@@ -3451,17 +3451,17 @@ class MainWindow(QMainWindow):
             + "    border: none;\n"
             + "}\n"
             + "QPushButton#refreshIconButton {\n"
-            + "    min-width: 30px;\n"
-            + "    max-width: 30px;\n"
-            + "    min-height: 30px;\n"
-            + "    max-height: 30px;\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
             + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
             + "    border: none;\n"
             + "    border-radius: 0px;\n"
             + "    padding: 0px;\n"
-            + "    font-size: 16px;\n"
-            + "    font-weight: 500;\n"
+            + "    font-size: 15px;\n"
+            + "    font-weight: 400;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
