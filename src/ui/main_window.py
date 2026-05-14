@@ -1660,6 +1660,16 @@ class SettingsDialog(QDialog):
         if index >= 0:
             self.app_theme_combo.setCurrentIndex(index)
 
+    def _preview_theme_creator(self):
+        colors = self._current_theme_creator_values()
+        if colors is None:
+            return
+        if not self._apply_callback:
+            return
+        preview_values = self.get_values()
+        preview_values.update(colors)
+        self._apply_callback(preview_values)
+
     @staticmethod
     def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
         index = combo.findData(target_value)
@@ -2226,6 +2236,11 @@ class SettingsDialog(QDialog):
         use_current_btn.setDefault(False)
         use_current_btn.clicked.connect(lambda: self._set_theme_creator_values(self._selected_app_preset()))
         creator_actions_row.addWidget(use_current_btn)
+        preview_theme_btn = QPushButton("Preview preset")
+        preview_theme_btn.setAutoDefault(False)
+        preview_theme_btn.setDefault(False)
+        preview_theme_btn.clicked.connect(self._preview_theme_creator)
+        creator_actions_row.addWidget(preview_theme_btn)
         save_theme_btn = QPushButton("Save custom preset")
         save_theme_btn.setAutoDefault(False)
         save_theme_btn.setDefault(False)
