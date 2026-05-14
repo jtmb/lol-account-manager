@@ -3078,6 +3078,8 @@ class MainWindow(QMainWindow):
         self.account_list.setObjectName("accountListWidget")
         self.account_list.setSpacing(0)
         self.account_list.setViewportMargins(0, 0, 0, 0)
+        self.account_list.setFrameShape(QFrame.NoFrame)
+        self.account_list.setContentsMargins(0, 0, 0, 0)
         self.account_list.setStyleSheet(
             "QListWidget#accountListWidget { background: transparent; border: none; outline: none; }"
             "QListWidget#accountListWidget:focus { outline: none; }"
