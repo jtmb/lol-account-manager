@@ -3591,7 +3591,10 @@ class MainWindow(QMainWindow):
 
     def _set_icon_state(self, button: QPushButton, state: str):
         if not qta:
-            button.setText("?")
+            if button is self._refresh_button:
+                button.setText("↻")
+            elif button is self._settings_button:
+                button.setText("⚙")
             return
         names = self._icon_buttons.get(button, [])
         if not names:
@@ -3607,7 +3610,13 @@ class MainWindow(QMainWindow):
             color = app_text
         icon = self._build_fa_icon(names, color)
         if icon:
+            button.setText("")
             button.setIcon(icon)
+        else:
+            if button is self._refresh_button:
+                button.setText("↻")
+            elif button is self._settings_button:
+                button.setText("⚙")
 
     def _build_fa_icon(self, names: list[str], color: str) -> Optional[QIcon]:
         if not qta:
