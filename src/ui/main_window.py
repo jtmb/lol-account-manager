@@ -165,7 +165,7 @@ class AccountListBackgroundFrame(QFrame):
         painter.fillRect(rect, base_color)
 
         if self._enabled and self._pixmap and not self._pixmap.isNull():
-            target = rect.adjusted(2, 2, -2, -2)
+            target = rect.adjusted(1, 1, -1, -1)
             scaled = self._pixmap.scaled(target.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
             if self._dark_mode:
                 x = max(0, (scaled.width() - target.width()) // 2)
@@ -2794,8 +2794,8 @@ class AccountListItem(QFrame):
                 self._shadow.setBlurRadius(14)
                 self._shadow.setColor(QColor(30, 60, 110, 90))
             elif active:
-                hover_bg = self._rgba(self._hover_highlight_color, 180)
-                hover_border = self._rgba(self._hover_highlight_color, 150)
+                hover_bg = self._rgba(self._hover_highlight_color, 170)
+                hover_border = self._rgba(self._hover_highlight_color, 118)
                 self.setStyleSheet(
                     "#accountListItem {"
                     f"background-color: {hover_bg};"
@@ -2803,7 +2803,7 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(18)
+                self._shadow.setBlurRadius(22)
                 self._shadow.setColor(QColor(0, 0, 0, 120))
             else:
                 self.setStyleSheet(
@@ -2857,8 +2857,8 @@ class AccountListItem(QFrame):
             self._shadow.setBlurRadius(8)
             self._shadow.setColor(QColor(15, 23, 42, 20))
         elif active:
-            hover_bg = self._rgba(self._hover_highlight_color, 155)
-            hover_border = self._rgba(self._hover_highlight_color, 185)
+            hover_bg = self._rgba(self._hover_highlight_color, 145)
+            hover_border = self._rgba(self._hover_highlight_color, 128)
             self.setStyleSheet(
                 "#accountListItem {"
                 f"background-color: {hover_bg};"
@@ -2866,7 +2866,7 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(10)
+            self._shadow.setBlurRadius(14)
             self._shadow.setColor(QColor(15, 23, 42, 28))
         else:
             self.setStyleSheet(
@@ -3069,7 +3069,7 @@ class MainWindow(QMainWindow):
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
         account_list_layout = QVBoxLayout(self.account_list_background)
-        account_list_layout.setContentsMargins(6, 6, 6, 6)
+        account_list_layout.setContentsMargins(0, 0, 0, 0)
         account_list_layout.setSpacing(0)
         self.account_list = QListWidget()
         self.account_list.setObjectName("accountListWidget")
