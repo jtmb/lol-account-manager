@@ -3580,7 +3580,9 @@ class MainWindow(QMainWindow):
         }
         for button in self._icon_buttons:
             button.setText("")
-            button.setIconSize(QSize(16, 16))
+            button.setFlat(True)
+            button.setIconSize(QSize(20, 20))
+            button.setFocusPolicy(Qt.NoFocus)
             button.installEventFilter(self)
             button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
             button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
@@ -3592,10 +3594,6 @@ class MainWindow(QMainWindow):
 
     def _set_icon_state(self, button: QPushButton, state: str):
         if not qta:
-            if button is self._refresh_button:
-                button.setText("↻")
-            elif button is self._settings_button:
-                button.setText("⚙")
             return
         names = self._icon_buttons.get(button, [])
         if not names:
@@ -3613,18 +3611,13 @@ class MainWindow(QMainWindow):
         if icon:
             button.setText("")
             button.setIcon(icon)
-        else:
-            if button is self._refresh_button:
-                button.setText("↻")
-            elif button is self._settings_button:
-                button.setText("⚙")
 
     def _build_fa_icon(self, names: list[str], color: str) -> Optional[QIcon]:
         if not qta:
             return None
         for name in names:
             try:
-                icon = qta.icon(name, color=color)
+                icon = qta.icon(name, color=color, scale_factor=1.2)
                 if icon and not icon.isNull():
                     return icon
             except Exception as e:
