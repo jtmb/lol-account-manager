@@ -4,10 +4,10 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent
-from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette
+from PyQt5.QtGui import QFont, QColor, QPixmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
 from pathlib import Path
 from typing import Optional, Callable
 import sys
@@ -54,6 +54,7 @@ DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = "#9ca3af"
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
 DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
+SPLASH_THEME_AUTO = "__none__"
 
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
@@ -72,6 +73,133 @@ def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
     if value == HOVER_HIGHLIGHT_THEME_AUTO:
         return _default_row_hover_highlight(dark_mode)
     return value
+
+
+CHAMPION_SPLASH_OPTIONS = [
+    ('Aatrox', 'Aatrox'), ('Ahri', 'Ahri'), ('Akali', 'Akali'), ('Akshan', 'Akshan'),
+    ('Alistar', 'Alistar'), ('Ambessa', 'Ambessa'), ('Amumu', 'Amumu'), ('Anivia', 'Anivia'),
+    ('Annie', 'Annie'), ('Aphelios', 'Aphelios'), ('Ashe', 'Ashe'), ('Aurelion Sol', 'AurelionSol'),
+    ('Aurora', 'Aurora'), ('Azir', 'Azir'), ('Bard', 'Bard'), ("Bel'Veth", 'Belveth'),
+    ('Blitzcrank', 'Blitzcrank'), ('Brand', 'Brand'), ('Braum', 'Braum'), ('Briar', 'Briar'),
+    ('Caitlyn', 'Caitlyn'), ('Camille', 'Camille'), ('Cassiopeia', 'Cassiopeia'), ("Cho'Gath", 'Chogath'),
+    ('Corki', 'Corki'), ('Darius', 'Darius'), ('Diana', 'Diana'), ('Dr. Mundo', 'DrMundo'),
+    ('Draven', 'Draven'), ('Ekko', 'Ekko'), ('Elise', 'Elise'), ('Evelynn', 'Evelynn'),
+    ('Ezreal', 'Ezreal'), ('Fiddlesticks', 'Fiddlesticks'), ('Fiora', 'Fiora'), ('Fizz', 'Fizz'),
+    ('Galio', 'Galio'), ('Gangplank', 'Gangplank'), ('Garen', 'Garen'), ('Gnar', 'Gnar'),
+    ('Gragas', 'Gragas'), ('Graves', 'Graves'), ('Gwen', 'Gwen'), ('Hecarim', 'Hecarim'),
+    ('Heimerdinger', 'Heimerdinger'), ('Hwei', 'Hwei'), ('Illaoi', 'Illaoi'), ('Irelia', 'Irelia'),
+    ('Ivern', 'Ivern'), ('Janna', 'Janna'), ('Jarvan IV', 'JarvanIV'), ('Jax', 'Jax'),
+    ('Jayce', 'Jayce'), ('Jhin', 'Jhin'), ('Jinx', 'Jinx'), ("K'Sante", 'KSante'),
+    ("Kai'Sa", 'Kaisa'), ('Kalista', 'Kalista'), ('Karma', 'Karma'), ('Karthus', 'Karthus'),
+    ('Kassadin', 'Kassadin'), ('Katarina', 'Katarina'), ('Kayle', 'Kayle'), ('Kayn', 'Kayn'),
+    ('Kennen', 'Kennen'), ("Kha'Zix", 'Khazix'), ('Kindred', 'Kindred'), ('Kled', 'Kled'),
+    ("Kog'Maw", 'KogMaw'), ('LeBlanc', 'Leblanc'), ('Lee Sin', 'LeeSin'), ('Leona', 'Leona'),
+    ('Lillia', 'Lillia'), ('Lissandra', 'Lissandra'), ('Lucian', 'Lucian'), ('Lulu', 'Lulu'),
+    ('Lux', 'Lux'), ('Malphite', 'Malphite'), ('Malzahar', 'Malzahar'), ('Maokai', 'Maokai'),
+    ('Master Yi', 'MasterYi'), ('Milio', 'Milio'), ('Miss Fortune', 'MissFortune'), ('Mordekaiser', 'Mordekaiser'),
+    ('Morgana', 'Morgana'), ('Naafiri', 'Naafiri'), ('Nami', 'Nami'), ('Nasus', 'Nasus'),
+    ('Nautilus', 'Nautilus'), ('Neeko', 'Neeko'), ('Nidalee', 'Nidalee'), ('Nilah', 'Nilah'),
+    ('Nocturne', 'Nocturne'), ('Nunu & Willump', 'Nunu'), ('Olaf', 'Olaf'), ('Orianna', 'Orianna'),
+    ('Ornn', 'Ornn'), ('Pantheon', 'Pantheon'), ('Poppy', 'Poppy'), ('Pyke', 'Pyke'),
+    ('Qiyana', 'Qiyana'), ('Quinn', 'Quinn'), ('Rakan', 'Rakan'), ('Rammus', 'Rammus'),
+    ("Rek'Sai", 'RekSai'), ('Rell', 'Rell'), ('Renata Glasc', 'Renata'), ('Renekton', 'Renekton'),
+    ('Rengar', 'Rengar'), ('Riven', 'Riven'), ('Rumble', 'Rumble'), ('Ryze', 'Ryze'),
+    ('Samira', 'Samira'), ('Sejuani', 'Sejuani'), ('Senna', 'Senna'), ('Seraphine', 'Seraphine'),
+    ('Sett', 'Sett'), ('Shaco', 'Shaco'), ('Shen', 'Shen'), ('Shyvana', 'Shyvana'),
+    ('Singed', 'Singed'), ('Sion', 'Sion'), ('Sivir', 'Sivir'), ('Skarner', 'Skarner'),
+    ('Smolder', 'Smolder'), ('Sona', 'Sona'), ('Soraka', 'Soraka'), ('Swain', 'Swain'),
+    ('Sylas', 'Sylas'), ('Syndra', 'Syndra'), ('Tahm Kench', 'TahmKench'), ('Taliyah', 'Taliyah'),
+    ('Talon', 'Talon'), ('Taric', 'Taric'), ('Teemo', 'Teemo'), ('Thresh', 'Thresh'),
+    ('Tristana', 'Tristana'), ('Trundle', 'Trundle'), ('Tryndamere', 'Tryndamere'), ('Twisted Fate', 'TwistedFate'),
+    ('Twitch', 'Twitch'), ('Udyr', 'Udyr'), ('Urgot', 'Urgot'), ('Varus', 'Varus'),
+    ('Vayne', 'Vayne'), ('Veigar', 'Veigar'), ("Vel'Koz", 'Velkoz'), ('Vex', 'Vex'),
+    ('Vi', 'Vi'), ('Viego', 'Viego'), ('Viktor', 'Viktor'), ('Vladimir', 'Vladimir'),
+    ('Volibear', 'Volibear'), ('Warwick', 'Warwick'), ('Wukong', 'MonkeyKing'), ('Xayah', 'Xayah'),
+    ('Xerath', 'Xerath'), ('Xin Zhao', 'XinZhao'), ('Yasuo', 'Yasuo'), ('Yone', 'Yone'),
+    ('Yorick', 'Yorick'), ('Yuumi', 'Yuumi'), ('Zac', 'Zac'), ('Zed', 'Zed'),
+    ('Zeri', 'Zeri'), ('Ziggs', 'Ziggs'), ('Zilean', 'Zilean'), ('Zoe', 'Zoe'), ('Zyra', 'Zyra'),
+]
+
+
+class AccountListBackgroundFrame(QFrame):
+    """Paintable background container for the account list splash art."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._enabled = False
+        self._pixmap: Optional[QPixmap] = None
+        self._opacity = 25
+        self._edge_fade = 55
+        self._inner_fade = 20
+        self._dark_mode = True
+
+    def set_background(self, enabled: bool, pixmap: Optional[QPixmap], opacity: int, edge_fade: int, inner_fade: int):
+        self._enabled = bool(enabled)
+        self._pixmap = pixmap
+        self._opacity = max(0, min(100, int(opacity)))
+        self._edge_fade = max(0, min(100, int(edge_fade)))
+        self._inner_fade = max(0, min(100, int(inner_fade)))
+        self.update()
+
+    def set_dark_mode(self, enabled: bool):
+        self._dark_mode = bool(enabled)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        rect = self.rect()
+        radius = 6.0
+        path = QPainterPath()
+        path.addRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
+        painter.setClipPath(path)
+
+        base_color = QColor("#181b2b") if self._dark_mode else QColor("#ededf0")
+        painter.fillRect(rect, base_color)
+
+        if self._enabled and self._pixmap and not self._pixmap.isNull():
+            target = rect.adjusted(1, 1, -1, -1)
+            scaled = self._pixmap.scaled(target.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = max(0, (scaled.width() - target.width()) // 2)
+            y = max(0, (scaled.height() - target.height()) // 2)
+            crop = scaled.copy(x, y, target.width(), target.height())
+            painter.setOpacity(self._opacity / 100.0)
+            painter.drawPixmap(target.topLeft(), crop)
+            painter.setOpacity(1.0)
+
+            edge_alpha = int(230 * (self._edge_fade / 100.0))
+            if edge_alpha > 0:
+                fade_width = max(24, int(min(rect.width(), rect.height()) * 0.20))
+                left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
+                left_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
+                left_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                painter.fillRect(rect.left(), rect.top(), fade_width, rect.height(), left_grad)
+
+                right_grad = QLinearGradient(rect.right(), 0, rect.right() - fade_width, 0)
+                right_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
+                right_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                painter.fillRect(rect.right() - fade_width, rect.top(), fade_width, rect.height(), right_grad)
+
+                top_grad = QLinearGradient(0, rect.top(), 0, rect.top() + fade_width)
+                top_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
+                top_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                painter.fillRect(rect.left(), rect.top(), rect.width(), fade_width, top_grad)
+
+                bottom_grad = QLinearGradient(0, rect.bottom(), 0, rect.bottom() - fade_width)
+                bottom_grad.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), edge_alpha))
+                bottom_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                painter.fillRect(rect.left(), rect.bottom() - fade_width, rect.width(), fade_width, bottom_grad)
+
+            inner_alpha = int(190 * (self._inner_fade / 100.0))
+            if inner_alpha > 0:
+                radial = QRadialGradient(rect.center(), max(rect.width(), rect.height()) * 0.45)
+                radial.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), inner_alpha))
+                radial.setColorAt(0.62, QColor(base_color.red(), base_color.green(), base_color.blue(), int(inner_alpha * 0.35)))
+                radial.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
+                painter.fillRect(rect, radial)
 
 
 def _escape_html(text: str) -> str:
@@ -1158,6 +1286,34 @@ class SettingsDialog(QDialog):
         ("Amber", "#f5a623"),
     ]
 
+    CHAMPION_SPLASH_OPTIONS = CHAMPION_SPLASH_OPTIONS
+
+    CHAMPION_SPLASH_OPACITY_OPTIONS = [
+        ("Off (0%)", 0),
+        ("Very Subtle (10%)", 10),
+        ("Subtle (20%)", 20),
+        ("Balanced (30%)", 30),
+        ("Visible (40%)", 40),
+        ("Strong (55%)", 55),
+        ("Bold (70%)", 70),
+    ]
+
+    CHAMPION_SPLASH_EDGE_FADE_OPTIONS = [
+        ("None (0%)", 0),
+        ("Light (25%)", 25),
+        ("Balanced (45%)", 45),
+        ("Strong (65%)", 65),
+        ("Heavy (80%)", 80),
+    ]
+
+    CHAMPION_SPLASH_INNER_FADE_OPTIONS = [
+        ("None (0%)", 0),
+        ("Light (20%)", 20),
+        ("Balanced (35%)", 35),
+        ("Strong (55%)", 55),
+        ("Heavy (75%)", 75),
+    ]
+
     LOGGED_IN_INTENSITY_OPTIONS = [
         ("Ultra Subtle (5%)", 5),
         ("Very Soft (10%)", 10),
@@ -1556,6 +1712,93 @@ class SettingsDialog(QDialog):
         hover_color_row.addStretch()
         appearance_layout.addLayout(hover_color_row)
 
+        self.champion_splash_enabled_checkbox = QCheckBox("Show champion splash background on account list")
+        self.champion_splash_enabled_checkbox.setChecked(bool(self._settings.get("champion_splash_enabled", False)))
+        self.champion_splash_enabled_checkbox.setToolTip(
+            "Show selected champion base splash art behind the account entries."
+        )
+        appearance_layout.addWidget(self.champion_splash_enabled_checkbox)
+
+        splash_champion_row = QHBoxLayout()
+        splash_champion_row.addWidget(QLabel("Splash champion:"))
+        self.champion_splash_combo = QComboBox()
+        self.champion_splash_combo.setEditable(True)
+        self.champion_splash_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.champion_splash_combo.addItem("Global Theme (None)", SPLASH_THEME_AUTO)
+        for name, champ_id in self.CHAMPION_SPLASH_OPTIONS:
+            self.champion_splash_combo.addItem(name, champ_id)
+        self.champion_splash_combo.setToolTip(
+            "Type champion name to quickly find base splash art."
+        )
+        completer = QCompleter(self.champion_splash_combo.model(), self)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+        try:
+            completer.setFilterMode(Qt.MatchContains)
+        except Exception:
+            pass
+        self.champion_splash_combo.setCompleter(completer)
+        current_splash_champion = str(self._settings.get("champion_splash_champion", SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO)
+        splash_champion_index = self.champion_splash_combo.findData(current_splash_champion)
+        if splash_champion_index < 0:
+            splash_champion_index = self.champion_splash_combo.findData(SPLASH_THEME_AUTO)
+        self.champion_splash_combo.setCurrentIndex(max(0, splash_champion_index))
+        splash_champion_row.addWidget(self.champion_splash_combo)
+        splash_champion_row.addStretch()
+        appearance_layout.addLayout(splash_champion_row)
+
+        splash_opacity_row = QHBoxLayout()
+        splash_opacity_row.addWidget(QLabel("Splash opacity:"))
+        self.champion_splash_opacity_combo = QComboBox()
+        for label, value in self.CHAMPION_SPLASH_OPACITY_OPTIONS:
+            self.champion_splash_opacity_combo.addItem(label, value)
+        current_splash_opacity = int(self._settings.get("champion_splash_opacity", 25))
+        splash_opacity_index = self.champion_splash_opacity_combo.findData(current_splash_opacity)
+        if splash_opacity_index < 0:
+            splash_opacity_index = self.champion_splash_opacity_combo.findData(25)
+        self.champion_splash_opacity_combo.setCurrentIndex(max(0, splash_opacity_index))
+        splash_opacity_row.addWidget(self.champion_splash_opacity_combo)
+        splash_opacity_row.addStretch()
+        appearance_layout.addLayout(splash_opacity_row)
+
+        splash_edge_row = QHBoxLayout()
+        splash_edge_row.addWidget(QLabel("Splash edge fade:"))
+        self.champion_splash_edge_fade_combo = QComboBox()
+        for label, value in self.CHAMPION_SPLASH_EDGE_FADE_OPTIONS:
+            self.champion_splash_edge_fade_combo.addItem(label, value)
+        current_splash_edge = int(self._settings.get("champion_splash_edge_fade", 55))
+        splash_edge_index = self.champion_splash_edge_fade_combo.findData(current_splash_edge)
+        if splash_edge_index < 0:
+            splash_edge_index = self.champion_splash_edge_fade_combo.findData(55)
+        self.champion_splash_edge_fade_combo.setCurrentIndex(max(0, splash_edge_index))
+        splash_edge_row.addWidget(self.champion_splash_edge_fade_combo)
+        splash_edge_row.addStretch()
+        appearance_layout.addLayout(splash_edge_row)
+
+        splash_inner_row = QHBoxLayout()
+        splash_inner_row.addWidget(QLabel("Splash inner fade:"))
+        self.champion_splash_inner_fade_combo = QComboBox()
+        for label, value in self.CHAMPION_SPLASH_INNER_FADE_OPTIONS:
+            self.champion_splash_inner_fade_combo.addItem(label, value)
+        current_splash_inner = int(self._settings.get("champion_splash_inner_fade", 20))
+        splash_inner_index = self.champion_splash_inner_fade_combo.findData(current_splash_inner)
+        if splash_inner_index < 0:
+            splash_inner_index = self.champion_splash_inner_fade_combo.findData(20)
+        self.champion_splash_inner_fade_combo.setCurrentIndex(max(0, splash_inner_index))
+        splash_inner_row.addWidget(self.champion_splash_inner_fade_combo)
+        splash_inner_row.addStretch()
+        appearance_layout.addLayout(splash_inner_row)
+
+        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_combo.setEnabled)
+        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_opacity_combo.setEnabled)
+        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_edge_fade_combo.setEnabled)
+        self.champion_splash_enabled_checkbox.toggled.connect(self.champion_splash_inner_fade_combo.setEnabled)
+        splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
+        self.champion_splash_combo.setEnabled(splash_enabled)
+        self.champion_splash_opacity_combo.setEnabled(splash_enabled)
+        self.champion_splash_edge_fade_combo.setEnabled(splash_enabled)
+        self.champion_splash_inner_fade_combo.setEnabled(splash_enabled)
+
         gradient_intensity_row = QHBoxLayout()
         gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
         self.logged_in_gradient_intensity_combo = QComboBox()
@@ -1752,6 +1995,14 @@ class SettingsDialog(QDialog):
         """Collect validated settings values."""
         window_size_mode = "custom" if self.window_size_combo.currentData() == self.CUSTOM_SIZE_VALUE else "static"
         window_size = self.current_window_size if window_size_mode == "custom" else self.window_size_combo.currentText()
+        champion_splash_value = self.champion_splash_combo.currentData()
+        if champion_splash_value is None:
+            typed = self.champion_splash_combo.currentText().strip().casefold()
+            champion_splash_value = SPLASH_THEME_AUTO
+            for name, champ_id in self.CHAMPION_SPLASH_OPTIONS:
+                if typed == name.casefold():
+                    champion_splash_value = champ_id
+                    break
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -1776,6 +2027,11 @@ class SettingsDialog(QDialog):
             "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
             "hover_highlight_color": str(self.hover_highlight_color_combo.currentData()),
+            "champion_splash_enabled": self.champion_splash_enabled_checkbox.isChecked(),
+            "champion_splash_champion": str(champion_splash_value),
+            "champion_splash_opacity": int(self.champion_splash_opacity_combo.currentData()),
+            "champion_splash_edge_fade": int(self.champion_splash_edge_fade_combo.currentData()),
+            "champion_splash_inner_fade": int(self.champion_splash_inner_fade_combo.currentData()),
             "logged_in_gradient_intensity": int(self.logged_in_gradient_intensity_combo.currentData()),
             "logged_in_border_width": int(self.logged_in_border_width_combo.currentData()),
             "logged_in_border_opacity": int(self.logged_in_border_opacity_combo.currentData()),
@@ -2531,6 +2787,14 @@ class MainWindow(QMainWindow):
             self._hover_highlight_color_setting,
             self._dark_mode,
         )
+        self._champion_splash_enabled: bool = bool(self._settings.get('champion_splash_enabled', False))
+        self._champion_splash_champion: str = str(
+            self._settings.get('champion_splash_champion', SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO
+        )
+        self._champion_splash_opacity: int = int(self._settings.get('champion_splash_opacity', 25))
+        self._champion_splash_edge_fade: int = int(self._settings.get('champion_splash_edge_fade', 55))
+        self._champion_splash_inner_fade: int = int(self._settings.get('champion_splash_inner_fade', 20))
+        self._champion_splash_pixmap_cache: dict[str, QPixmap] = {}
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
         self._logged_in_border_opacity: int = int(self._settings.get('logged_in_border_opacity', 60))
@@ -2665,15 +2929,30 @@ class MainWindow(QMainWindow):
         
         # Account list
         layout.addWidget(QLabel("Saved Accounts:"))
+        self.account_list_background = AccountListBackgroundFrame()
+        self.account_list_background.setObjectName("accountListContainer")
+        account_list_layout = QVBoxLayout(self.account_list_background)
+        account_list_layout.setContentsMargins(0, 0, 0, 0)
+        account_list_layout.setSpacing(0)
         self.account_list = QListWidget()
+        self.account_list.setObjectName("accountListWidget")
         self.account_list.setSpacing(0)
         self.account_list.setViewportMargins(0, 0, 0, 0)
+        self.account_list.setStyleSheet(
+            "QListWidget#accountListWidget { background: transparent; border: none; }"
+            "QListWidget#accountListWidget::item { background: transparent; border: none; }"
+            "QListWidget#accountListWidget::item:selected { background: transparent; border: none; }"
+            "QListWidget#accountListWidget::item:hover { background: transparent; border: none; }"
+        )
+        self.account_list.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.account_list.viewport().setAutoFillBackground(False)
         self.account_list.itemClicked.connect(self.on_account_selected)
         self.account_list.itemDoubleClicked.connect(lambda _: self.launch_account())
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
         self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
-        layout.addWidget(self.account_list)
+        account_list_layout.addWidget(self.account_list)
+        layout.addWidget(self.account_list_background)
         
         # Button layout
         button_layout = QHBoxLayout()
@@ -2706,8 +2985,49 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self.lol_path_label)
         self._refresh_lol_path_label()
+
+        self._apply_account_list_background()
         
         central_widget.setLayout(layout)
+
+    @staticmethod
+    def _champion_splash_url(champion_id: str) -> str:
+        return f"https://ddragon.leagueoflegends.com/cdn/img/champion/splash/{champion_id}_0.jpg"
+
+    def _load_champion_splash_pixmap(self, champion_id: str) -> Optional[QPixmap]:
+        champ = str(champion_id or "").strip()
+        if not champ or champ == SPLASH_THEME_AUTO:
+            return None
+        cached = self._champion_splash_pixmap_cache.get(champ)
+        if cached is not None:
+            return cached
+        try:
+            req = Request(self._champion_splash_url(champ), headers={"User-Agent": "lol-account-manager"})
+            with urlopen(req, timeout=6) as resp:
+                raw = resp.read()
+            pix = QPixmap()
+            if pix.loadFromData(raw):
+                self._champion_splash_pixmap_cache[champ] = pix
+                return pix
+        except Exception:
+            logging.debug("Failed loading champion splash for %s", champ, exc_info=True)
+        self._champion_splash_pixmap_cache[champ] = QPixmap()
+        return None
+
+    def _apply_account_list_background(self):
+        if not hasattr(self, "account_list_background"):
+            return
+        self.account_list_background.set_dark_mode(self._dark_mode)
+        pixmap = None
+        if self._champion_splash_enabled:
+            pixmap = self._load_champion_splash_pixmap(self._champion_splash_champion)
+        self.account_list_background.set_background(
+            enabled=self._champion_splash_enabled and bool(pixmap and not pixmap.isNull()),
+            pixmap=pixmap,
+            opacity=self._champion_splash_opacity,
+            edge_fade=self._champion_splash_edge_fade,
+            inner_fade=self._champion_splash_inner_fade,
+        )
 
     def _apply_window_size(self, resolution: str):
         """Resize the window without treating it as a user-initiated custom resize."""
@@ -2760,6 +3080,7 @@ class MainWindow(QMainWindow):
         cog_hover = "#45475a" if dark_mode else "#c8c9d1"
         cog_pressed = "#585b70" if dark_mode else "#bebfc8"
         cog_focus = "#6c7086" if dark_mode else "#a8a8a8"
+        list_border = "#45475a" if dark_mode else "#c4c6cf"
         search_fg = "#dbe4ff" if dark_mode else "#2e2d2a"
         search_bg = "#171a2a" if dark_mode else "#f2f3f6"
         search_border = "#3f4b71" if dark_mode else "#d0d0d6"
@@ -2812,6 +3133,15 @@ class MainWindow(QMainWindow):
             + "    text-align: center;\n"
             + "    min-height: 30px;\n"
             + "}\n"
+            + "QFrame#accountListContainer {\n"
+            + f"    border: 1px solid {list_border};\n"
+            + "    border-radius: 6px;\n"
+            + "    background: transparent;\n"
+            + "}\n"
+            + "QListWidget#accountListWidget {\n"
+            + "    background: transparent;\n"
+            + "    border: none;\n"
+            + "}\n"
         )
 
     def _apply_theme(self):
@@ -2826,6 +3156,7 @@ class MainWindow(QMainWindow):
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
         QTimer.singleShot(0, self._apply_filter_input_palette)
+        self._apply_account_list_background()
 
         self.update_account_item_states()
         self._apply_title_bar_theme()
@@ -2898,6 +3229,11 @@ class MainWindow(QMainWindow):
             self._hover_highlight_color_setting,
             self._dark_mode,
         )
+        self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
+        self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
+        self._champion_splash_opacity = int(values.get('champion_splash_opacity', self._champion_splash_opacity))
+        self._champion_splash_edge_fade = int(values.get('champion_splash_edge_fade', self._champion_splash_edge_fade))
+        self._champion_splash_inner_fade = int(values.get('champion_splash_inner_fade', self._champion_splash_inner_fade))
         self._logged_in_gradient_intensity = int(values.get('logged_in_gradient_intensity', self._logged_in_gradient_intensity))
         self._logged_in_border_width = int(values.get('logged_in_border_width', self._logged_in_border_width))
         self._logged_in_border_opacity = int(values.get('logged_in_border_opacity', self._logged_in_border_opacity))
