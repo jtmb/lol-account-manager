@@ -3586,9 +3586,7 @@ class MainWindow(QMainWindow):
             button.setFocusPolicy(Qt.NoFocus)
             button.setCursor(Qt.PointingHandCursor)
             button.installEventFilter(self)
-            button.pressed.connect(lambda b=button: self._set_icon_state(b, "pressed"))
-            button.released.connect(lambda b=button: self._set_icon_state(b, "hover" if b.underMouse() else "normal"))
-        # Set initial icons immediately
+        # Set initial icons
         for button in self._icon_buttons:
             self._set_icon_state(button, "normal")
 
@@ -3734,8 +3732,14 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, obj, event):
         if obj in getattr(self, "_icon_buttons", {}):
-            if event.type() == QEvent.Enter:
-                self._set_icon_state(obj, "hover")
+            if event.type() == QEvent.MouseButtonPress:
+                self._set_icon_state(obj, "pressed")
+            elif event.type() == QEvent.MouseButtonRelease:
+                # Reset state on mouse release
+                self._set_icon_state(obj, "hover" if obj.underMouse() else "normal")
+            elif event.type() == QEvent.Enter:
+                if not obj.isDown():
+                    self._set_icon_state(obj, "hover")
             elif event.type() == QEvent.Leave:
                 self._set_icon_state(obj, "normal")
         return super().eventFilter(obj, event)
