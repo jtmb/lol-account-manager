@@ -3695,13 +3695,12 @@ class MainWindow(QMainWindow):
 
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
-        self._reset_refresh_button_state()
         QTimer.singleShot(0, self._perform_refresh_ui)
 
     def _perform_refresh_ui(self):
         self._apply_theme()
         self.refresh_account_list()
-        self._reset_refresh_button_state()
+        self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
