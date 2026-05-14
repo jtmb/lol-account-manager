@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath
@@ -1427,6 +1427,102 @@ class SettingsDialog(QDialog):
 
     BACKUP_KEEP_OPTIONS = [10, 20, 40, 80]
 
+    APP_COLOR_PRESETS = [
+        ("Custom", {}),
+        ("Default Dark", {
+            "app_bg_color": DEFAULT_APP_BG_COLOR,
+            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+            "app_border_color": DEFAULT_APP_BORDER_COLOR,
+            "app_text_color": DEFAULT_APP_TEXT_COLOR,
+            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+        }),
+        ("Discord Dark", {
+            "app_bg_color": "#1e1f22",
+            "app_surface_color": "#2b2d31",
+            "app_border_color": "#3f4147",
+            "app_text_color": "#dbdee1",
+            "app_accent_color": "#5865f2",
+        }),
+        ("Slack Dark", {
+            "app_bg_color": "#1a1d21",
+            "app_surface_color": "#222529",
+            "app_border_color": "#3d3f43",
+            "app_text_color": "#e8e8e8",
+            "app_accent_color": "#4a154b",
+        }),
+        ("GitHub Dark", {
+            "app_bg_color": "#0d1117",
+            "app_surface_color": "#161b22",
+            "app_border_color": "#30363d",
+            "app_text_color": "#c9d1d9",
+            "app_accent_color": "#2f81f7",
+        }),
+        ("Nord", {
+            "app_bg_color": "#2e3440",
+            "app_surface_color": "#3b4252",
+            "app_border_color": "#4c566a",
+            "app_text_color": "#eceff4",
+            "app_accent_color": "#88c0d0",
+        }),
+        ("Dracula", {
+            "app_bg_color": "#282a36",
+            "app_surface_color": "#303545",
+            "app_border_color": "#44475a",
+            "app_text_color": "#f8f8f2",
+            "app_accent_color": "#bd93f9",
+        }),
+        ("Solarized Dark", {
+            "app_bg_color": "#002b36",
+            "app_surface_color": "#073642",
+            "app_border_color": "#586e75",
+            "app_text_color": "#eee8d5",
+            "app_accent_color": "#268bd2",
+        }),
+    ]
+
+    APP_COLOR_OPTIONS = {
+        "app_bg_color": [
+            ("Default Dark", DEFAULT_APP_BG_COLOR),
+            ("Discord Dark", "#1e1f22"),
+            ("GitHub Dark", "#0d1117"),
+            ("Deep Navy", "#111827"),
+            ("Charcoal", "#1f2937"),
+            ("Midnight", "#0f172a"),
+        ],
+        "app_surface_color": [
+            ("Default Surface", DEFAULT_APP_SURFACE_COLOR),
+            ("Discord Surface", "#2b2d31"),
+            ("GitHub Surface", "#161b22"),
+            ("Slate", "#273043"),
+            ("Graphite", "#20242f"),
+            ("Blue Gray", "#222c3c"),
+        ],
+        "app_border_color": [
+            ("Default Border", DEFAULT_APP_BORDER_COLOR),
+            ("Muted Slate", "#3b4052"),
+            ("Graphite", "#2b2f3f"),
+            ("Cool Gray", "#434a5e"),
+            ("Nord Border", "#4c566a"),
+        ],
+        "app_text_color": [
+            ("Default Text", DEFAULT_APP_TEXT_COLOR),
+            ("Soft White", "#e5e7eb"),
+            ("Cool Gray", "#cbd5f5"),
+            ("Warm Gray", "#d6d3d1"),
+            ("Silver", "#d1d5db"),
+        ],
+        "app_accent_color": [
+            ("Default Accent", DEFAULT_APP_ACCENT_COLOR),
+            ("Discord Blurple", "#5865f2"),
+            ("Slack Purple", "#4a154b"),
+            ("GitHub Blue", "#2f81f7"),
+            ("Emerald", "#10b981"),
+            ("Amber", "#f59e0b"),
+            ("Rose", "#f43f5e"),
+            ("Cyan", "#22d3ee"),
+        ],
+    }
+
     def __init__(self, parent=None, settings: Optional[dict] = None, apply_callback: Optional[Callable[[dict], None]] = None):
         super().__init__(parent)
         self._settings = settings or {}
@@ -1496,38 +1592,49 @@ class SettingsDialog(QDialog):
         appearance_layout.addWidget(self.text_zoom_combo)
 
         appearance_layout.addWidget(QLabel("Application colors:"))
-        self.app_color_inputs: dict[str, QLineEdit] = {}
+        self.app_color_combos: dict[str, QComboBox] = {}
 
-        def add_color_row(label: str, setting_key: str, default_color: str):
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("Theme preset:"))
+        self.app_theme_combo = QComboBox()
+        for label, preset in self.APP_COLOR_PRESETS:
+            self.app_theme_combo.addItem(label, preset)
+        self.app_theme_combo.setCurrentIndex(1)
+        theme_row.addWidget(self.app_theme_combo)
+        theme_row.addStretch()
+        appearance_layout.addLayout(theme_row)
+
+        def add_color_row(label: str, setting_key: str):
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
-            edit = QLineEdit()
-            edit.setText(str(self._settings.get(setting_key, default_color) or default_color))
-            edit.setPlaceholderText(default_color)
-            edit.setMaxLength(9)
-            edit.setFixedWidth(120)
-            pick_btn = QPushButton("Pick")
-            pick_btn.setAutoDefault(False)
-            pick_btn.setDefault(False)
-
-            def pick_color():
-                current = QColor(edit.text().strip() or default_color)
-                chosen = QColorDialog.getColor(current, self, f"Select {label}")
-                if chosen.isValid():
-                    edit.setText(chosen.name())
-
-            pick_btn.clicked.connect(pick_color)
-            row.addWidget(edit)
-            row.addWidget(pick_btn)
+            combo = QComboBox()
+            for option_label, option_value in self.APP_COLOR_OPTIONS.get(setting_key, []):
+                combo.addItem(option_label, option_value)
+            current = str(self._settings.get(setting_key, "") or "").strip()
+            default_color = {
+                "app_bg_color": DEFAULT_APP_BG_COLOR,
+                "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
+                "app_border_color": DEFAULT_APP_BORDER_COLOR,
+                "app_text_color": DEFAULT_APP_TEXT_COLOR,
+                "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
+            }.get(setting_key, DEFAULT_APP_BG_COLOR)
+            if not current:
+                current = default_color
+            idx = combo.findData(current)
+            combo.setCurrentIndex(max(0, idx))
+            combo.currentIndexChanged.connect(self._mark_app_theme_custom)
+            row.addWidget(combo)
             row.addStretch()
             appearance_layout.addLayout(row)
-            self.app_color_inputs[setting_key] = edit
+            self.app_color_combos[setting_key] = combo
 
-        add_color_row("Background", "app_bg_color", DEFAULT_APP_BG_COLOR)
-        add_color_row("Surface", "app_surface_color", DEFAULT_APP_SURFACE_COLOR)
-        add_color_row("Border", "app_border_color", DEFAULT_APP_BORDER_COLOR)
-        add_color_row("Text", "app_text_color", DEFAULT_APP_TEXT_COLOR)
-        add_color_row("Accent", "app_accent_color", DEFAULT_APP_ACCENT_COLOR)
+        add_color_row("Background", "app_bg_color")
+        add_color_row("Surface", "app_surface_color")
+        add_color_row("Border", "app_border_color")
+        add_color_row("Text", "app_text_color")
+        add_color_row("Accent", "app_accent_color")
+        self.app_theme_combo.currentIndexChanged.connect(self._apply_selected_app_theme)
+        self._sync_app_theme_preset()
 
         self.show_ranks_checkbox = QCheckBox("Show ranks")
         self.show_ranks_checkbox.setChecked(bool(self._settings.get("show_ranks", True)))
@@ -2217,17 +2324,61 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
-            "app_bg_color": self.app_color_inputs.get("app_bg_color").text().strip() or DEFAULT_APP_BG_COLOR,
-            "app_surface_color": self.app_color_inputs.get("app_surface_color").text().strip() or DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": self.app_color_inputs.get("app_border_color").text().strip() or DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": self.app_color_inputs.get("app_text_color").text().strip() or DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": self.app_color_inputs.get("app_accent_color").text().strip() or DEFAULT_APP_ACCENT_COLOR,
+            "app_bg_color": str(self.app_color_combos.get("app_bg_color").currentData() or DEFAULT_APP_BG_COLOR),
+            "app_surface_color": str(self.app_color_combos.get("app_surface_color").currentData() or DEFAULT_APP_SURFACE_COLOR),
+            "app_border_color": str(self.app_color_combos.get("app_border_color").currentData() or DEFAULT_APP_BORDER_COLOR),
+            "app_text_color": str(self.app_color_combos.get("app_text_color").currentData() or DEFAULT_APP_TEXT_COLOR),
+            "app_accent_color": str(self.app_color_combos.get("app_accent_color").currentData() or DEFAULT_APP_ACCENT_COLOR),
         }
 
     def apply_settings(self):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
             self._apply_callback(self.get_values())
+
+    def _mark_app_theme_custom(self):
+        if not hasattr(self, "app_theme_combo"):
+            return
+        current = self.app_theme_combo.currentIndex()
+        if current != 0:
+            self.app_theme_combo.blockSignals(True)
+            self.app_theme_combo.setCurrentIndex(0)
+            self.app_theme_combo.blockSignals(False)
+
+    def _apply_selected_app_theme(self):
+        if not hasattr(self, "app_theme_combo"):
+            return
+        preset = self.app_theme_combo.currentData() or {}
+        if not preset:
+            return
+        for key, value in preset.items():
+            combo = self.app_color_combos.get(key)
+            if not combo:
+                continue
+            idx = combo.findData(value)
+            if idx >= 0:
+                combo.blockSignals(True)
+                combo.setCurrentIndex(idx)
+                combo.blockSignals(False)
+
+    def _sync_app_theme_preset(self):
+        if not hasattr(self, "app_theme_combo"):
+            return
+        current_values = {
+            key: str(combo.currentData())
+            for key, combo in self.app_color_combos.items()
+        }
+        matched_index = 0
+        for index in range(self.app_theme_combo.count()):
+            preset = self.app_theme_combo.itemData(index) or {}
+            if not preset:
+                continue
+            if all(current_values.get(k) == v for k, v in preset.items()):
+                matched_index = index
+                break
+        self.app_theme_combo.blockSignals(True)
+        self.app_theme_combo.setCurrentIndex(matched_index)
+        self.app_theme_combo.blockSignals(False)
 
     def eventFilter(self, obj, event):
         if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
