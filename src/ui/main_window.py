@@ -3686,8 +3686,7 @@ class MainWindow(QMainWindow):
         """Force a refresh of UI styling and list visuals."""
         self._apply_theme()
         self.refresh_account_list()
-        self._refresh_button.setDown(False)
-        QTimer.singleShot(0, lambda: self._sync_icon_button_state(self._refresh_button))
+        self._reset_refresh_button_state()
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -3695,6 +3694,7 @@ class MainWindow(QMainWindow):
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
+        self._refresh_button.released.connect(self._reset_refresh_button_state)
         for button in self._icon_buttons:
             button.setText("")
             button.setIconSize(QSize(24, 24))
@@ -3704,6 +3704,10 @@ class MainWindow(QMainWindow):
         # Set initial icons
         for button in self._icon_buttons:
             self._set_icon_state(button, "normal")
+
+    def _reset_refresh_button_state(self):
+        self._refresh_button.setDown(False)
+        self._set_icon_state(self._refresh_button, "hover" if self._refresh_button.underMouse() else "normal")
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
@@ -3860,7 +3864,8 @@ class MainWindow(QMainWindow):
                 self._set_icon_state(obj, "pressed")
             elif event.type() == QEvent.MouseButtonRelease:
                 if obj is self._refresh_button:
-                    obj.setDown(False)
+                    self._reset_refresh_button_state()
+                    return super().eventFilter(obj, event)
                 self._sync_icon_button_state(obj)
             elif event.type() == QEvent.Enter:
                 if obj is self._settings_button and getattr(self, "_settings_icon_latched", False):
