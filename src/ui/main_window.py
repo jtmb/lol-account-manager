@@ -3452,7 +3452,6 @@ class MainWindow(QMainWindow):
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
             return
-        self.account_list_background.set_dark_mode(self._dark_mode)
         self.account_list_background.set_base_color(self._app_surface_color)
         pixmap = None
         if self._champion_splash_enabled:
@@ -5090,7 +5089,6 @@ QMenu#trayQuickMenu::separator {
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
                 is_logged_in = bool(self._logged_in_username) and item.data(Qt.UserRole) == self._logged_in_username
-                widget.set_dark_mode(self._dark_mode)
                 widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
                 widget.set_logged_in(is_logged_in)
