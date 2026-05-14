@@ -166,11 +166,16 @@ class AccountListBackgroundFrame(QFrame):
             x = max(0, (scaled.width() - target.width()) // 2)
             y = max(0, (scaled.height() - target.height()) // 2)
             crop = scaled.copy(x, y, target.width(), target.height())
-            painter.setOpacity(self._opacity / 100.0)
+            effective_opacity = self._opacity
+            if not self._dark_mode:
+                # Light mode needs a stronger base image to avoid washed-out splash art.
+                effective_opacity = min(100, int(self._opacity * 1.25) + 6)
+            painter.setOpacity(effective_opacity / 100.0)
             painter.drawPixmap(target.topLeft(), crop)
             painter.setOpacity(1.0)
 
-            edge_alpha = int(230 * (self._edge_fade / 100.0))
+            edge_alpha_base = 230 if self._dark_mode else 120
+            edge_alpha = int(edge_alpha_base * (self._edge_fade / 100.0))
             if edge_alpha > 0:
                 fade_width = max(24, int(min(rect.width(), rect.height()) * 0.20))
                 left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
@@ -193,7 +198,8 @@ class AccountListBackgroundFrame(QFrame):
                 bottom_grad.setColorAt(1.0, QColor(base_color.red(), base_color.green(), base_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.bottom() - fade_width, rect.width(), fade_width, bottom_grad)
 
-            inner_alpha = int(190 * (self._inner_fade / 100.0))
+            inner_alpha_base = 190 if self._dark_mode else 90
+            inner_alpha = int(inner_alpha_base * (self._inner_fade / 100.0))
             if inner_alpha > 0:
                 radial = QRadialGradient(rect.center(), max(rect.width(), rect.height()) * 0.45)
                 radial.setColorAt(0.0, QColor(base_color.red(), base_color.green(), base_color.blue(), inner_alpha))
@@ -1738,6 +1744,45 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         self.champion_splash_combo.setCompleter(completer)
+        self._champion_splash_line_edit = self.champion_splash_combo.lineEdit()
+        if self._champion_splash_line_edit:
+            self._champion_splash_line_edit.setPlaceholderText("Type champion name")
+            self._champion_splash_line_edit.setClearButtonEnabled(True)
+            self._champion_splash_line_edit.installEventFilter(self)
+
+        if parent_dark_mode:
+            edit_bg = "#171a2a"
+            edit_fg = "#dbe4ff"
+            edit_border = "#3f4b71"
+            placeholder = "#8ea1cf"
+            popup_bg = "#151b2d"
+            popup_fg = "#e9efff"
+            popup_border = "#3f4b71"
+            popup_sel_bg = "#2d3d62"
+            popup_sel_fg = "#ffffff"
+        else:
+            edit_bg = "#fafafa"
+            edit_fg = "#2e2d2a"
+            edit_border = "#d0d0d6"
+            placeholder = "#8a90a3"
+            popup_bg = "#ffffff"
+            popup_fg = "#273247"
+            popup_border = "#cfd6e6"
+            popup_sel_bg = "#e2e8f5"
+            popup_sel_fg = "#13233f"
+
+        self.champion_splash_combo.setStyleSheet(
+            "QComboBox { padding-right: 24px; }"
+            f"QComboBox QLineEdit {{ background-color: {edit_bg}; color: {edit_fg}; border: 1px solid {edit_border}; border-radius: 4px; padding: 3px 6px; }}"
+            f"QComboBox QLineEdit:placeholder {{ color: {placeholder}; }}"
+            f"QComboBox QAbstractItemView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; selection-background-color: {popup_sel_bg}; selection-color: {popup_sel_fg}; padding: 4px; }}"
+        )
+        completer.popup().setStyleSheet(
+            f"QListView {{ background: {popup_bg}; color: {popup_fg}; border: 1px solid {popup_border}; border-radius: 8px; padding: 4px; outline: none; }}"
+            f"QListView::item {{ padding: 6px 8px; border-radius: 6px; }}"
+            f"QListView::item:selected {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
+            f"QListView::item:hover {{ background: {popup_sel_bg}; color: {popup_sel_fg}; }}"
+        )
         current_splash_champion = str(self._settings.get("champion_splash_champion", SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO)
         splash_champion_index = self.champion_splash_combo.findData(current_splash_champion)
         if splash_champion_index < 0:
@@ -1752,10 +1797,10 @@ class SettingsDialog(QDialog):
         self.champion_splash_opacity_combo = QComboBox()
         for label, value in self.CHAMPION_SPLASH_OPACITY_OPTIONS:
             self.champion_splash_opacity_combo.addItem(label, value)
-        current_splash_opacity = int(self._settings.get("champion_splash_opacity", 25))
+        current_splash_opacity = int(self._settings.get("champion_splash_opacity", 70))
         splash_opacity_index = self.champion_splash_opacity_combo.findData(current_splash_opacity)
         if splash_opacity_index < 0:
-            splash_opacity_index = self.champion_splash_opacity_combo.findData(25)
+            splash_opacity_index = self.champion_splash_opacity_combo.findData(70)
         self.champion_splash_opacity_combo.setCurrentIndex(max(0, splash_opacity_index))
         splash_opacity_row.addWidget(self.champion_splash_opacity_combo)
         splash_opacity_row.addStretch()
@@ -1766,10 +1811,10 @@ class SettingsDialog(QDialog):
         self.champion_splash_edge_fade_combo = QComboBox()
         for label, value in self.CHAMPION_SPLASH_EDGE_FADE_OPTIONS:
             self.champion_splash_edge_fade_combo.addItem(label, value)
-        current_splash_edge = int(self._settings.get("champion_splash_edge_fade", 55))
+        current_splash_edge = int(self._settings.get("champion_splash_edge_fade", 80))
         splash_edge_index = self.champion_splash_edge_fade_combo.findData(current_splash_edge)
         if splash_edge_index < 0:
-            splash_edge_index = self.champion_splash_edge_fade_combo.findData(55)
+            splash_edge_index = self.champion_splash_edge_fade_combo.findData(80)
         self.champion_splash_edge_fade_combo.setCurrentIndex(max(0, splash_edge_index))
         splash_edge_row.addWidget(self.champion_splash_edge_fade_combo)
         splash_edge_row.addStretch()
@@ -1780,10 +1825,10 @@ class SettingsDialog(QDialog):
         self.champion_splash_inner_fade_combo = QComboBox()
         for label, value in self.CHAMPION_SPLASH_INNER_FADE_OPTIONS:
             self.champion_splash_inner_fade_combo.addItem(label, value)
-        current_splash_inner = int(self._settings.get("champion_splash_inner_fade", 20))
+        current_splash_inner = int(self._settings.get("champion_splash_inner_fade", 75))
         splash_inner_index = self.champion_splash_inner_fade_combo.findData(current_splash_inner)
         if splash_inner_index < 0:
-            splash_inner_index = self.champion_splash_inner_fade_combo.findData(20)
+            splash_inner_index = self.champion_splash_inner_fade_combo.findData(75)
         self.champion_splash_inner_fade_combo.setCurrentIndex(max(0, splash_inner_index))
         splash_inner_row.addWidget(self.champion_splash_inner_fade_combo)
         splash_inner_row.addStretch()
@@ -1995,14 +2040,15 @@ class SettingsDialog(QDialog):
         """Collect validated settings values."""
         window_size_mode = "custom" if self.window_size_combo.currentData() == self.CUSTOM_SIZE_VALUE else "static"
         window_size = self.current_window_size if window_size_mode == "custom" else self.window_size_combo.currentText()
+        typed = self.champion_splash_combo.currentText().strip().casefold()
         champion_splash_value = self.champion_splash_combo.currentData()
-        if champion_splash_value is None:
-            typed = self.champion_splash_combo.currentText().strip().casefold()
-            champion_splash_value = SPLASH_THEME_AUTO
+        if typed:
             for name, champ_id in self.CHAMPION_SPLASH_OPTIONS:
                 if typed == name.casefold():
                     champion_splash_value = champ_id
                     break
+        if champion_splash_value is None:
+            champion_splash_value = SPLASH_THEME_AUTO
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -2046,6 +2092,11 @@ class SettingsDialog(QDialog):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
             self._apply_callback(self.get_values())
+
+    def eventFilter(self, obj, event):
+        if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
+            self._champion_splash_line_edit.clear()
+        return super().eventFilter(obj, event)
 
 
 class AccountListItem(QFrame):
@@ -2791,9 +2842,9 @@ class MainWindow(QMainWindow):
         self._champion_splash_champion: str = str(
             self._settings.get('champion_splash_champion', SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO
         )
-        self._champion_splash_opacity: int = int(self._settings.get('champion_splash_opacity', 25))
-        self._champion_splash_edge_fade: int = int(self._settings.get('champion_splash_edge_fade', 55))
-        self._champion_splash_inner_fade: int = int(self._settings.get('champion_splash_inner_fade', 20))
+        self._champion_splash_opacity: int = int(self._settings.get('champion_splash_opacity', 70))
+        self._champion_splash_edge_fade: int = int(self._settings.get('champion_splash_edge_fade', 80))
+        self._champion_splash_inner_fade: int = int(self._settings.get('champion_splash_inner_fade', 75))
         self._champion_splash_pixmap_cache: dict[str, QPixmap] = {}
         self._logged_in_gradient_intensity: int = int(self._settings.get('logged_in_gradient_intensity', 20))
         self._logged_in_border_width: int = int(self._settings.get('logged_in_border_width', 2))
