@@ -1152,7 +1152,7 @@ class SettingsDialog(QDialog):
         self.close_behavior_combo = QComboBox()
         for label, value in self.CLOSE_BEHAVIOR_OPTIONS:
             self.close_behavior_combo.addItem(label, value)
-        current_close_behavior = str(self._settings.get("close_behavior", "exit"))
+        current_close_behavior = str(self._settings.get("close_behavior", "tray"))
         close_behavior_index = self.close_behavior_combo.findData(current_close_behavior)
         self.close_behavior_combo.setCurrentIndex(max(0, close_behavior_index))
         self.close_behavior_combo.setToolTip("Choose whether window close exits app or minimizes to tray.")
@@ -1174,7 +1174,7 @@ class SettingsDialog(QDialog):
         general_layout.addLayout(auto_lock_row)
 
         self.remember_password_24h_checkbox = QCheckBox("Remember master password for 24 hours")
-        self.remember_password_24h_checkbox.setChecked(bool(self._settings.get("remember_password_24h", False)))
+        self.remember_password_24h_checkbox.setChecked(bool(self._settings.get("remember_password_24h", True)))
         self.remember_password_24h_checkbox.setToolTip(
             "Skip password prompts on startup and auto-lock events for 24 hours after successful unlock."
         )
@@ -1194,7 +1194,7 @@ class SettingsDialog(QDialog):
         general_layout.addLayout(clipboard_row)
 
         self.confirm_launch_checkbox = QCheckBox("Ask confirmation before launch")
-        self.confirm_launch_checkbox.setChecked(bool(self._settings.get("confirm_before_launch", False)))
+        self.confirm_launch_checkbox.setChecked(bool(self._settings.get("confirm_before_launch", True)))
         general_layout.addWidget(self.confirm_launch_checkbox)
 
         self.confirm_delete_checkbox = QCheckBox("Ask confirmation before delete")
@@ -2224,11 +2224,11 @@ class MainWindow(QMainWindow):
         self.current_launch_username: Optional[str] = None
         self._dark_mode: bool = self._settings.get('dark_mode', True)
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
-        self._close_behavior: str = str(self._settings.get('close_behavior', 'exit'))
+        self._close_behavior: str = str(self._settings.get('close_behavior', 'tray'))
         self._auto_lock_minutes: int = int(self._settings.get('auto_lock_minutes', 0))
-        self._remember_password_24h: bool = bool(self._settings.get('remember_password_24h', False))
+        self._remember_password_24h: bool = bool(self._settings.get('remember_password_24h', True))
         self._clipboard_auto_clear_seconds: int = int(self._settings.get('clipboard_auto_clear_seconds', 0))
-        self._confirm_before_launch: bool = bool(self._settings.get('confirm_before_launch', False))
+        self._confirm_before_launch: bool = bool(self._settings.get('confirm_before_launch', True))
         self._confirm_before_delete: bool = bool(self._settings.get('confirm_before_delete', True))
         self._rank_refresh_mode: str = str(self._settings.get('rank_refresh_mode', 'manual'))
         self._auto_check_updates: bool = bool(self._settings.get('auto_check_updates', True))
