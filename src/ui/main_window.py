@@ -3580,6 +3580,7 @@ class MainWindow(QMainWindow):
             self._refresh_button: "refresh",
             self._settings_button: "settings",
         }
+        self._settings_icon_latched = False
         for button in self._icon_buttons:
             button.setText("")
             button.setIconSize(QSize(24, 24))
@@ -3592,7 +3593,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_icon_buttons(self):
         for button in getattr(self, "_icon_buttons", {}):
-            self._set_icon_state(button, "hover" if button.underMouse() else "normal")
+            if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+                self._set_icon_state(button, "pressed")
+            else:
+                self._set_icon_state(button, "hover" if button.underMouse() else "normal")
         # Clean stylesheet for icon buttons
         self._refresh_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
@@ -3600,6 +3604,12 @@ class MainWindow(QMainWindow):
         self._settings_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
         )
+
+    def _sync_icon_button_state(self, button: QPushButton):
+        if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+            self._set_icon_state(button, "pressed")
+            return
+        self._set_icon_state(button, "hover" if button.underMouse() else "normal")
 
     def _set_icon_state(self, button: QPushButton, state: str):
         icon_type = self._icon_buttons.get(button)
@@ -3735,13 +3745,14 @@ class MainWindow(QMainWindow):
             if event.type() == QEvent.MouseButtonPress:
                 self._set_icon_state(obj, "pressed")
             elif event.type() == QEvent.MouseButtonRelease:
-                # Reset state on mouse release
-                self._set_icon_state(obj, "hover" if obj.underMouse() else "normal")
+                self._sync_icon_button_state(obj)
             elif event.type() == QEvent.Enter:
-                if not obj.isDown():
+                if obj is self._settings_button and getattr(self, "_settings_icon_latched", False):
+                    self._set_icon_state(obj, "pressed")
+                elif not obj.isDown():
                     self._set_icon_state(obj, "hover")
             elif event.type() == QEvent.Leave:
-                self._set_icon_state(obj, "normal")
+                self._sync_icon_button_state(obj)
         return super().eventFilter(obj, event)
 
     def _apply_filter_input_palette(self):
@@ -3791,11 +3802,17 @@ class MainWindow(QMainWindow):
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
         dialog = SettingsDialog(self, settings=dialog_settings, apply_callback=self._apply_settings_values)
-        if dialog.exec_() != QDialog.Accepted:
-            return
+        self._settings_icon_latched = True
+        self._set_icon_state(self._settings_button, "pressed")
+        try:
+            if dialog.exec_() != QDialog.Accepted:
+                return
 
-        values = dialog.get_values()
-        self._apply_settings_values(values)
+            values = dialog.get_values()
+            self._apply_settings_values(values)
+        finally:
+            self._settings_icon_latched = False
+            self._sync_icon_button_state(self._settings_button)
 
     def _apply_settings_values(self, values: dict):
         """Apply settings values to runtime state and persist them."""
