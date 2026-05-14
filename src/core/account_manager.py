@@ -29,6 +29,8 @@ class Account:
     notes: str = ""
     ban_status: str = "none"   # "none", "temporary", "permanent"
     ban_end_date: str = ""     # ISO date "YYYY-MM-DD", only for temporary bans
+    is_pinned: bool = False
+    last_launched_at: str = ""  # ISO datetime (UTC)
 
     def is_banned(self) -> bool:
         """Return True if the account is currently under an active ban."""
@@ -249,6 +251,25 @@ class AccountManager:
         if self._clear_expired_temporary_bans():
             self.save_accounts()
         return self.accounts.copy()
+
+    def set_account_pinned(self, username: str, pinned: bool) -> Account:
+        """Set pinned/favorite flag for an account."""
+        for account in self.accounts:
+            if account.username == username:
+                account.is_pinned = bool(pinned)
+                self.save_accounts()
+                return account
+        raise ValueError(f"Account '{username}' not found")
+
+    def mark_account_launched(self, username: str) -> Account:
+        """Store launch timestamp used by 'last used' sorting."""
+        stamp = datetime.utcnow().isoformat(timespec='seconds')
+        for account in self.accounts:
+            if account.username == username:
+                account.last_launched_at = stamp
+                self.save_accounts()
+                return account
+        raise ValueError(f"Account '{username}' not found")
 
     def export_to_file(self, file_path: str):
         """Export accounts to a backup file encrypted with the current master password."""

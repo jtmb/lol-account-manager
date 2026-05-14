@@ -1184,6 +1184,12 @@ class SettingsDialog(QDialog):
         ("Auto (120s)", "120"),
     ]
 
+    ACCOUNT_SORT_OPTIONS = [
+        ("Manual", "manual"),
+        ("Last Used", "last_used"),
+        ("Alphabetical", "alphabetical"),
+    ]
+
     LOG_LEVEL_OPTIONS = [
         ("Error", "ERROR"),
         ("Warning", "WARNING"),
@@ -1343,6 +1349,19 @@ class SettingsDialog(QDialog):
         self.confirm_delete_checkbox = QCheckBox("Ask confirmation before delete")
         self.confirm_delete_checkbox.setChecked(bool(self._settings.get("confirm_before_delete", True)))
         general_layout.addWidget(self.confirm_delete_checkbox)
+
+        sort_mode_row = QHBoxLayout()
+        sort_mode_row.addWidget(QLabel("Account sort mode:"))
+        self.account_sort_mode_combo = QComboBox()
+        for label, value in self.ACCOUNT_SORT_OPTIONS:
+            self.account_sort_mode_combo.addItem(label, value)
+        current_sort_mode = str(self._settings.get("account_sort_mode", "manual"))
+        sort_mode_index = self.account_sort_mode_combo.findData(current_sort_mode)
+        self.account_sort_mode_combo.setCurrentIndex(max(0, sort_mode_index))
+        self.account_sort_mode_combo.setToolTip("Choose how accounts are ordered in the list.")
+        sort_mode_row.addWidget(self.account_sort_mode_combo)
+        sort_mode_row.addStretch()
+        general_layout.addLayout(sort_mode_row)
 
         security_row = QHBoxLayout()
         security_row.addWidget(QLabel("Security:"))
@@ -1657,6 +1676,7 @@ class SettingsDialog(QDialog):
             "clipboard_auto_clear_seconds": int(self.clipboard_clear_combo.currentData()),
             "confirm_before_launch": self.confirm_launch_checkbox.isChecked(),
             "confirm_before_delete": self.confirm_delete_checkbox.isChecked(),
+            "account_sort_mode": str(self.account_sort_mode_combo.currentData()),
             "rank_refresh_mode": str(self.rank_refresh_combo.currentData()),
             "auto_check_updates": self.auto_check_updates_checkbox.isChecked(),
             "diagnostics_log_level": str(self.log_level_combo.currentData()),
@@ -1906,6 +1926,12 @@ class AccountListItem(QFrame):
         name_row = QHBoxLayout()
         name_row.setSpacing(4)
 
+        self.pin_label = QLabel("★")
+        self.pin_label.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.pin_label.setVisible(bool(getattr(self.account, "is_pinned", False)))
+        self.pin_label.setStyleSheet("background: transparent; border: none;")
+        name_row.addWidget(self.pin_label)
+
         self.name_label = QLabel(self.account.display_name)
         self.name_label.setFont(name_font)
         self.name_label.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -2019,12 +2045,18 @@ class AccountListItem(QFrame):
             username_color = "#d2dbf5" if self._logged_in else "#b5bfdc"
             region_color = "#c0cbea" if self._logged_in else "#9aa8cd"
             tag_color = "#c7d3f0"
+            pin_color = "#f6c453"
             self.name_label.setStyleSheet("background: transparent; border: none; color: #e8edff;")
         else:
             username_color = "#6b7280"
             region_color = "#6b7280"
             tag_color = "#9aa1b2"
+            pin_color = "#9a6f2a"
             self.name_label.setStyleSheet("background: transparent; border: none; color: #111827;")
+
+        self.pin_label.setStyleSheet(
+            f"background: transparent; border: none; color: {pin_color}; font-size: 11px;"
+        )
 
         self.tag_line_label.setStyleSheet(
             f"background: transparent; border: none; color: {tag_color};"
@@ -2381,6 +2413,7 @@ class MainWindow(QMainWindow):
         self._clipboard_auto_clear_seconds: int = int(self._settings.get('clipboard_auto_clear_seconds', 0))
         self._confirm_before_launch: bool = bool(self._settings.get('confirm_before_launch', True))
         self._confirm_before_delete: bool = bool(self._settings.get('confirm_before_delete', True))
+        self._account_sort_mode: str = str(self._settings.get('account_sort_mode', 'manual'))
         self._rank_refresh_mode: str = str(self._settings.get('rank_refresh_mode', 'manual'))
         self._auto_check_updates: bool = bool(self._settings.get('auto_check_updates', True))
         self._diagnostics_log_level: str = str(self._settings.get('diagnostics_log_level', 'INFO')).upper()
@@ -2734,6 +2767,7 @@ class MainWindow(QMainWindow):
         self._clipboard_auto_clear_seconds = int(values.get('clipboard_auto_clear_seconds', self._clipboard_auto_clear_seconds))
         self._confirm_before_launch = bool(values.get('confirm_before_launch', self._confirm_before_launch))
         self._confirm_before_delete = bool(values.get('confirm_before_delete', self._confirm_before_delete))
+        self._account_sort_mode = str(values.get('account_sort_mode', self._account_sort_mode or 'manual'))
         self._rank_refresh_mode = str(values.get('rank_refresh_mode', self._rank_refresh_mode))
         self._auto_check_updates = bool(values.get('auto_check_updates', self._auto_check_updates))
         self._diagnostics_log_level = str(values.get('diagnostics_log_level', self._diagnostics_log_level)).upper()
@@ -3308,6 +3342,46 @@ QMenu#trayQuickMenu::separator {
             "comfortable": 84,
             "spacious": 96,
         }.get(self._row_density, 84)
+
+    def _sorted_accounts(self, accounts: list[Account]) -> list[Account]:
+        """Return accounts sorted by current mode with pinned accounts first."""
+        if not accounts:
+            return []
+
+        indexed = list(enumerate(accounts))
+        mode = str(self._account_sort_mode or "manual")
+
+        if mode == "alphabetical":
+            indexed.sort(
+                key=lambda pair: (
+                    not bool(getattr(pair[1], "is_pinned", False)),
+                    (str(getattr(pair[1], "display_name", "") or pair[1].username)).casefold(),
+                    pair[0],
+                )
+            )
+            return [acc for _, acc in indexed]
+
+        if mode == "last_used":
+            indexed.sort(
+                key=lambda pair: (
+                    not bool(getattr(pair[1], "is_pinned", False)),
+                    str(getattr(pair[1], "last_launched_at", "") or ""),
+                    pair[0],
+                )
+            )
+            # Keep most-recent timestamps first inside each pinned group.
+            indexed.sort(
+                key=lambda pair: str(getattr(pair[1], "last_launched_at", "") or ""),
+                reverse=True,
+            )
+            indexed.sort(
+                key=lambda pair: not bool(getattr(pair[1], "is_pinned", False))
+            )
+            return [acc for _, acc in indexed]
+
+        # Manual order preserves stored order while still bubbling pinned accounts.
+        indexed.sort(key=lambda pair: (not bool(getattr(pair[1], "is_pinned", False)), pair[0]))
+        return [acc for _, acc in indexed]
     
     def refresh_account_list(self):
         """Refresh the account list display"""
@@ -3317,6 +3391,7 @@ QMenu#trayQuickMenu::separator {
             return
         
         accounts = self.account_manager.get_all_accounts()
+        accounts = self._sorted_accounts(accounts)
         self._rebuild_tag_filter_options(accounts)
         filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
         
@@ -3525,6 +3600,8 @@ QMenu#trayQuickMenu::separator {
         menu.setAttribute(Qt.WA_TranslucentBackground, True)
         menu.setContentsMargins(0, 0, 0, 0)
         menu.setStyleSheet(self._account_context_menu_stylesheet())
+        toggle_pin_action = menu.addAction("Unpin Account" if getattr(account, "is_pinned", False) else "Pin Account")
+        menu.addSeparator()
         open_opgg_profile_action = menu.addAction("Open OP.GG Profile")
         open_opgg_ingame_action = menu.addAction("Open Live-Game Page")
         menu.addSeparator()
@@ -3533,7 +3610,13 @@ QMenu#trayQuickMenu::separator {
         copy_friend_code_action = menu.addAction("Copy Friend Code")
 
         chosen_action = menu.exec_(self.account_list.viewport().mapToGlobal(position))
-        if chosen_action == open_opgg_profile_action:
+        if chosen_action == toggle_pin_action:
+            try:
+                self.account_manager.set_account_pinned(account.username, not bool(getattr(account, "is_pinned", False)))
+                self.refresh_account_list()
+            except Exception as exc:
+                self._show_error("Pin", f"Could not update pin state: {exc}")
+        elif chosen_action == open_opgg_profile_action:
             self._open_opgg_profile(account)
         elif chosen_action == open_opgg_ingame_action:
             self._open_ingame_webpage(self._build_opgg_ingame_url(account))
@@ -3783,9 +3866,13 @@ QMenu::separator {
             username = self.current_launch_username or "Unknown"
             account = self.account_manager.get_account(username) if self.account_manager else None
             if account:
+                try:
+                    self.account_manager.mark_account_launched(account.username)
+                except Exception:
+                    logging.debug("Could not update last launch timestamp", exc_info=True)
                 self._logged_in_username = account.username
                 self._session_miss_count = 0
-                self.update_account_item_states()
+                self.refresh_account_list()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
         else:
