@@ -3957,7 +3957,6 @@ class MainWindow(QMainWindow):
         self._apply_account_list_background()
 
         self.update_account_item_states()
-        self._apply_title_bar_theme()
         if self._tray_menu:
             self._tray_menu.setStyleSheet(self._tray_menu_stylesheet())
         # Delay icon refresh to ensure stylesheet is fully applied
