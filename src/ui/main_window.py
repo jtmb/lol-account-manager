@@ -4093,58 +4093,63 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
     if (!document.getElementById('_ugg_embed_hide')) {
         var s = document.createElement('style');
         s.id = '_ugg_embed_hide';
-        /* Hide every <nav> and <aside> on the page; u.gg profile tabs use
-           plain <div>s so this won't remove the Overview / Champion Stats row. */
         s.textContent = [
-            'nav { display:none!important }',
-            'aside { display:none!important }',
-            '[role="navigation"] { display:none!important }',
-            '[role="complementary"] { display:none!important }',
-            /* class-fragment matches for CSS-Modules hashed names */
-            '[class*="Sidebar"] { display:none!important }',
-            '[class*="sidebar"] { display:none!important }',
-            '[class*="SideNav"] { display:none!important }',
-            '[class*="TopNav"] { display:none!important }',
-            '[class*="NavBar"] { display:none!important }',
-            '[class*="nav-bar"] { display:none!important }',
-            '[class*="GameSelector"] { display:none!important }',
-            '[class*="game-selector"] { display:none!important }',
-            /* remove left offset from content area */
-            '[class*="ContentContainer"] { padding-left:0!important; margin-left:0!important }',
-            '[class*="content-container"] { padding-left:0!important; margin-left:0!important }'
+            /* Hide ALL nav and aside globally */
+            'nav { display:none!important; visibility:hidden!important; }',
+            'aside { display:none!important; visibility:hidden!important; }',
+            '[role="navigation"] { display:none!important; visibility:hidden!important; }',
+            '[role="complementary"] { display:none!important; visibility:hidden!important; }',
+            /* Hide elements by class patterns (CSS Modules) */
+            '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
+            '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
+            '[class*="TopNav"] { display:none!important; visibility:hidden!important; }',
+            '[class*="NavBar"] { display:none!important; visibility:hidden!important; }',
+            '[class*="nav-bar"] { display:none!important; visibility:hidden!important; }',
+            '[class*="game-selector"] { display:none!important; visibility:hidden!important; }',
+            '[class*="GameSelector"] { display:none!important; visibility:hidden!important; }',
+            /* Remove offsets caused by hidden elements */
+            'body { margin:0!important; padding:0!important; }',
+            '[class*="Layout"] { margin-left:0!important; padding-left:0!important; }',
+            '[class*="layout"] { margin-left:0!important; padding-left:0!important; }',
+            '[class*="Container"] { margin-left:0!important; padding-left:0!important; }',
+            '[class*="container"] { margin-left:0!important; padding-left:0!important; }',
+            '[class*="ContentWrapper"] { margin-left:0!important; padding-left:0!important; width:100%!important; }',
+            '[class*="content-wrapper"] { margin-left:0!important; padding-left:0!important; width:100%!important; }',
+            '[class*="Wrapper"] { margin-left:0!important; padding-left:0!important; }',
+            '[class*="wrapper"] { margin-left:0!important; padding-left:0!important; }',
+            /* Ensure main content area takes full width */
+            'main { width:100%!important; margin-left:0!important; padding-left:0!important; }',
+            '[role="main"] { width:100%!important; margin-left:0!important; padding-left:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
     }
 
-    /* ── direct element hide (handles elements already in DOM) ───────── */
-    var targets = document.querySelectorAll(
-        'nav, aside, [role="navigation"], [role="complementary"]'
-    );
-    targets.forEach(function(el) {
-        el.style.setProperty('display', 'none', 'important');
+    /* ── immediately hide any nav/aside in DOM ───────────────────────── */
+    document.querySelectorAll('nav, aside').forEach(function(el) {
+        el.style.cssText = 'display:none!important; visibility:hidden!important; height:0!important; width:0!important; margin:0!important; padding:0!important; overflow:hidden!important;';
     });
 
-    /* ── game-tab link container ─────────────────────────────────────── */
-    /* Walk up from any game-tab anchor and hide its outermost container
-       that is a direct child of <body> or of the app root. */
-    var gameHrefs = ['/lol', '/valorant', '/tft', '/deadlock'];
-    gameHrefs.forEach(function(href) {
-        var links = document.querySelectorAll('a[href="' + href + '"]');
-        links.forEach(function(link) {
-            var el = link;
-            for (var i = 0; i < 8; i++) {
-                if (!el.parentElement) break;
-                el = el.parentElement;
-                /* stop at a direct child of body / app root */
-                var pp = el.parentElement;
-                if (pp && (pp === document.body || pp.id === 'root' ||
-                           pp.id === '__next' || pp.tagName === 'BODY')) {
-                    el.style.setProperty('display', 'none', 'important');
-                    break;
-                }
+    /* ── hide by finding elements containing game links ──────────────── */
+    ['lol', 'valorant', 'rematch', 'teamfight', 'deadlock', 'worldcraft', 'helldivers'].forEach(function(game) {
+        document.querySelectorAll('a[href*="/' + game + '"]').forEach(function(link) {
+            var container = link.closest('nav, aside, [class*="Selector"], [class*="selector"]');
+            if (container) {
+                container.style.cssText = 'display:none!important; visibility:hidden!important;';
             }
         });
     });
+
+    /* ── hide left sidebar icons (colored squares on left) ────────────── */
+    var allDivs = document.querySelectorAll('div');
+    for (var i = 0; i < allDivs.length; i++) {
+        var div = allDivs[i];
+        var style = window.getComputedStyle(div);
+        /* Sidebar is typically narrow, fixed-position, on the left */
+        if (style.position === 'fixed' && style.left === '0px' && 
+            parseInt(style.width) < 100) {
+            div.style.display = 'none';
+        }
+    }
 })();
 """
         self._web_view.page().runJavaScript(js)
