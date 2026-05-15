@@ -146,8 +146,10 @@ if !errorlevel! neq 0 (
         echo.
         echo ----- Last 80 log lines -----
         powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 80"
+        start "" notepad.exe "%APP_LOG%"
     )
     pause
+    exit /b 1
 )
 
 popd >nul 2>&1

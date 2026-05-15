@@ -169,6 +169,7 @@ if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "----- Last 80 log lines -----"
         Get-Content -LiteralPath $appLog -Tail 80
+        Start-Process notepad.exe -ArgumentList $appLog
     }
     Read-Host "Press Enter to exit"
 }
