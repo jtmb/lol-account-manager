@@ -2562,6 +2562,18 @@ class SettingsDialog(QDialog):
         "1920x1080",
     ]
 
+    CHAMP_SELECT_RESOLUTIONS = [
+        "800x900",
+        "900x1000",
+        "1000x1100",
+        "1134x1200",
+        "1280x1300",
+        "1440x1440",
+        "1600x1600",
+        "1920x1080",
+        "1920x1200",
+    ]
+
     TEXT_ZOOM_OPTIONS = [
         ("90%", 90),
         ("100%", 100),
@@ -2897,6 +2909,10 @@ class SettingsDialog(QDialog):
             index = self.window_size_combo.findText(window_size)
             self.window_size_combo.setCurrentIndex(0 if index < 0 else index)
 
+        champ_select_size = str(values.get("champ_select_window_size", "1134x1200"))
+        cs_idx = self.champ_select_size_combo.findText(champ_select_size)
+        self.champ_select_size_combo.setCurrentIndex(0 if cs_idx < 0 else cs_idx)
+
         self._set_combo_to_data(self.text_zoom_combo, int(values.get("text_zoom_percent", 110)))
         self.show_ranks_checkbox.setChecked(bool(values.get("show_ranks", True)))
         self.show_images_checkbox.setChecked(bool(values.get("show_rank_images", True)))
@@ -3023,6 +3039,18 @@ class SettingsDialog(QDialog):
                 index = 0
             self.window_size_combo.setCurrentIndex(index)
         general_layout.addWidget(self.window_size_combo)
+
+        general_layout.addWidget(QLabel("Champ Select window size:"))
+        self.champ_select_size_combo = QComboBox()
+        for res in self.CHAMP_SELECT_RESOLUTIONS:
+            self.champ_select_size_combo.addItem(res)
+        self.champ_select_size_combo.setToolTip(
+            "The window will automatically resize to this resolution when champ select opens."
+        )
+        cs_size = str(self._settings.get("champ_select_window_size", "1134x1200"))
+        cs_index = self.champ_select_size_combo.findText(cs_size)
+        self.champ_select_size_combo.setCurrentIndex(0 if cs_index < 0 else cs_index)
+        general_layout.addWidget(self.champ_select_size_combo)
 
         appearance_layout.addWidget(QLabel("Text Size:"))
         self.text_zoom_combo = QComboBox()
@@ -3696,6 +3724,7 @@ class SettingsDialog(QDialog):
             "diagnostics_log_level": str(self.log_level_combo.currentData()),
             "window_size": window_size,
             "window_size_mode": window_size_mode,
+            "champ_select_window_size": self.champ_select_size_combo.currentText(),
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
@@ -4566,6 +4595,9 @@ class MainWindow(QMainWindow):
         ).strip().lower()
         if self._window_size_mode not in {'static', 'custom'}:
             self._window_size_mode = 'custom' if self._window_size not in SettingsDialog.COMMON_RESOLUTIONS else 'static'
+        self._champ_select_window_size: str = str(self._settings.get('champ_select_window_size', '1134x1200'))
+        self._in_champ_select_mode: bool = False
+        self._pre_champ_select_size: str = ""
         self._search_query: str = ""
         self._tag_filter_value: str = "__all__"
         self._rank_threads: list = []  # keep references so threads aren't GC'd
@@ -4691,7 +4723,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(top_row)
 
         filter_row = QHBoxLayout()
-        filter_row.addWidget(QLabel("Filters:"))
+        self._filters_label = QLabel("Filters:")
+        filter_row.addWidget(self._filters_label)
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("accountSearchInput")
@@ -4704,14 +4737,15 @@ class MainWindow(QMainWindow):
         self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.tag_filter_combo)
 
-        clear_filters_btn = QPushButton("Clear")
-        clear_filters_btn.clicked.connect(self._clear_filters)
-        filter_row.addWidget(clear_filters_btn)
+        self.clear_filters_btn = QPushButton("Clear")
+        self.clear_filters_btn.clicked.connect(self._clear_filters)
+        filter_row.addWidget(self.clear_filters_btn)
 
         layout.addLayout(filter_row)
         
         # Account list
-        layout.addWidget(QLabel("Saved Accounts:"))
+        self._saved_accounts_label = QLabel("Saved Accounts:")
+        layout.addWidget(self._saved_accounts_label)
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
         account_list_layout = QVBoxLayout(self.account_list_background)
@@ -4881,9 +4915,43 @@ class MainWindow(QMainWindow):
         finally:
             self._suppress_window_size_persistence = False
 
+    def _enter_champ_select_mode(self):
+        """Resize window and disable home-page UI elements for champ select."""
+        if self._in_champ_select_mode:
+            return
+        self._in_champ_select_mode = True
+        self._pre_champ_select_size = f"{self.width()}x{self.height()}"
+        self._apply_window_size(self._champ_select_window_size)
+        for widget in (
+            self.search_input, self.tag_filter_combo, self.clear_filters_btn,
+            self._filters_label, self._saved_accounts_label,
+            self.launch_btn, self.add_btn, self.edit_btn, self.delete_btn,
+        ):
+            if hasattr(self, widget.objectName() if callable(getattr(widget, "objectName", None)) else "__none__") or True:
+                widget.setEnabled(False)
+
+    def _exit_champ_select_mode(self):
+        """Restore window size and re-enable home-page UI elements after champ select."""
+        if not self._in_champ_select_mode:
+            return
+        self._in_champ_select_mode = False
+        restore = self._pre_champ_select_size or self._window_size
+        self._pre_champ_select_size = ""
+        self._apply_window_size(restore)
+        for widget in (
+            self.search_input, self.tag_filter_combo, self.clear_filters_btn,
+            self._filters_label, self._saved_accounts_label,
+            self.add_btn,
+        ):
+            widget.setEnabled(True)
+        # Restore state-dependent buttons via normal update
+        self.update_account_item_states()
+
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
         if self.isMaximized() or self.isFullScreen():
+            return
+        if self._in_champ_select_mode:
             return
         current_resolution = f"{self.width()}x{self.height()}"
         self._window_size = current_resolution
@@ -4897,6 +4965,8 @@ class MainWindow(QMainWindow):
         if self._suppress_window_size_persistence:
             return
         if self.isMaximized() or self.isFullScreen():
+            return
+        if self._in_champ_select_mode:
             return
         self._window_size_mode = 'custom'
         self._window_resize_save_timer.start()
@@ -5462,6 +5532,7 @@ class MainWindow(QMainWindow):
         self._window_size_mode = str(values.get('window_size_mode', 'custom')).strip().lower()
         if self._window_size_mode not in {'static', 'custom'}:
             self._window_size_mode = 'custom'
+        self._champ_select_window_size = str(values.get('champ_select_window_size', self._champ_select_window_size))
 
         self._settings['window_size_mode'] = self._window_size_mode
         if self._window_size_mode == 'custom':
@@ -6795,6 +6866,8 @@ QMenu#trayQuickMenu::separator {
         if self.game_info_panel:
             self.game_info_panel.update_payload(payload)
         if self.main_area_stack:
+            if self.main_area_stack.currentIndex() != 1:
+                self._enter_champ_select_mode()
             self.main_area_stack.setCurrentIndex(1)
 
     def _close_champ_select_assistant(self):
@@ -6802,6 +6875,8 @@ QMenu#trayQuickMenu::separator {
         self._last_champ_select_signature = ""
         self._last_champ_select_refresh_at = 0.0
         if self.main_area_stack:
+            if self.main_area_stack.currentIndex() == 1:
+                self._exit_champ_select_mode()
             self.main_area_stack.setCurrentIndex(0)
 
     def _show_game_panel_ingame(self):
