@@ -5566,6 +5566,8 @@ class MainWindow(QMainWindow):
         account row and has up-to-date content.  Safe to call at any time."""
         if self._in_champ_select_mode:
             return
+        if getattr(self, '_spotlight_user_dismissed', False):
+            return
         if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
             return
 
@@ -5646,11 +5648,18 @@ class MainWindow(QMainWindow):
         """Exit spotlight mode and return to the normal home view."""
         if not self.account_spotlight_panel:
             return
-        # Re-parent and hide spotlight, then refresh the list
-        self.account_spotlight_panel.setParent(self.account_list_background)
-        self.account_spotlight_panel.hide()
+        # Suppress auto-reshow until the logged-in account changes
+        self._spotlight_user_dismissed = True
+        # Remove the spotlight list item without triggering a full list rebuild
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                # Re-parent BEFORE takeItem so Qt doesn't delete the widget
+                self.account_spotlight_panel.setParent(self.account_list_background)
+                self.account_spotlight_panel.hide()
+                self.account_list.takeItem(index)
+                break
         self._exit_spotlight_ui_mode()
-        self.refresh_account_list(fetch_ranks=False)
 
     def _enter_spotlight_ui_mode(self):
         """Hide filters, bottom buttons and main scrollbar while spotlight is visible."""
@@ -7890,6 +7899,7 @@ QMenu#trayQuickMenu::separator {
             self._session_miss_count = 0
             if matched_username != self._logged_in_username:
                 self._logged_in_username = matched_username
+                self._spotlight_user_dismissed = False  # new account logged in — allow spotlight
                 self.update_account_item_states()
                 # Start in-game watcher for externally logged-in account if not already running
                 if not self.ingame_watch_thread or not self.ingame_watch_thread.isRunning():
