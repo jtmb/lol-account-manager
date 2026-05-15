@@ -7951,7 +7951,7 @@ QMenu#trayQuickMenu::separator {
             return
         self._spotlight_user_dismissed = False
 
-        # If spotlight is already in the list, just update content and return
+        # If spotlight is already in the list, just update content and scroll
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
@@ -7960,6 +7960,11 @@ QMenu#trayQuickMenu::separator {
                 self.account_spotlight_panel.set_account(account, rank_data, profile_url)
                 QTimer.singleShot(200, self._update_webview_zoom)
                 self._enter_spotlight_ui_mode()
+                # Scroll to the account row above the spotlight
+                if index > 0:
+                    row_above = self.account_list.item(index - 1)
+                    if row_above:
+                        self.account_list.scrollToItem(row_above, self.account_list.PositionAtTop)
                 return
 
         # Find the row for this account and insert spotlight after it
@@ -7987,7 +7992,10 @@ QMenu#trayQuickMenu::separator {
         rank_data = self._rank_data_by_username.get(account.username, {})
         self.account_spotlight_panel.set_account(account, rank_data, profile_url)
         QTimer.singleShot(200, self._update_webview_zoom)
-        self.account_list.scrollToItem(spotlight_item)
+        # Scroll so the account row is at the top, spotlight fills the view below it
+        account_item = self.account_list.item(target_row)
+        if account_item:
+            self.account_list.scrollToItem(account_item, self.account_list.PositionAtTop)
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
