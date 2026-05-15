@@ -5606,12 +5606,21 @@ class MainWindow(QMainWindow):
                 break
 
     def _reapply_ugg_embed_css(self):
-        """Re-apply the hide script when window resizes to ensure layout stays correct."""
+        """Dispatch resize event to trigger u.gg's responsive layout."""
         if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
             return
-        # Re-run the same proven hide script to reapply all CSS constraints
-        # This includes the max-width removal and resize listener
-        self.account_spotlight_panel._run_hide_script()
+        if self.account_spotlight_panel._web_view is not None:
+            # Only dispatch resize - don't re-apply CSS which breaks layout
+            js = r"""
+(function() {
+    /* Dispatch resize events to trigger React re-layout */
+    window.dispatchEvent(new Event('resize', { bubbles: true }));
+    setTimeout(function() {
+        window.dispatchEvent(new Event('resize', { bubbles: true }));
+    }, 100);
+})();
+"""
+            self.account_spotlight_panel._web_view.page().runJavaScript(js)
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
