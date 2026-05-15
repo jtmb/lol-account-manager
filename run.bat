@@ -13,7 +13,6 @@ cmd /k "%~f0" __KEEP
 exit /b 0
 
 :main
-setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 
 if not defined LOL_STAGED (
@@ -148,18 +147,17 @@ REM Run the application
 echo.
 echo [*] Starting League of Legends Account Manager...
 echo.
-"%VENV_PYTHON%" -X faulthandler -m src.main > "%APP_LOG%" 2>&1
-set "APP_EXIT=%errorlevel%"
-
-if !APP_EXIT! neq 0 (
+"%VENV_PYTHON%" -u -m src.main > "%APP_LOG%" 2>&1
+if !errorlevel! neq 0 (
     echo.
     echo [ERROR] Application error occurred
     echo [!] Log saved to:
     echo %APP_LOG%
     if exist "%APP_LOG%" (
         echo.
-        echo ----- Last 80 log lines -----
-        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 80"
+        echo ----- Last 100 log lines -----
+        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 100"
+        timeout /t 2 /nobreak
         start "" notepad.exe "%APP_LOG%"
     )
     pause

@@ -1506,6 +1506,18 @@ class SettingsDialog(QDialog):
         app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
         app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
         
+        # Set palette to prevent white flash on dialog creation
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(app_bg))
+        palette.setColor(QPalette.WindowText, QColor(app_text))
+        palette.setColor(QPalette.Base, QColor(app_surface))
+        palette.setColor(QPalette.AlternateBase, QColor(app_border))
+        palette.setColor(QPalette.Text, QColor(app_text))
+        palette.setColor(QPalette.Button, QColor(app_surface))
+        palette.setColor(QPalette.ButtonText, QColor(app_text))
+        palette.setColor(QPalette.BrightText, QColor(app_text))
+        self.setPalette(palette)
+        
         # Apply stylesheet minimally
         self.setStyleSheet(
             f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"

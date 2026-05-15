@@ -2,39 +2,14 @@
 import sys
 import ctypes
 import subprocess
-import faulthandler
-import traceback
-from datetime import datetime
 from pathlib import Path
 
 
-def _startup_log_path() -> Path:
-    crash_dir = Path.home() / ".lol-account-manager"
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    return crash_dir / "last-crash.log"
-
-
-_STARTUP_LOG_PATH = _startup_log_path()
-_STARTUP_LOG_FILE = _STARTUP_LOG_PATH.open("a", encoding="utf-8")
-faulthandler.enable(file=_STARTUP_LOG_FILE, all_threads=True)
-
-
-def _write_startup_crash_log(exc: BaseException) -> None:
-    _STARTUP_LOG_FILE.write(
-        f"[{datetime.now().isoformat()}] Startup exception\n\n{traceback.format_exc()}\n{type(exc).__name__}: {exc}\n"
-    )
-    _STARTUP_LOG_FILE.flush()
-
-
-try:
-    from PyQt5.QtCore import QCoreApplication
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtGui import QIcon, QPalette, QColor
-    from src.ui.main_window import MainWindow
-    from src.config.paths import load_settings
-except Exception as exc:
-    _write_startup_crash_log(exc)
-    raise
+from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QIcon, QPalette, QColor
+from src.ui.main_window import MainWindow
+from src.config.paths import load_settings
 
 
 def _detach_console() -> None:
@@ -171,8 +146,7 @@ def main():
             window.show()
 
         sys.exit(app.exec_())
-    except Exception as exc:
-        _write_startup_crash_log(exc)
+    except Exception:
         raise
 
 
