@@ -4109,17 +4109,13 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
             /* Aggressive body collapse */
-            'body, html { margin:0!important; padding:0!important; min-height:auto!important; height:auto!important; }',
-            'body > * { margin:0!important; margin-top:0!important; padding:0!important; padding-top:0!important; }',
-            /* Force content to align top with no gaps */
-            'body { display:flex!important; flex-direction:column!important; align-items:stretch!important; }',
-            'body > div:first-child { margin-top:-9999px!important; }'
+            'body, html { margin:0!important; padding:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
         /* ── immediate aggressive pass ─── */
         setTimeout(function() {
-            /* Zero out everything */
+            /* Zero out margins */
             document.body.style.margin = '0';
             document.body.style.padding = '0';
             document.body.style.marginTop = '0';
@@ -4131,30 +4127,6 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             window.scrollTo(0, 0);
             document.documentElement.scrollTop = 0;
             document.body.scrollTop = 0;
-            
-            /* Find actual content container and pull it up */
-            var mainWrapper = document.querySelector('body > div:first-child');
-            if (mainWrapper) {
-                mainWrapper.style.marginTop = '0';
-                mainWrapper.style.margin = '0';
-                mainWrapper.style.padding = '0';
-                mainWrapper.style.paddingTop = '0';
-                
-                /* Measure how far down the real content starts */
-                var allKids = mainWrapper.children;
-                var minTop = 9999;
-                for (var i = 0; i < allKids.length; i++) {
-                    var rect = allKids[i].getBoundingClientRect();
-                    if (rect.height > 0 && rect.top < minTop) {
-                        minTop = rect.top;
-                    }
-                }
-                
-                /* If there's a gap, use negative margin to pull content up */
-                if (minTop > 50) {
-                    mainWrapper.style.marginTop = '-' + minTop + 'px';
-                }
-            }
         }, 50);
         
         /* ── second pass: nuclear option - hide the first empty section ─── */
@@ -4172,26 +4144,11 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             });
         }, 100);
         
-        /* ── third pass: verify everything is at top ─── */
+        /* ── third pass: scroll to top ─── */
         setTimeout(function() {
             document.body.style.margin = '0';
             document.body.style.padding = '0';
             window.scrollTo(0, 0);
-            
-            /* Force any flex gaps to be 0 */
-            var allDivs = document.querySelectorAll('*');
-            allDivs.forEach(function(el) {
-                var computed = window.getComputedStyle(el);
-                if (computed.gap && computed.gap !== '0px') {
-                    el.style.gap = '0';
-                }
-                if (computed.rowGap && computed.rowGap !== '0px') {
-                    el.style.rowGap = '0';
-                }
-                if (el.offsetTop < 200) {
-                    el.style.marginTop = '0';
-                }
-            });
         }, 300);
         
         /* ── set up resize listener ─── */
