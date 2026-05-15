@@ -4309,55 +4309,55 @@ class MainWindow(QMainWindow):
             self._logged_in_gradient_color,
             self._logged_in_gradient_intensity,
             self._logged_in_border_width,
-            if self._logged_in and active:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_active},"
-                    f"stop:0.18 {mid_active},"
-                    "stop:1 rgba(37, 41, 61, 170));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
-            elif self._logged_in:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_idle},"
-                    f"stop:0.16 {mid_idle},"
-                    "stop:1 rgba(25, 30, 47, 95));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
-            elif active:
-                hover_bg = self._rgba(self._hover_highlight_color, 170)
-                hover_border = self._rgba(self._hover_highlight_color, 118)
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    f"background-color: {hover_bg};"
-                    f"border: 1px solid {hover_border};"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is None:
-                    self.setGraphicsEffect(self._shadow)
-            else:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background-color: transparent;"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
-            return
+            self._logged_in_border_opacity,
+            self._champion_splash_enabled,
+            self._champion_splash_champion,
+            self._champion_splash_skin,
+            self._champion_splash_opacity,
+            self._row_density,
+            self._tag_size,
+            self._tag_chip_style,
+            self._rank_icon_size,
+            self._rank_text_brightness,
+            self._show_rank_images,
+            self._show_tags,
+        )
+
+        self._settings.update(values)
+        self._start_minimized_to_tray = bool(values.get('start_minimized_to_tray', self._start_minimized_to_tray))
+        self._close_behavior = str(values.get('close_behavior', self._close_behavior))
+        self._auto_lock_minutes = int(values.get('auto_lock_minutes', self._auto_lock_minutes))
+        self._remember_password_24h = bool(values.get('remember_password_24h', self._remember_password_24h))
+        self._clipboard_auto_clear_seconds = int(values.get('clipboard_auto_clear_seconds', self._clipboard_auto_clear_seconds))
+        self._confirm_before_launch = bool(values.get('confirm_before_launch', self._confirm_before_launch))
+        self._confirm_before_delete = bool(values.get('confirm_before_delete', self._confirm_before_delete))
+        self._account_sort_mode = str(values.get('account_sort_mode', self._account_sort_mode or 'manual'))
+        self._rank_refresh_mode = str(values.get('rank_refresh_mode', self._rank_refresh_mode))
+        self._auto_check_updates = bool(values.get('auto_check_updates', self._auto_check_updates))
+        self._diagnostics_log_level = str(values.get('diagnostics_log_level', self._diagnostics_log_level)).upper()
+        self._show_ranks = bool(values['show_ranks'])
+        self._show_rank_images = bool(values['show_rank_images'])
+        self._show_tags = bool(values['show_tags'])
+        self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
+        self._tag_size = str(values['tag_size'])
+        self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
+        self._text_zoom_percent = int(values['text_zoom_percent'])
+        self._app_bg_color = str(values.get('app_bg_color', self._app_bg_color) or self._app_bg_color)
+        self._app_surface_color = str(values.get('app_surface_color', self._app_surface_color) or self._app_surface_color)
+        self._app_border_color = str(values.get('app_border_color', self._app_border_color) or self._app_border_color)
+        self._app_text_color = str(values.get('app_text_color', self._app_text_color) or self._app_text_color)
+        self._app_accent_color = str(values.get('app_accent_color', self._app_accent_color) or self._app_accent_color)
+        self._app_hover_color = str(values.get('app_hover_color', self._app_hover_color) or self._app_hover_color)
+        self._logged_in_gradient_color = str(values.get('logged_in_gradient_color', self._logged_in_gradient_color))
+        self._hover_highlight_color_setting = str(
+            values.get('hover_highlight_color', self._hover_highlight_color_setting)
+        )
+        self._hover_highlight_color = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
+        )
+        self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
+        self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
         self._champion_splash_skin = int(values.get('champion_splash_skin', self._champion_splash_skin))
         self._champion_splash_opacity = int(values.get('champion_splash_opacity', self._champion_splash_opacity))
         self._champion_splash_edge_fade = LOCKED_CHAMPION_SPLASH_EDGE_FADE
@@ -4407,54 +4407,36 @@ class MainWindow(QMainWindow):
             self._logged_in_gradient_color,
             self._logged_in_gradient_intensity,
             self._logged_in_border_width,
-            if self._logged_in and active:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_active},"
-                    f"stop:0.30 {mid_active},"
-                    "stop:1 rgba(236, 231, 223, 95));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
-            elif self._logged_in:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                    f"stop:0 {left_idle},"
-                    f"stop:0.30 {mid_idle},"
-                    "stop:1 rgba(223, 216, 205, 78));"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
-            elif active:
-                hover_bg = self._rgba(self._hover_highlight_color, 145)
-                hover_border = self._rgba(self._hover_highlight_color, 128)
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    f"background-color: {hover_bg};"
-                    f"border: 1px solid {hover_border};"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is None:
-                    self.setGraphicsEffect(self._shadow)
+            self._logged_in_border_opacity,
+            self._champion_splash_enabled,
+            self._champion_splash_champion,
+            self._champion_splash_skin,
+            self._champion_splash_opacity,
+            self._row_density,
+            self._tag_size,
+            self._tag_chip_style,
+            self._rank_icon_size,
+            self._rank_text_brightness,
+            self._show_rank_images,
+            self._show_tags,
+        )
+
+        if theme_before != theme_after:
+            self._apply_theme()
+        else:
+            self._apply_account_list_background()
+            self.update_account_item_states()
+
+        self.refresh_account_list(fetch_ranks=False)
+
+    def open_logs_folder(self):
+        """Open diagnostics logs folder in file manager."""
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(str(LOGS_DIR))
             else:
-                self.setStyleSheet(
-                    "#accountListItem {"
-                    "background-color: transparent;"
-                    "border: 1px solid transparent;"
-                    "border-radius: 10px;"
-                    "}"
-                )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
+                webbrowser.open(LOGS_DIR.resolve().as_uri())
         except Exception as exc:
             self._show_error("Logs", f"Could not open logs folder: {exc}")
 
