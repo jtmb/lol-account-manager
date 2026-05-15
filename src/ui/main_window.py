@@ -2956,7 +2956,7 @@ class AccountListItem(QFrame):
         tags = getattr(self.account, "tags", []) or []
         if self._show_tags and tags:
             size = self._tag_size_preset()
-            tags_wrap = QWidget()
+            tags_wrap = QWidget(self)
             tags_wrap.setAttribute(Qt.WA_TranslucentBackground, True)
             tags_layout = QHBoxLayout(tags_wrap)
             tags_layout.setContentsMargins(0, 0, 0, 0)
@@ -2992,7 +2992,7 @@ class AccountListItem(QFrame):
         outer.addStretch()
 
         # Rank block (right side)
-        rank_widget = QWidget()
+        rank_widget = QWidget(self)
         rank_widget.setAttribute(Qt.WA_TranslucentBackground, True)
         rank_widget.setStyleSheet("background: transparent; border: none;")
         rank_layout = QHBoxLayout(rank_widget)
@@ -3458,6 +3458,7 @@ class MainWindow(QMainWindow):
         self._row_density: str = str(self._settings.get('row_density', 'compact'))
         self._rank_icon_size: int = int(self._settings.get('rank_icon_size', 34))
         self._rank_text_brightness: int = int(self._settings.get('rank_text_brightness', 100))
+        self._pending_rank_fetch_after_modal: bool = False
         self._window_size: str = self._settings.get('window_size', '800x600')
         self._window_size_mode: str = str(
             self._settings.get(
@@ -3972,7 +3973,7 @@ class MainWindow(QMainWindow):
         _hide_any_python_titled_window()
         self._apply_account_list_background()
         self.update_account_item_states()
-        self.refresh_account_list(fetch_ranks=True)
+        self._refresh_visible_ranks()
         self._set_refresh_icon_normal()
         # Burst suppression to catch delayed popup creation.
         QTimer.singleShot(25, _hide_any_python_titled_window)
@@ -4256,6 +4257,9 @@ class MainWindow(QMainWindow):
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
+            if self._pending_rank_fetch_after_modal and not QApplication.activeModalWidget():
+                self._pending_rank_fetch_after_modal = False
+                QTimer.singleShot(0, lambda: self.refresh_account_list(fetch_ranks=True))
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
@@ -4390,7 +4394,10 @@ class MainWindow(QMainWindow):
             self._apply_account_list_background()
             self.update_account_item_states()
 
-        self.refresh_account_list(fetch_ranks=True)
+        if QApplication.activeModalWidget():
+            self._pending_rank_fetch_after_modal = True
+        else:
+            self.refresh_account_list(fetch_ranks=True)
         QTimer.singleShot(25, _hide_any_python_titled_window)
         QTimer.singleShot(75, _hide_any_python_titled_window)
         QTimer.singleShot(150, _hide_any_python_titled_window)
@@ -5381,6 +5388,7 @@ QMenu#trayQuickMenu::separator {
             return
 
         if QApplication.activeModalWidget():
+            self._pending_rank_fetch_after_modal = True
             return
 
         # Stop leftover threads from a previous refresh
