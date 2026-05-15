@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
-    QStackedWidget
+    QStackedWidget, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
@@ -1584,12 +1584,12 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._skill_path_grid.setHorizontalSpacing(3)
         self._skill_path_grid.setVerticalSpacing(4)
         self._skill_path_grid_wrap = QWidget()
-        self._skill_path_grid_wrap.setMaximumWidth(700)
+        self._skill_path_grid_wrap.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         skill_grid_wrap_layout = QVBoxLayout(self._skill_path_grid_wrap)
         skill_grid_wrap_layout.setContentsMargins(0, 0, 0, 0)
         skill_grid_wrap_layout.setSpacing(0)
         skill_grid_wrap_layout.addLayout(self._skill_path_grid)
-        path_col.addWidget(self._skill_path_grid_wrap, 0, Qt.AlignLeft)
+        path_col.addWidget(self._skill_path_grid_wrap, 1)
         path_col.addStretch()
 
         self._skill_path_meta = QLabel("—")
@@ -1945,7 +1945,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         spacing = max(0, self._skill_path_grid.horizontalSpacing())
         usable = max(520, available_width - 8)
         cell_w = int((usable - 24 - (18 * spacing)) / 18)
-        cell_w = max(24, min(32, cell_w))
+        cell_w = max(24, min(34, cell_w))
         cell_h = 26 if cell_w <= 26 else 28
         row_label_w = 24 if cell_w <= 26 else 26
         header_h = 18
