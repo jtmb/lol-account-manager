@@ -75,19 +75,19 @@ DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#4
 
 def _default_logged_in_highlight(dark_mode: bool) -> str:
     """Return theme-appropriate default logged-in highlight color."""
-    return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK if dark_mode else DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT
+    return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK
 
 
 def _default_row_hover_highlight(dark_mode: bool) -> str:
     """Return theme-appropriate default hover/selection row highlight color."""
-    return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK if dark_mode else DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT
+    return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK
 
 
 def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
     """Resolve effective hover color from saved setting or theme auto mode."""
     value = str(setting_value or HOVER_HIGHLIGHT_THEME_AUTO).strip()
     if value == HOVER_HIGHLIGHT_THEME_AUTO:
-        return _default_row_hover_highlight(dark_mode)
+        return _default_row_hover_highlight(True)
     return value
 
 
@@ -175,7 +175,7 @@ class AccountListBackgroundFrame(QFrame):
         self.update()
 
     def set_dark_mode(self, enabled: bool):
-        self._dark_mode = bool(enabled)
+        self._dark_mode = True
         self.update()
 
     def paintEvent(self, event):
@@ -354,7 +354,7 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
             ctypes.sizeof(corner_preference),
         )
 
-        value = ctypes.c_int(1 if dark_mode else 0)
+        value = ctypes.c_int(1)
         ctypes.windll.dwmapi.DwmSetWindowAttribute(
             hwnd,
             DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -362,12 +362,8 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
             ctypes.sizeof(value),
         )
 
-        if dark_mode:
-            caption_color = ctypes.c_int(0x302B2B)
-            text_color = ctypes.c_int(0xF4D6CD)
-        else:
-            caption_color = ctypes.c_int(0xF2F2F2)
-            text_color = ctypes.c_int(0x1E1E1E)
+        caption_color = ctypes.c_int(0x302B2B)
+        text_color = ctypes.c_int(0xF4D6CD)
 
         border_color = caption_color
 
@@ -858,29 +854,16 @@ class InGameDiagnosticsDialog(QDialog):
         self.setModal(False)
         self.setMinimumSize(520, 330)
 
-        dark_mode = bool(getattr(parent, "_dark_mode", True))
-        if dark_mode:
-            self.setStyleSheet(
-                "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
-                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #e2e8f0; }"
-                "QLabel#diagValue { color: #dbe4ff; }"
-                "QPushButton {"
-                "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
-                "border-radius: 6px; padding: 6px 12px;"
-                "}"
-                "QPushButton:hover { background-color: #45475a; }"
-            )
-        else:
-            self.setStyleSheet(
-                "QDialog { background-color: #fafafa; color: #2e2d2a; }"
-                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #2e2d2a; }"
-                "QLabel#diagValue { color: #2e2d2a; }"
-                "QPushButton {"
-                "background-color: #d2d3db; color: #2e2d2a; border: 1px solid #c4c6cf;"
-                "border-radius: 6px; padding: 6px 12px;"
-                "}"
-                "QPushButton:hover { background-color: #c8c9d1; }"
-            )
+        self.setStyleSheet(
+            "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
+            "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #e2e8f0; }"
+            "QLabel#diagValue { color: #dbe4ff; }"
+            "QPushButton {"
+            "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
+            "border-radius: 6px; padding: 6px 12px;"
+            "}"
+            "QPushButton:hover { background-color: #45475a; }"
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -1040,81 +1023,41 @@ class LaunchProgressDialog(QDialog):
         self.setMaximumWidth(560)
         self.setAttribute(Qt.WA_StyledBackground, True)
 
-        dark_mode = bool(getattr(parent, "_dark_mode", True))
-        if dark_mode:
-            self.setStyleSheet(
-                "QDialog {"
-                "background-color: #1e1e2e;"
-                "color: #cdd6f4;"
-                "}"
-                "QLabel#launchTitle {"
-                "font-size: 12pt;"
-                "font-weight: 600;"
-                "color: #e2e8f0;"
-                "}"
-                "QLabel#launchMessage {"
-                "font-size: 10.5pt;"
-                "color: #cdd6f4;"
-                "}"
-                "QProgressBar {"
-                "border: 1px solid #45475a;"
-                "border-radius: 7px;"
-                "background-color: #181825;"
-                "text-align: center;"
-                "min-height: 18px;"
-                "}"
-                "QProgressBar::chunk {"
-                "border-radius: 6px;"
-                "background-color: #7aa2f7;"
-                "}"
-                "QPushButton {"
-                "background-color: #313244;"
-                "color: #cdd6f4;"
-                "border: 1px solid #45475a;"
-                "border-radius: 5px;"
-                "padding: 6px 12px;"
-                "}"
-                "QPushButton:hover { background-color: #45475a; }"
-                "QPushButton:pressed { background-color: #585b70; }"
-            )
-        else:
-            self.setStyleSheet(
-                "QDialog {"
-                "background-color: #f4f4f4;"
-                "color: #2e2d2a;"
-                "}"
-                "QLabel#launchTitle {"
-                "font-size: 12pt;"
-                "font-weight: 600;"
-                "background-color: transparent;"
-                "color: #2e2d2a;"
-                "}"
-                "QLabel#launchMessage {"
-                "font-size: 10.5pt;"
-                "background-color: transparent;"
-                "color: #49453f;"
-                "}"
-                "QProgressBar {"
-                "border: 1px solid #d0d0d6;"
-                "border-radius: 7px;"
-                "background-color: #f0f1f5;"
-                "text-align: center;"
-                "min-height: 18px;"
-                "}"
-                "QProgressBar::chunk {"
-                "border-radius: 6px;"
-                "background-color: #b6b8c3;"
-                "}"
-                "QPushButton {"
-                "background-color: #d2d3db;"
-                "color: #2e2d2a;"
-                "border: 1px solid #c4c6cf;"
-                "border-radius: 5px;"
-                "padding: 6px 12px;"
-                "}"
-                "QPushButton:hover { background-color: #c8c9d1; }"
-                "QPushButton:pressed { background-color: #bebfc8; }"
-            )
+        self.setStyleSheet(
+            "QDialog {"
+            "background-color: #1e1e2e;"
+            "color: #cdd6f4;"
+            "}"
+            "QLabel#launchTitle {"
+            "font-size: 12pt;"
+            "font-weight: 600;"
+            "color: #e2e8f0;"
+            "}"
+            "QLabel#launchMessage {"
+            "font-size: 10.5pt;"
+            "color: #cdd6f4;"
+            "}"
+            "QProgressBar {"
+            "border: 1px solid #45475a;"
+            "border-radius: 7px;"
+            "background-color: #181825;"
+            "text-align: center;"
+            "min-height: 18px;"
+            "}"
+            "QProgressBar::chunk {"
+            "border-radius: 6px;"
+            "background-color: #7aa2f7;"
+            "}"
+            "QPushButton {"
+            "background-color: #313244;"
+            "color: #cdd6f4;"
+            "border: 1px solid #45475a;"
+            "border-radius: 5px;"
+            "padding: 6px 12px;"
+            "}"
+            "QPushButton:hover { background-color: #45475a; }"
+            "QPushButton:pressed { background-color: #585b70; }"
+        )
 
         self._title_label = QLabel("Starting launch")
         self._title_label.setObjectName("launchTitle")
@@ -2120,8 +2063,7 @@ class SettingsDialog(QDialog):
         self.logged_in_gradient_color_combo.setToolTip(
             "Choose the color used for the logged-in row highlight."
         )
-        parent_dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
-        default_gradient_color = _default_logged_in_highlight(parent_dark_mode)
+        default_gradient_color = _default_logged_in_highlight(True)
         current_gradient_color = str(
             self._settings.get("logged_in_gradient_color", default_gradient_color) or default_gradient_color
         )
@@ -2137,7 +2079,7 @@ class SettingsDialog(QDialog):
         for label, value in self.HOVER_HIGHLIGHT_COLOR_OPTIONS:
             self.hover_highlight_color_combo.addItem(label, value)
         self.hover_highlight_color_combo.setToolTip(
-            "Global Theme follows light/dark mode automatically. Pick a color here to override it."
+            "Global Theme follows the dark theme automatically. Pick a color here to override it."
         )
         default_hover_color = HOVER_HIGHLIGHT_THEME_AUTO
         current_hover_color = str(
@@ -2183,26 +2125,15 @@ class SettingsDialog(QDialog):
             self._champion_splash_line_edit.setClearButtonEnabled(True)
             self._champion_splash_line_edit.installEventFilter(self)
 
-        if parent_dark_mode:
-            edit_bg = "#171a2a"
-            edit_fg = "#dbe4ff"
-            edit_border = "#3f4b71"
-            placeholder = "#8ea1cf"
-            popup_bg = "#151b2d"
-            popup_fg = "#e9efff"
-            popup_border = "#3f4b71"
-            popup_sel_bg = "#2d3d62"
-            popup_sel_fg = "#ffffff"
-        else:
-            edit_bg = "#fafafa"
-            edit_fg = "#2e2d2a"
-            edit_border = "#d0d0d6"
-            placeholder = "#8a90a3"
-            popup_bg = "#ffffff"
-            popup_fg = "#273247"
-            popup_border = "#cfd6e6"
-            popup_sel_bg = "#e2e8f5"
-            popup_sel_fg = "#13233f"
+        edit_bg = "#171a2a"
+        edit_fg = "#dbe4ff"
+        edit_border = "#3f4b71"
+        placeholder = "#8ea1cf"
+        popup_bg = "#151b2d"
+        popup_fg = "#e9efff"
+        popup_border = "#3f4b71"
+        popup_sel_bg = "#2d3d62"
+        popup_sel_fg = "#ffffff"
 
         self.champion_splash_combo.setStyleSheet(
             "QComboBox { padding-right: 24px; }"
@@ -2578,19 +2509,11 @@ class SettingsDialog(QDialog):
             skin_line_edit.setPlaceholderText("Type skin name")
             skin_line_edit.setClearButtonEnabled(True)
 
-        dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
-        if dark_mode:
-            popup_bg = "#151b2d"
-            popup_fg = "#e9efff"
-            popup_border = "#3f4b71"
-            popup_sel_bg = "#2d3d62"
-            popup_sel_fg = "#ffffff"
-        else:
-            popup_bg = "#ffffff"
-            popup_fg = "#273247"
-            popup_border = "#cfd6e6"
-            popup_sel_bg = "#e2e8f5"
-            popup_sel_fg = "#13233f"
+        popup_bg = "#151b2d"
+        popup_fg = "#e9efff"
+        popup_border = "#3f4b71"
+        popup_sel_bg = "#2d3d62"
+        popup_sel_fg = "#ffffff"
 
         skin_completer = QCompleter(self.champion_splash_skin_combo.model(), self)
         skin_completer.setCaseSensitivity(Qt.CaseInsensitive)
@@ -4966,19 +4889,11 @@ QMenu#trayQuickMenu::separator {
             notes = str(payload.get("body") or "").strip()
             note_preview = self._build_release_notes_preview(notes)
 
-            dark_mode = bool(getattr(self, "_dark_mode", True))
-            if dark_mode:
-                dialog_bg = "#0f1424"
-                text_primary = "#eef3ff"
-                text_secondary = "#aeb6cc"
-                text_accent = "#8bb0ff"
-                divider_color = "#2b3652"
-            else:
-                dialog_bg = "#f3f5fb"
-                text_primary = "#1f2937"
-                text_secondary = "#5b657a"
-                text_accent = "#2d5ca8"
-                divider_color = "#d5dcec"
+            dialog_bg = "#0f1424"
+            text_primary = "#eef3ff"
+            text_secondary = "#aeb6cc"
+            text_accent = "#8bb0ff"
+            divider_color = "#2b3652"
 
             prompt = (
                 "<div style='margin-bottom: 8px;'>"
