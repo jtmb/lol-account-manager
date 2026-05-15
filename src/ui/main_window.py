@@ -1107,7 +1107,7 @@ class _UggBuildFetchThread(QThread):
 class InClientGamePanel(AccountListBackgroundFrame):
     """Inline panel shown in place of the account list during champ select / in-game."""
 
-    _PORTRAIT_SIZE = 80
+    _PORTRAIT_SIZE = 100
     _ICON_SIZE = 32          # rune style path icons
     _ACTIVE_PERK_SIZE = 32   # selected perk icons in the active row
     _PERK_TREE_SIZE = 30     # perk icons inside the rune tree grid
@@ -1312,7 +1312,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         self._rune_slots_stack.addLayout(self._primary_slots_col, 3)
         self._rune_slots_stack.addLayout(self._secondary_slots_col, 2)
-        runes_layout.addLayout(self._rune_slots_stack, 1)
+        runes_layout.addLayout(self._rune_slots_stack)
 
         self._shard_row = QHBoxLayout()
         self._shard_row.setSpacing(8)
@@ -1440,13 +1440,11 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         matchup_title = QLabel("Champion Matchup")
         matchup_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
-        right_layout.addWidget(matchup_title)
 
         matchup_row = QHBoxLayout()
         matchup_row.setSpacing(4)
 
         you_col = QVBoxLayout()
-        you_col.setSpacing(4)
         you_col.setAlignment(Qt.AlignHCenter)
         you_role_lbl = QLabel("YOU")
         you_role_lbl.setAlignment(Qt.AlignCenter)
@@ -1456,7 +1454,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._my_portrait.setFixedSize(self._PORTRAIT_SIZE, self._PORTRAIT_SIZE)
         self._my_portrait.setAlignment(Qt.AlignCenter)
         self._my_portrait.setStyleSheet(
-            "border-radius: 40px; background: #313244; border: 2px solid #89b4fa;"
+            "border-radius: 50px; background: #313244; border: 2px solid #89b4fa;"
         )
         you_col.addWidget(self._my_portrait, 0, Qt.AlignHCenter)
         champ_font = QFont()
@@ -1487,7 +1485,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._enemy_portrait.setFixedSize(self._PORTRAIT_SIZE, self._PORTRAIT_SIZE)
         self._enemy_portrait.setAlignment(Qt.AlignCenter)
         self._enemy_portrait.setStyleSheet(
-            "border-radius: 40px; background: #313244; border: 2px solid #f38ba8;"
+            "border-radius: 50px; background: #313244; border: 2px solid #f38ba8;"
         )
         enemy_col.addWidget(self._enemy_portrait, 0, Qt.AlignHCenter)
         self._enemy_champ_label = QLabel("—")
@@ -1497,6 +1495,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         enemy_col.addWidget(self._enemy_champ_label)
         matchup_row.addLayout(enemy_col, 1)
 
+        right_layout.addStretch(1)
+        right_layout.addWidget(matchup_title)
         right_layout.addLayout(matchup_row)
         right_layout.addStretch(1)
 
@@ -1550,7 +1550,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._skill_path_grid = QGridLayout()
         self._skill_path_grid.setHorizontalSpacing(3)
         self._skill_path_grid.setVerticalSpacing(4)
-        path_col.addLayout(self._skill_path_grid, 1)
+        path_col.addLayout(self._skill_path_grid)
+        path_col.addStretch()
 
         self._skill_path_meta = QLabel("—")
         self._skill_path_meta.setStyleSheet("color: #94a0be; font-size: 8pt;")
@@ -1558,7 +1559,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         skill_layout.addLayout(priority_col, 1)
         skill_layout.addLayout(path_col, 5)
-        outer.addWidget(skill_card, 2)
+        outer.addWidget(skill_card)  # natural height, no vertical stretch
 
         # ── Status hint ───────────────────────────────────────────────────
         self._status_label = QLabel("Waiting for champion selection…")
@@ -1861,6 +1862,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             header = QLabel(str(col))
             header.setAlignment(Qt.AlignCenter)
             header.setMinimumWidth(22)
+            header.setMaximumHeight(18)
             header.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
             self._skill_path_grid.addWidget(header, 0, col)
             self._skill_path_grid.setColumnStretch(col, 1)
@@ -1868,7 +1870,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         for row_idx, skill in enumerate(row_skills, start=1):
             row_lbl = QLabel(skill)
             row_lbl.setAlignment(Qt.AlignCenter)
-            row_lbl.setFixedSize(24, 24)
+            row_lbl.setFixedSize(24, 26)
             row_lbl.setStyleSheet(
                 f"border-radius: 4px; background: #1e1e2e; color: {color_by_skill.get(skill, '#cdd6f4')}; font-weight: bold;"
             )
@@ -1877,7 +1879,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for lv in range(1, 19):
                 cell = QLabel("")
                 cell.setAlignment(Qt.AlignCenter)
-                cell.setMinimumSize(22, 24)
+                cell.setMinimumSize(22, 26)
+                cell.setMaximumHeight(36)
                 cell.setStyleSheet("border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: 7pt;")
 
                 if lv <= len(skill_path):
