@@ -4167,23 +4167,6 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
 """
         self._web_view.page().runJavaScript(js)
 
-    def _reapply_ugg_embed_css(self):
-        """Re-apply the u.gg embed CSS (called when window state changes like maximize)."""
-        if not self.account_spotlight_panel or not self.account_spotlight_panel.isVisible():
-            return
-        # Trigger the CSS reset on the web page to adapt to new window size
-        if self.account_spotlight_panel._web_view is not None:
-            js = r"""
-(function() {
-    /* Force elements to recalculate with new viewport width */
-    document.querySelectorAll('[class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
-        el.style.maxWidth = 'none';
-        el.style.width = '100%';
-    });
-})();
-"""
-            self.account_spotlight_panel._web_view.page().runJavaScript(js)
-
     def _apply_panel_styles(self):
         text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
         text_muted = "#9fb0d5" if self._is_dark_mode else "#4b5563"
@@ -5615,6 +5598,23 @@ class MainWindow(QMainWindow):
                     self.account_spotlight_panel.setMinimumHeight(new_h)
                     self._reapply_ugg_embed_css()
                 break
+
+    def _reapply_ugg_embed_css(self):
+        """Re-apply the u.gg embed CSS (called when window state changes like maximize)."""
+        if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
+            return
+        # Trigger the CSS reset on the web page to adapt to new window size
+        if self.account_spotlight_panel._web_view is not None:
+            js = r"""
+(function() {
+    /* Force elements to recalculate with new viewport width */
+    document.querySelectorAll('[class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
+        el.style.maxWidth = 'none';
+        el.style.width = '100%';
+    });
+})();
+"""
+            self.account_spotlight_panel._web_view.page().runJavaScript(js)
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
