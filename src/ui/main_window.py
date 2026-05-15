@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
+    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget, QGroupBox,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
     QStackedWidget, QSizePolicy
