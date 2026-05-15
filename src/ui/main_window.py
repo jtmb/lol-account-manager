@@ -7498,25 +7498,22 @@ QMenu#trayQuickMenu::separator {
         """Refresh the account list display"""
         self.account_list.setUpdatesEnabled(False)
         try:
-            # Remove the spotlight item via takeItem() BEFORE clear() so that
-            # Qt's QAbstractItemView::reset() (triggered by clear()) sees an
-            # already-invalid QPersistentModelIndex and does NOT call deleteLater()
-            # on the panel widget.  Simple setParent() alone is not reliable across
-            # all Qt 5.x builds; takeItem() guarantees the index is invalidated.
+            # On Windows, QWidget::setParent() destroys and recreates the HWND.
+            # If the spotlight panel contains an active QWebEngineView the renderer
+            # process holds a reference to the old surface and crashes (0xC0000005)
+            # the moment that HWND is gone.  The fix is to NEVER call setParent
+            # during a refresh: just stop the web-view, take the spotlight item out
+            # of the list, and hide the panel.  The panel stays a child of the
+            # viewport throughout.  When _show_logged_in_spotlight() later calls
+            # setItemWidget() again, Qt calls setParent(viewport()) but the widget
+            # is already a viewport child so no HWND is recreated.
             if self.account_spotlight_panel:
                 try:
-                    spotlight_found = False
                     for idx in range(self.account_list.count()):
                         item = self.account_list.item(idx)
                         if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                            # Reparent first so Qt never treats the panel as a
-                            # viewport child scheduled for deletion.
-                            self.account_spotlight_panel.setParent(self.account_list_background)
                             self.account_list.takeItem(idx)
-                            spotlight_found = True
                             break
-                    if not spotlight_found:
-                        self.account_spotlight_panel.setParent(self.account_list_background)
                     self.account_spotlight_panel.hide()
                     self._exit_spotlight_ui_mode()
                 except RuntimeError:
