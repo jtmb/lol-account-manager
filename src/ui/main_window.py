@@ -876,6 +876,29 @@ class MasterPasswordDialog(QDialog):
         self.setWindowTitle("Master Password" if not self.is_setup else "Set Master Password")
         self.setModal(True)
         self.setMinimumWidth(350)
+
+        mw = self.parent()
+        app_bg = str(getattr(mw, "_app_bg_color", DEFAULT_APP_BG_COLOR))
+        app_surface = str(getattr(mw, "_app_surface_color", DEFAULT_APP_SURFACE_COLOR))
+        app_border = str(getattr(mw, "_app_border_color", DEFAULT_APP_BORDER_COLOR))
+        app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
+        app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
+
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAutoFillBackground(True)
+        self.setStyleSheet(
+            f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QWidget {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QLineEdit {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
+            f"QPushButton {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 5px 10px; }}"
+            f"QPushButton:hover {{ background-color: {app_hover}; }}"
+        )
+
+        if sys.platform.startswith("win"):
+            self.setAttribute(Qt.WA_NativeWindow, True)
+            self.create()
+            _apply_windows11_chrome(self, True)
+            self.setProperty("_chrome_preapplied", True)
         
         layout = QVBoxLayout()
         
@@ -1401,15 +1424,16 @@ class SettingsDialog(QDialog):
         # *before* the dialog is shown — prevents the white title bar flash.
         self.create()
         _apply_windows11_chrome(self, True)
+        self.setProperty("_chrome_preapplied", True)
 
         self.init_ui()
         self.setUpdatesEnabled(True)
         self.repaint()
 
     def showEvent(self, event):
-        super().showEvent(event)
         if sys.platform.startswith("win"):
-            QTimer.singleShot(0, lambda: _apply_windows11_chrome(self, True))
+            _apply_windows11_chrome(self, True)
+        super().showEvent(event)
 
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
@@ -3188,6 +3212,7 @@ class MainWindow(QMainWindow):
             self.setAttribute(Qt.WA_NativeWindow, True)
             self.create()
             _apply_windows11_chrome(self, self._dark_mode)
+            self.setProperty("_chrome_preapplied", True)
         self.init_ui()
         app = QApplication.instance()
         if app:
@@ -3920,6 +3945,10 @@ class MainWindow(QMainWindow):
             settings=dialog_settings,
             apply_callback=self._apply_settings_values,
         )
+        dialog.ensurePolished()
+        if sys.platform.startswith("win"):
+            dialog.create()
+            _apply_windows11_chrome(dialog, self._dark_mode)
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
         try:
@@ -4830,7 +4859,9 @@ QMenu#trayQuickMenu::separator {
                 return True
 
         if event.type() == QEvent.Show and isinstance(obj, QDialog):
-            _apply_windows11_chrome(obj, self._dark_mode)
+            if not bool(obj.property("_chrome_preapplied")):
+                _apply_windows11_chrome(obj, self._dark_mode)
+                obj.setProperty("_chrome_preapplied", True)
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.KeyPress):
             self._reset_auto_lock_timer()
         return super().eventFilter(obj, event)
