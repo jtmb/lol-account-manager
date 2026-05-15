@@ -8,8 +8,8 @@ if "%~1"=="__KEEP" (
     goto :main
 )
 
-REM First run: spawn persistent cmd window
-cmd /k "%~f0" __KEEP
+REM First run: open a new persistent cmd window, then exit this throwaway one
+start "" cmd /k ""%~f0" __KEEP"
 exit /b 0
 
 :main

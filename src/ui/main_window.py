@@ -1374,6 +1374,11 @@ class SettingsDialog(QDialog):
         _pal.setColor(QPalette.ButtonText,  _text)
         self.setPalette(_pal)
 
+        # Force HWND creation so we can apply dark-mode chrome to the title bar
+        # *before* the dialog is shown — prevents the white title bar flash.
+        self.create()
+        _apply_windows11_chrome(self, True)
+
         self.init_ui()
 
     def _default_settings_values(self) -> dict:
