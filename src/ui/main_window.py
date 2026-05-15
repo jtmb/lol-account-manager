@@ -4184,14 +4184,6 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             attributes: true, attributeFilter: ['style', 'class']
         });
     }
-
-    /* ── 5. Resize forwarding ────────────────────────────────────────── */
-    if (!window._ugg_resize_set) {
-        window._ugg_resize_set = true;
-        window.addEventListener('resize', function() {
-            window.dispatchEvent(new Event('resize', { bubbles: true }));
-        }, { passive: true });
-    }
 })();
 """
         self._web_view.page().runJavaScript(js)
@@ -5653,7 +5645,6 @@ class MainWindow(QMainWindow):
                 self.account_spotlight_panel.setMaximumHeight(new_h)
                 self.account_list.doItemsLayout()
                 self.account_list.viewport().update()
-                self._reapply_ugg_embed_css()
                 # Restore scroll position that doItemsLayout resets.
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
@@ -5726,13 +5717,7 @@ class MainWindow(QMainWindow):
         if self.account_spotlight_panel._web_view is not None:
             # Only dispatch resize - don't re-apply CSS which breaks layout
             js = r"""
-(function() {
-    /* Dispatch resize events to trigger React re-layout */
-    window.dispatchEvent(new Event('resize', { bubbles: true }));
-    setTimeout(function() {
-        window.dispatchEvent(new Event('resize', { bubbles: true }));
-    }, 100);
-})();
+window.dispatchEvent(new Event('resize', { bubbles: true }));
 """
             self.account_spotlight_panel._web_view.page().runJavaScript(js)
 
@@ -5755,7 +5740,6 @@ class MainWindow(QMainWindow):
         # Fire at 10 ms (fast) and 300 ms (safety net after slow layout settle).
         QTimer.singleShot(10, self._update_spotlight_size_hint)
         QTimer.singleShot(300, self._update_spotlight_size_hint)
-        QTimer.singleShot(100, self._reapply_ugg_embed_css)
         # After a window-state change, Qt issues an extra resize; use it to
         # reapply zoom and CSS for the new dimensions.
         if getattr(self, '_should_reapply_css_on_resize', False):
