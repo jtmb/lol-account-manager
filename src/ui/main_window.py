@@ -4074,29 +4074,77 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             webbrowser.open(self._profile_url)
 
     def _inject_hide_css(self, ok: bool):
-        """Inject CSS into the loaded u.gg page to hide site chrome that is
-        not relevant in the embedded spotlight view (top nav, left sidebar)."""
+        """Called on loadFinished. Schedules repeated hide-script runs so that
+        React-rendered elements (which arrive after the load event) are also caught."""
         if not ok or self._web_view is None:
             return
-        css = (
-            # Top navigation bar (game switcher row)
-            ".navigation-bar, .nav-bar, nav.main-nav, header > nav,"
-            " div[class*='NavigationBar'], div[class*='navigation-bar'] { display: none !important; }"
-            # Left sidebar icon panel
-            " .sidebar-icons, .sidebar-left, .main-sidebar, aside.sidebar,"
-            " div[class*='SidebarIcons'], div[class*='sidebar-icons'],"
-            " div[class*='SideBar'], div[class*='side-bar'] { display: none !important; }"
-            # Collapse left margin/padding freed by removing the sidebar
-            " .main-content, .content-section, .profile-container,"
-            " div[class*='MainContent'], div[class*='main-content'] { margin-left: 0 !important; padding-left: 0 !important; }"
-        )
+        self._run_hide_script()
+        QTimer.singleShot(600,  self._run_hide_script)
+        QTimer.singleShot(1500, self._run_hide_script)
+        QTimer.singleShot(3000, self._run_hide_script)
+
+    def _run_hide_script(self):
+        """Inject CSS + directly force-hide u.gg navigation chrome."""
+        if self._web_view is None:
+            return
         js = r"""
 (function() {
-    if (document.getElementById('_ugg_embed_hide')) return;
-    var s = document.createElement('style');
-    s.id = '_ugg_embed_hide';
-    s.textContent = """ + repr(css) + r""";
-    (document.head || document.documentElement).appendChild(s);
+    /* ── persistent style tag ───────────────────────────────────────── */
+    if (!document.getElementById('_ugg_embed_hide')) {
+        var s = document.createElement('style');
+        s.id = '_ugg_embed_hide';
+        /* Hide every <nav> and <aside> on the page; u.gg profile tabs use
+           plain <div>s so this won't remove the Overview / Champion Stats row. */
+        s.textContent = [
+            'nav { display:none!important }',
+            'aside { display:none!important }',
+            '[role="navigation"] { display:none!important }',
+            '[role="complementary"] { display:none!important }',
+            /* class-fragment matches for CSS-Modules hashed names */
+            '[class*="Sidebar"] { display:none!important }',
+            '[class*="sidebar"] { display:none!important }',
+            '[class*="SideNav"] { display:none!important }',
+            '[class*="TopNav"] { display:none!important }',
+            '[class*="NavBar"] { display:none!important }',
+            '[class*="nav-bar"] { display:none!important }',
+            '[class*="GameSelector"] { display:none!important }',
+            '[class*="game-selector"] { display:none!important }',
+            /* remove left offset from content area */
+            '[class*="ContentContainer"] { padding-left:0!important; margin-left:0!important }',
+            '[class*="content-container"] { padding-left:0!important; margin-left:0!important }'
+        ].join(' ');
+        (document.head || document.documentElement).appendChild(s);
+    }
+
+    /* ── direct element hide (handles elements already in DOM) ───────── */
+    var targets = document.querySelectorAll(
+        'nav, aside, [role="navigation"], [role="complementary"]'
+    );
+    targets.forEach(function(el) {
+        el.style.setProperty('display', 'none', 'important');
+    });
+
+    /* ── game-tab link container ─────────────────────────────────────── */
+    /* Walk up from any game-tab anchor and hide its outermost container
+       that is a direct child of <body> or of the app root. */
+    var gameHrefs = ['/lol', '/valorant', '/tft', '/deadlock'];
+    gameHrefs.forEach(function(href) {
+        var links = document.querySelectorAll('a[href="' + href + '"]');
+        links.forEach(function(link) {
+            var el = link;
+            for (var i = 0; i < 8; i++) {
+                if (!el.parentElement) break;
+                el = el.parentElement;
+                /* stop at a direct child of body / app root */
+                var pp = el.parentElement;
+                if (pp && (pp === document.body || pp.id === 'root' ||
+                           pp.id === '__next' || pp.tagName === 'BODY')) {
+                    el.style.setProperty('display', 'none', 'important');
+                    break;
+                }
+            }
+        });
+    });
 })();
 """
         self._web_view.page().runJavaScript(js)
