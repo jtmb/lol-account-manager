@@ -1340,14 +1340,6 @@ class SettingsDialog(QDialog):
             "app_accent_color": "#e85d8a",
             "app_hover_color": "#584050",
         }),
-        ("Classic Light", {
-            "app_bg_color": "#c8cad3",
-            "app_surface_color": "#eef0f3",
-            "app_border_color": "#8d909e",
-            "app_text_color": "#1e1c1a",
-            "app_accent_color": "#c0c2ca",
-            "app_hover_color": "#adb0bc",
-        }),
     ]
 
     def __init__(
@@ -1415,23 +1407,15 @@ class SettingsDialog(QDialog):
         self.app_theme_combo.blockSignals(False)
 
     def _is_classic_light_selected(self) -> bool:
-        return hasattr(self, "app_theme_combo") and self.app_theme_combo.currentText() == "Classic Light"
+        return False
 
     def _sync_champion_splash_availability(self):
-        classic_light = self._is_classic_light_selected()
-        if classic_light:
-            self.champion_splash_enabled_checkbox.blockSignals(True)
-            self.champion_splash_enabled_checkbox.setChecked(False)
-            self.champion_splash_enabled_checkbox.blockSignals(False)
-        self.champion_splash_enabled_checkbox.setEnabled(not classic_light)
-        if classic_light:
-            self.champion_splash_enabled_checkbox.setToolTip("Disabled for Classic Light preset.")
-        else:
-            self.champion_splash_enabled_checkbox.setToolTip(
-                "Show selected champion base splash art behind the account entries."
-            )
+        self.champion_splash_enabled_checkbox.setEnabled(True)
+        self.champion_splash_enabled_checkbox.setToolTip(
+            "Show selected champion base splash art behind the account entries."
+        )
 
-        splash_enabled = self.champion_splash_enabled_checkbox.isChecked() and not classic_light
+        splash_enabled = self.champion_splash_enabled_checkbox.isChecked()
         self.champion_splash_combo.setEnabled(splash_enabled)
         self.champion_splash_skin_combo.setEnabled(splash_enabled and self.champion_splash_combo.currentData() != SPLASH_THEME_AUTO)
         self.champion_splash_opacity_combo.setEnabled(splash_enabled)
@@ -1678,6 +1662,37 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.setMinimumWidth(620)
+
+        # Apply a dark fallback before child widgets are created so the dialog
+        # never flashes a light frame on first paint.
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        mw = self.parent()
+        app_bg = str(getattr(mw, "_app_bg_color", DEFAULT_APP_BG_COLOR))
+        app_surface = str(getattr(mw, "_app_surface_color", DEFAULT_APP_SURFACE_COLOR))
+        app_border = str(getattr(mw, "_app_border_color", DEFAULT_APP_BORDER_COLOR))
+        app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
+        app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
+        self.setStyleSheet(
+            "QDialog, QWidget {"
+            f"background-color: {app_bg};"
+            f"color: {app_text};"
+            "}"
+            "QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {"
+            f"background-color: {app_surface};"
+            f"color: {app_text};"
+            f"border: 1px solid {app_border};"
+            "border-radius: 4px;"
+            "padding: 4px;"
+            "}"
+            "QPushButton {"
+            f"border: 1px solid {app_border};"
+            "border-radius: 5px;"
+            "padding: 5px 10px;"
+            "}"
+            "QPushButton:hover {"
+            f"background-color: {app_hover};"
+            "}"
+        )
 
         layout = QVBoxLayout()
 

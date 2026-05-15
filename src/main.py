@@ -2,6 +2,8 @@
 import sys
 import ctypes
 import subprocess
+import traceback
+from datetime import datetime
 from pathlib import Path
 from PyQt5.QtCore import QCoreApplication
 from PyQt5.QtWidgets import QApplication
@@ -118,31 +120,41 @@ def _apply_dark_palette(app: QApplication) -> None:
 
 def main():
     """Run the application"""
-    # Detach the Windows console before anything else so it can never flash.
-    _detach_console()
-    _install_no_console_subprocess_guard()
+    try:
+        # Detach the Windows console before anything else so it can never flash.
+        _detach_console()
+        _install_no_console_subprocess_guard()
 
-    # Ensure accidental top-level Qt windows never use the default "python" title.
-    QCoreApplication.setApplicationName("League of Legends Account Manager")
+        # Ensure accidental top-level Qt windows never use the default "python" title.
+        QCoreApplication.setApplicationName("League of Legends Account Manager")
 
-    app = QApplication(sys.argv)
+        app = QApplication(sys.argv)
 
-    # Must be called before any window is created so that every widget's
-    # initial OS-level background paint uses dark colors, preventing the
-    # white flash on Windows.
-    _apply_dark_palette(app)
+        # Must be called before any window is created so that every widget's
+        # initial OS-level background paint uses dark colors, preventing the
+        # white flash on Windows.
+        _apply_dark_palette(app)
 
-    icon_path = _resource_path("assets/icon.ico")
-    if icon_path.exists():
-        app.setWindowIcon(QIcon(str(icon_path)))
-    
-    window = MainWindow()
-    if bool(load_settings().get("start_minimized_to_tray", False)):
-        window.hide()
-    else:
-        window.show()
-    
-    sys.exit(app.exec_())
+        icon_path = _resource_path("assets/icon.ico")
+        if icon_path.exists():
+            app.setWindowIcon(QIcon(str(icon_path)))
+
+        window = MainWindow()
+        if bool(load_settings().get("start_minimized_to_tray", False)):
+            window.hide()
+        else:
+            window.show()
+
+        sys.exit(app.exec_())
+    except Exception:
+        crash_dir = Path.home() / ".lol-account-manager"
+        crash_dir.mkdir(parents=True, exist_ok=True)
+        crash_file = crash_dir / "last-crash.log"
+        crash_file.write_text(
+            f"[{datetime.now().isoformat()}] Unhandled startup exception\n\n{traceback.format_exc()}",
+            encoding="utf-8",
+        )
+        raise
 
 
 if __name__ == '__main__':
