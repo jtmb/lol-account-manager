@@ -402,6 +402,26 @@ def _hide_windows_console_window():
         pass
 
 
+def _ensure_console_hidden_and_app_focused(app_hwnd: int):
+    """Hide console window and bring app window back to focus after stylesheet/UI updates."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        # Hide console
+        console_hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if console_hwnd:
+            ctypes.windll.user32.ShowWindow(console_hwnd, 0)
+        
+        # Bring app window to foreground without stealing focus in an aggressive way
+        # Use SetWindowPos with appropriate flags to update z-order
+        SWP_NOACTIVATE = 0x0010
+        SWP_NOZORDER = 0x0004
+        HWND_TOPMOST = -1
+        ctypes.windll.user32.SetWindowPos(app_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOZORDER)
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -3888,6 +3908,14 @@ class MainWindow(QMainWindow):
         """Apply the current theme stylesheet."""
         self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
 
+        # Ensure console stays hidden and app stays in focus after stylesheet change on Windows
+        if sys.platform.startswith("win"):
+            try:
+                app_hwnd = int(self.winId())
+                _ensure_console_hidden_and_app_focused(app_hwnd)
+            except Exception:
+                pass
+
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
         QTimer.singleShot(0, self._apply_filter_input_palette)
@@ -3909,6 +3937,14 @@ class MainWindow(QMainWindow):
         self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
+        
+        # Ensure console stays hidden on Windows after UI refresh
+        if sys.platform.startswith("win"):
+            try:
+                app_hwnd = int(self.winId())
+                _ensure_console_hidden_and_app_focused(app_hwnd)
+            except Exception:
+                pass
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4319,6 +4355,13 @@ class MainWindow(QMainWindow):
         else:
             self._apply_account_list_background()
             self.update_account_item_states()
+            # Ensure console stays hidden on Windows after settings apply without theme change
+            if sys.platform.startswith("win"):
+                try:
+                    app_hwnd = int(self.winId())
+                    _ensure_console_hidden_and_app_focused(app_hwnd)
+                except Exception:
+                    pass
 
         self.refresh_account_list(fetch_ranks=False)
 
