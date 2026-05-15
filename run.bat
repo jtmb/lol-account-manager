@@ -4,7 +4,7 @@ setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 
 if not defined LOL_KEEP_OPEN (
-    start "League of Legends Account Manager" cmd /k "set LOL_KEEP_OPEN=1&& call \"%~f0\" __KEEP_OPEN"
+    start "League of Legends Account Manager" cmd /k "set LOL_KEEP_OPEN=1&& cd /d %~dp0 && call run.bat __KEEP_OPEN"
     exit /b 0
 )
 
