@@ -7949,7 +7949,12 @@ QMenu#trayQuickMenu::separator {
         """Show the spotlight panel for any account row (not just the logged-in one)."""
         if not self._ensure_spotlight_panel():
             return
-        self._spotlight_user_dismissed = False
+        # Only clear the dismissed flag when showing the logged-in account's spotlight.
+        # For any other account, keep it True so the recurring timer cannot overwrite.
+        if account.username == self._logged_in_username:
+            self._spotlight_user_dismissed = False
+        else:
+            self._spotlight_user_dismissed = True
 
         # If spotlight is already in the list, just update content and scroll
         for index in range(self.account_list.count()):
@@ -7964,7 +7969,9 @@ QMenu#trayQuickMenu::separator {
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
                     if row_above:
-                        self.account_list.scrollToItem(row_above, self.account_list.PositionAtTop)
+                        QTimer.singleShot(50, lambda r=row_above: self.account_list.scrollToItem(
+                            r, self.account_list.PositionAtTop
+                        ))
                 return
 
         # Find the row for this account and insert spotlight after it
@@ -7992,10 +7999,12 @@ QMenu#trayQuickMenu::separator {
         rank_data = self._rank_data_by_username.get(account.username, {})
         self.account_spotlight_panel.set_account(account, rank_data, profile_url)
         QTimer.singleShot(200, self._update_webview_zoom)
-        # Scroll so the account row is at the top, spotlight fills the view below it
+        # Defer scroll until layout has settled so PositionAtTop takes effect
         account_item = self.account_list.item(target_row)
         if account_item:
-            self.account_list.scrollToItem(account_item, self.account_list.PositionAtTop)
+            QTimer.singleShot(50, lambda: self.account_list.scrollToItem(
+                account_item, self.account_list.PositionAtTop
+            ))
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
