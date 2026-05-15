@@ -3973,7 +3973,7 @@ class MainWindow(QMainWindow):
         _hide_any_python_titled_window()
         self._apply_account_list_background()
         self.update_account_item_states()
-        self._refresh_visible_ranks()
+        self.refresh_account_list(fetch_ranks=True)
         self._set_refresh_icon_normal()
         # Burst suppression to catch delayed popup creation.
         QTimer.singleShot(25, _hide_any_python_titled_window)
