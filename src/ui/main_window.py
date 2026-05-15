@@ -5266,6 +5266,11 @@ QMenu#trayQuickMenu::separator {
             if matched_username != self._logged_in_username:
                 self._logged_in_username = matched_username
                 self.update_account_item_states()
+                # Start in-game watcher for externally logged-in account if not already running
+                if not self.ingame_watch_thread or not self.ingame_watch_thread.isRunning():
+                    account = self.account_manager.get_account(matched_username)
+                    if account:
+                        self._start_ingame_watcher(account)
             return
 
         if not self._logged_in_username:
@@ -5279,6 +5284,7 @@ QMenu#trayQuickMenu::separator {
         self._logged_in_username = None
         self._session_miss_count = 0
         self.update_account_item_states()
+        self._stop_ingame_watcher()
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
