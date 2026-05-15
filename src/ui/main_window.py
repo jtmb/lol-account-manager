@@ -5641,7 +5641,16 @@ QMenu::separator {
         self.ingame_watch_thread.start()
 
     def _open_ingame_webpage(self, url: str):
-        """Open op.gg in-game page in the system browser."""
+        """Open op.gg in-game page in the system browser after a 10-second delay."""
+        # Delay opening to allow op.gg to populate the game data
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._do_open_ingame_webpage(url, timer))
+        timer.start(10000)  # 10 seconds
+
+    def _do_open_ingame_webpage(self, url: str, timer: QTimer):
+        """Actually open the op.gg in-game page."""
+        timer.deleteLater()
         try:
             webbrowser.open_new_tab(url)
         except Exception:
