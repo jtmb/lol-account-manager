@@ -41,6 +41,7 @@ from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
 from src.core.opgg_service import fetch_rank
 from src.core.opgg_service import OPGG_REGION_MAP
+from src.core.game_stats import GameStatsTracker
 from src.security.encryption import PasswordEncryption
 from src.config.paths import (
     get_lol_executable,
@@ -588,44 +589,97 @@ QPushButton:disabled {
     color: #585b70;
     border: 1px solid #313244;
 }
-QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
-    background-color: #181825;
+QLineEdit, QDateEdit, QTextEdit, QPlainTextEdit {
+    background-color: #1a1a24;
     color: #cdd6f4;
-    border: 1px solid #45475a;
-    border-radius: 4px;
-    padding: 4px;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 8px 12px;
+    selection-background-color: #7aa2f7;
 }
-QSpinBox::up-button, QSpinBox::down-button {
-    subcontrol-origin: border;
-    background-color: #313244;
-    border-left: 1px solid #45475a;
-    width: 16px;
+QLineEdit:hover, QDateEdit:hover, QTextEdit:hover, QPlainTextEdit:hover {
+    border: 1px solid #585b70;
 }
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #45475a;
+QLineEdit:focus, QDateEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 2px solid #7aa2f7;
+    outline: none;
 }
 QLineEdit::placeholder {
     color: #9aa4bf;
 }
-QComboBox QAbstractItemView {
-    background-color: #181825;
+QSpinBox {
+    background-color: #1a1a24;
     color: #cdd6f4;
-    selection-background-color: #45475a;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+QSpinBox:hover {
+    border: 1px solid #585b70;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #313244;
+    border-left: 1px solid #404758;
+    width: 18px;
+    padding: 2px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #404758;
 }
 QComboBox {
-    padding-right: 24px;
+    background-color: #1a1a24;
+    color: #cdd6f4;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 8px 12px;
+    padding-right: 32px;
+    min-height: 24px;
+}
+QComboBox:hover {
+    border: 1px solid #585b70;
+    background-color: #1f1f2a;
+}
+QComboBox:focus {
+    border: 2px solid #7aa2f7;
 }
 QComboBox::drop-down {
     subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 20px;
-    border-left: 1px solid #45475a;
-    background-color: #22263a;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
+    subcontrol-position: center right;
+    width: 24px;
+    border: none;
+    background: transparent;
+    margin-right: 4px;
+}
+QComboBox::down-arrow {
+    image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMUw2IDZMMTEgMSIgc3Ryb2tlPSIjY2RkNmY0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==");
+    width: 12px;
+    height: 8px;
+}
+QComboBox QAbstractItemView {
+    background-color: #1a1a24;
+    color: #cdd6f4;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    outline: none;
+    selection-background-color: #404758;
+    show-decoration-selected: 1;
+}
+QComboBox QAbstractItemView::item {
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #7aa2f7;
+    color: #1e1e2e;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #313244;
+    color: #cdd6f4;
 }
 QLabel {
     color: #cdd6f4;
+    font-weight: 500;
 }
 QProgressDialog {
     background-color: #1e1e2e;
@@ -2576,6 +2630,12 @@ class AddAccountDialog(QDialog):
         self.display_name_input = QLineEdit()
         layout.addWidget(self.display_name_input)
 
+        # Email (optional)
+        layout.addWidget(QLabel("Email (optional):"))
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("account@example.com")
+        layout.addWidget(self.email_input)
+
         # Region
         layout.addWidget(QLabel("Region:"))
         self.region_combo = QComboBox()
@@ -2632,6 +2692,7 @@ class AddAccountDialog(QDialog):
             self.tag_line_input.setText(getattr(self.editing_account, "tag_line", "NA1"))
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
+            self.email_input.setText(getattr(self.editing_account, "email", "") or "")
             self.tags_input.setText(", ".join(getattr(self.editing_account, "tags", []) or []))
             self.notes_input.setPlainText(getattr(self.editing_account, "notes", "") or "")
             region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
@@ -2679,6 +2740,7 @@ class AddAccountDialog(QDialog):
             'notes': self.notes_input.toPlainText().strip(),
             'ban_status': ban_status,
             'ban_end_date': ban_end_date,
+            'email': self.email_input.text().strip(),
         }
 
 
@@ -2697,7 +2759,7 @@ class SettingsDialog(QDialog):
         "1920x1080",
     ]
 
-    CHAMP_SELECT_DEFAULT_RESOLUTION = "941x1053"
+    CHAMP_SELECT_DEFAULT_RESOLUTION = "1501x1014"
 
     CHAMP_SELECT_RESOLUTIONS = [
         "941x1053",
@@ -2707,6 +2769,7 @@ class SettingsDialog(QDialog):
         "1134x1200",
         "1280x1300",
         "1440x1440",
+        "1501x1014",
         "1600x1600",
         "1920x1080",
         "1920x1200",
@@ -3242,6 +3305,13 @@ class SettingsDialog(QDialog):
             "Automatically open the op.gg in-game page when a live match is detected."
         )
         general_layout.addWidget(self.auto_open_ingame_checkbox)
+
+        self.champ_select_secondary_monitor_checkbox = QCheckBox("Open champ select on secondary monitor")
+        self.champ_select_secondary_monitor_checkbox.setChecked(bool(self._settings.get("champ_select_secondary_monitor", False)))
+        self.champ_select_secondary_monitor_checkbox.setToolTip(
+            "When enabled, champ select window will open on secondary monitor (if available)."
+        )
+        general_layout.addWidget(self.champ_select_secondary_monitor_checkbox)
 
         self.start_minimized_checkbox = QCheckBox("Start minimized to tray")
         self.start_minimized_checkbox.setChecked(bool(self._settings.get("start_minimized_to_tray", False)))
@@ -3873,6 +3943,7 @@ class SettingsDialog(QDialog):
             "show_rank_images": self.show_images_checkbox.isChecked(),
             "show_tags": self.show_tags_checkbox.isChecked(),
             "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
+            "champ_select_secondary_monitor": self.champ_select_secondary_monitor_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
             "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
@@ -3934,6 +4005,107 @@ class SettingsDialog(QDialog):
         if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
             self._champion_splash_line_edit.clear()
         return super().eventFilter(obj, event)
+
+
+class PostGameStatsPanel(AccountListBackgroundFrame):
+    """Panel for displaying post-game statistics and account spotlight"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.game_stats_tracker = None
+        self.current_username = ""
+        self.init_ui()
+    
+    def init_ui(self):
+        """Initialize the post-game stats UI"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+        
+        # Title
+        title = QLabel("Account Spotlight")
+        title_font = title.font()
+        title_font.setPointSize(14)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+        
+        # Stats summary (wins, losses, KDA, etc.)
+        summary_group = QGroupBox("Summary Statistics")
+        summary_layout = QGridLayout()
+        
+        self.wins_label = QLabel("Wins: 0")
+        self.losses_label = QLabel("Losses: 0")
+        self.winrate_label = QLabel("Win Rate: 0%")
+        self.avg_kda_label = QLabel("Avg KDA: 0.0")
+        self.avg_damage_label = QLabel("Avg Damage: 0")
+        self.avg_gold_label = QLabel("Avg Gold: 0")
+        self.avg_cs_label = QLabel("Avg CS: 0")
+        self.total_games_label = QLabel("Total Games: 0")
+        
+        summary_layout.addWidget(self.wins_label, 0, 0)
+        summary_layout.addWidget(self.losses_label, 0, 1)
+        summary_layout.addWidget(self.winrate_label, 0, 2)
+        summary_layout.addWidget(self.total_games_label, 1, 0)
+        summary_layout.addWidget(self.avg_kda_label, 1, 1)
+        summary_layout.addWidget(self.avg_damage_label, 1, 2)
+        summary_layout.addWidget(self.avg_gold_label, 2, 0)
+        summary_layout.addWidget(self.avg_cs_label, 2, 1)
+        
+        summary_group.setLayout(summary_layout)
+        layout.addWidget(summary_group)
+        
+        # Recent games list
+        games_group = QGroupBox("Recent Games")
+        games_layout = QVBoxLayout()
+        
+        self.games_list = QListWidget()
+        self.games_list.setMaximumHeight(300)
+        games_layout.addWidget(self.games_list)
+        
+        games_group.setLayout(games_layout)
+        layout.addWidget(games_group)
+        
+        layout.addStretch()
+    
+    def update_stats(self, username: str, game_stats_tracker):
+        """Update displayed stats for an account"""
+        self.current_username = username
+        self.game_stats_tracker = game_stats_tracker
+        
+        if not game_stats_tracker:
+            return
+        
+        # Get summary stats
+        summary = game_stats_tracker.get_account_summary(username)
+        recent_games = game_stats_tracker.get_account_stats(username, limit=10)
+        
+        # Update summary
+        self.wins_label.setText(f"Wins: {summary['wins']}")
+        self.losses_label.setText(f"Losses: {summary['losses']}")
+        self.winrate_label.setText(f"Win Rate: {summary['win_rate']:.1f}%")
+        self.avg_kda_label.setText(f"Avg KDA: {summary['avg_kda']:.2f}")
+        self.avg_damage_label.setText(f"Avg Damage: {summary['avg_damage']:,}")
+        self.avg_gold_label.setText(f"Avg Gold: {summary['avg_gold']:,}")
+        self.avg_cs_label.setText(f"Avg CS: {summary['avg_cs']}")
+        self.total_games_label.setText(f"Total Games: {summary['total_games']}")
+        
+        # Update recent games
+        self.games_list.clear()
+        for game in recent_games:
+            result_text = game.game_result.upper() if game.game_result else "UNKNOWN"
+            result_color = "#90EE90" if game.game_result == "victory" else "#FF6B6B"
+            
+            game_item_text = (
+                f"[{result_text}] {game.player_champion} - "
+                f"KDA: {game.player_kills}/{game.player_deaths}/{game.player_assists} - "
+                f"Damage: {game.player_damage:,} - "
+                f"Gold: {game.player_gold:,} - "
+                f"CS: {game.player_cs}"
+            )
+            item = QListWidgetItem(game_item_text)
+            item.setForeground(QColor(result_color))
+            self.games_list.addItem(item)
 
 
 class AccountListItem(QFrame):
@@ -4680,6 +4852,8 @@ class MainWindow(QMainWindow):
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
         self.game_info_panel: Optional[InClientGamePanel] = None
+        self.post_game_stats_panel: Optional[PostGameStatsPanel] = None
+        self.game_stats_tracker: GameStatsTracker = GameStatsTracker()
         self.main_area_stack: Optional[QStackedWidget] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
@@ -4687,6 +4861,7 @@ class MainWindow(QMainWindow):
         self._last_champ_select_signature: str = ""
         self._last_champ_select_role_hint: str = ""
         self._last_champ_select_refresh_at: float = 0.0
+        self._last_champ_select_close_at: float = 0.0
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = True
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
@@ -4704,6 +4879,7 @@ class MainWindow(QMainWindow):
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._show_tags: bool = self._settings.get('show_tags', True)
         self._auto_open_ingame_page: bool = bool(self._settings.get('auto_open_ingame_page', True))
+        self._champ_select_secondary_monitor: bool = bool(self._settings.get('champ_select_secondary_monitor', False))
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
@@ -4948,9 +5124,11 @@ class MainWindow(QMainWindow):
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
         self.game_info_panel = InClientGamePanel()
+        self.post_game_stats_panel = PostGameStatsPanel()
         self.main_area_stack = QStackedWidget()
         self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
         self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
+        self.main_area_stack.addWidget(self.post_game_stats_panel)    # index 2: post-game stats
         layout.addWidget(self.main_area_stack)
         
         # Apply clipping mask to account list viewport
@@ -4979,6 +5157,11 @@ class MainWindow(QMainWindow):
         self.delete_btn.clicked.connect(self.delete_account)
         self.delete_btn.setEnabled(False)
         button_layout.addWidget(self.delete_btn)
+        
+        self.view_stats_btn = QPushButton("View Stats")
+        self.view_stats_btn.clicked.connect(self.show_account_spotlight)
+        self.view_stats_btn.setEnabled(False)
+        button_layout.addWidget(self.view_stats_btn)
         
         layout.addWidget(self._button_row_widget)
         
@@ -5129,6 +5312,18 @@ class MainWindow(QMainWindow):
         self._suppress_window_size_persistence = True
         try:
             self.resize(width, height)
+            
+            # If secondary monitor setting is enabled, move window to secondary monitor
+            if self._champ_select_secondary_monitor:
+                screens = QApplication.screens()
+                if len(screens) > 1:
+                    # Move to second screen (index 1)
+                    secondary_screen = screens[1]
+                    screen_geo = secondary_screen.geometry()
+                    # Center window on secondary screen
+                    new_x = screen_geo.x() + (screen_geo.width() - width) // 2
+                    new_y = screen_geo.y() + (screen_geo.height() - height) // 2
+                    self.move(new_x, new_y)
         finally:
             self._suppress_window_size_persistence = False
 
@@ -5168,6 +5363,9 @@ class MainWindow(QMainWindow):
         self._saved_accounts_label.hide()
         self._button_row_widget.hide()
         self.lol_path_label.hide()
+        # Bring the app window to the foreground
+        self.activateWindow()
+        self.raise_()
 
     def _exit_champ_select_mode(self):
         """Restore window size and show home-page UI elements after champ select."""
@@ -5183,6 +5381,34 @@ class MainWindow(QMainWindow):
         self._button_row_widget.show()
         self.lol_path_label.show()
         self.update_account_item_states()
+
+    def show_account_spotlight(self):
+        """Show post-game statistics and account spotlight for selected account"""
+        selected = self.account_list.currentItem()
+        if not selected:
+            return
+        
+        username = selected.data(Qt.UserRole)
+        if not username:
+            return
+        
+        # Update post-game stats panel
+        if self.post_game_stats_panel:
+            self.post_game_stats_panel.update_stats(username, self.game_stats_tracker)
+            # Switch to post-game stats view
+            self.main_area_stack.setCurrentWidget(self.post_game_stats_panel)
+            
+            # Add a button to go back to account list
+            if not hasattr(self, '_spotlight_back_btn'):
+                self._spotlight_back_btn = QPushButton("← Back to Accounts")
+                self._spotlight_back_btn.clicked.connect(self.close_account_spotlight)
+                # Insert at the beginning of post-game panel layout
+                layout = self.post_game_stats_panel.layout()
+                layout.insertWidget(0, self._spotlight_back_btn)
+    
+    def close_account_spotlight(self):
+        """Close account spotlight and return to account list"""
+        self.main_area_stack.setCurrentIndex(0)
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
@@ -5752,6 +5978,7 @@ class MainWindow(QMainWindow):
         self._show_rank_images = bool(values['show_rank_images'])
         self._show_tags = bool(values['show_tags'])
         self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
+        self._champ_select_secondary_monitor = bool(values.get('champ_select_secondary_monitor', False))
         self._tag_size = str(values['tag_size'])
         self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
@@ -6749,7 +6976,7 @@ QMenu#trayQuickMenu::separator {
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
         self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
 
     def _clear_filters(self):
         self.search_input.clear()
@@ -6980,6 +7207,7 @@ QMenu#trayQuickMenu::separator {
             self.launch_btn.setEnabled(username is not None)
             self.edit_btn.setEnabled(username is not None)
             self.delete_btn.setEnabled(username is not None)
+            self.view_stats_btn.setEnabled(username is not None)
 
     def update_account_item_states(self):
         """Refresh hover/selected visuals for account rows."""
@@ -7003,11 +7231,7 @@ QMenu#trayQuickMenu::separator {
         if bool(status.get("in_game", False)):
             return f"In Game ({queue_type})" if queue_type else "In Game"
 
-        # Keep a short, explicit transition after game end before settling to Logged In.
-        ended_at = float(status.get("last_game_timestamp", 0) or 0)
-        if ended_at > 0 and (time.time() - ended_at) <= 15.0:
-            return "Out of Game"
-
+        # Always return "Logged In" after a game ends (removed "Out of Game" display)
         return "Logged In"
 
     def _normalize_champion_slug(self, champion_name: str) -> str:
@@ -7111,6 +7335,13 @@ QMenu#trayQuickMenu::separator {
             return
 
         now = time.time()
+        
+        # Debounce rapid close/reopen cycles: if we just closed champ select within 0.8 seconds,
+        # skip re-opening to prevent double-trigger. This fixes the issue where LCU signal changes
+        # cause the window to flicker open and closed.
+        if (now - self._last_champ_select_close_at) < 0.8 and not self._in_champ_select_mode:
+            return
+        
         if not force and (now - self._last_champ_select_refresh_at) < 1.4:
             return
         self._last_champ_select_refresh_at = now
@@ -7186,6 +7417,7 @@ QMenu#trayQuickMenu::separator {
         self._last_champ_select_signature = ""
         self._last_champ_select_role_hint = ""
         self._last_champ_select_refresh_at = 0.0
+        self._last_champ_select_close_at = time.time()
         if self.main_area_stack:
             if self.main_area_stack.currentIndex() == 1:
                 self._exit_champ_select_mode()
