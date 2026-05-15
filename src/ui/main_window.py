@@ -1109,8 +1109,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
     _PORTRAIT_SIZE = 100
     _ICON_SIZE = 32          # rune style path icons
-    _ACTIVE_PERK_SIZE = 32   # selected perk icons in the active row
-    _PERK_TREE_SIZE = 30     # perk icons inside the rune tree grid
+    _ACTIVE_PERK_SIZE = 36   # selected perk icons in the active row
+    _PERK_TREE_SIZE = 36     # perk icons inside the rune tree grid
     _ITEM_ICON_SIZE = 36     # item chips (starting/core/stage)
     _DDRAGON_VERSION = "16.10.1"
 
@@ -1293,7 +1293,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         )
         self._primary_slots_col.addWidget(self._primary_slots_title)
         self._primary_slots_body = QVBoxLayout()
-        self._primary_slots_body.setSpacing(6)
+        self._primary_slots_body.setSpacing(8)
         self._primary_slots_col.addLayout(self._primary_slots_body)
         self._primary_slots_col.addStretch()
 
@@ -1306,7 +1306,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         )
         self._secondary_slots_col.addWidget(self._secondary_slots_title)
         self._secondary_slots_body = QVBoxLayout()
-        self._secondary_slots_body.setSpacing(6)
+        self._secondary_slots_body.setSpacing(8)
         self._secondary_slots_col.addLayout(self._secondary_slots_body)
         self._secondary_slots_col.addStretch()
 
@@ -1915,7 +1915,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             if not isinstance(slot, dict):
                 continue
             row = QHBoxLayout()
-            row.setSpacing(4)
+            row.setSpacing(6)
             runes = slot.get("runes", []) if isinstance(slot.get("runes", []), list) else []
             for rune in runes:
                 if not isinstance(rune, dict):
@@ -2561,7 +2561,10 @@ class SettingsDialog(QDialog):
         "1920x1080",
     ]
 
+    CHAMP_SELECT_DEFAULT_RESOLUTION = "941x1053"
+
     CHAMP_SELECT_RESOLUTIONS = [
+        "941x1053",
         "800x900",
         "900x1000",
         "1000x1100",
@@ -2908,8 +2911,10 @@ class SettingsDialog(QDialog):
             index = self.window_size_combo.findText(window_size)
             self.window_size_combo.setCurrentIndex(0 if index < 0 else index)
 
-        champ_select_size = str(values.get("champ_select_window_size", "1134x1200"))
-        cs_idx = self.champ_select_size_combo.findText(champ_select_size)
+        champ_select_size = str(values.get("champ_select_window_size", self.CHAMP_SELECT_DEFAULT_RESOLUTION))
+        cs_idx = self.champ_select_size_combo.findData(champ_select_size)
+        if cs_idx < 0:
+            cs_idx = self.champ_select_size_combo.findData(self.CHAMP_SELECT_DEFAULT_RESOLUTION)
         self.champ_select_size_combo.setCurrentIndex(0 if cs_idx < 0 else cs_idx)
 
         self._set_combo_to_data(self.text_zoom_combo, int(values.get("text_zoom_percent", 110)))
@@ -3042,12 +3047,15 @@ class SettingsDialog(QDialog):
         general_layout.addWidget(QLabel("Champ Select window size:"))
         self.champ_select_size_combo = QComboBox()
         for res in self.CHAMP_SELECT_RESOLUTIONS:
-            self.champ_select_size_combo.addItem(res)
+            label = f"{res} (Default)" if res == self.CHAMP_SELECT_DEFAULT_RESOLUTION else res
+            self.champ_select_size_combo.addItem(label, res)
         self.champ_select_size_combo.setToolTip(
             "The window will automatically resize to this resolution when champ select opens."
         )
-        cs_size = str(self._settings.get("champ_select_window_size", "1134x1200"))
-        cs_index = self.champ_select_size_combo.findText(cs_size)
+        cs_size = str(self._settings.get("champ_select_window_size", self.CHAMP_SELECT_DEFAULT_RESOLUTION))
+        cs_index = self.champ_select_size_combo.findData(cs_size)
+        if cs_index < 0:
+            cs_index = self.champ_select_size_combo.findData(self.CHAMP_SELECT_DEFAULT_RESOLUTION)
         self.champ_select_size_combo.setCurrentIndex(0 if cs_index < 0 else cs_index)
         general_layout.addWidget(self.champ_select_size_combo)
 
@@ -3723,7 +3731,7 @@ class SettingsDialog(QDialog):
             "diagnostics_log_level": str(self.log_level_combo.currentData()),
             "window_size": window_size,
             "window_size_mode": window_size_mode,
-            "champ_select_window_size": self.champ_select_size_combo.currentText(),
+            "champ_select_window_size": str(self.champ_select_size_combo.currentData() or self.CHAMP_SELECT_DEFAULT_RESOLUTION),
             "text_zoom_percent": int(self.text_zoom_combo.currentData()),
             "show_ranks": self.show_ranks_checkbox.isChecked(),
             "show_rank_images": self.show_images_checkbox.isChecked(),
@@ -4594,7 +4602,13 @@ class MainWindow(QMainWindow):
         ).strip().lower()
         if self._window_size_mode not in {'static', 'custom'}:
             self._window_size_mode = 'custom' if self._window_size not in SettingsDialog.COMMON_RESOLUTIONS else 'static'
-        self._champ_select_window_size: str = str(self._settings.get('champ_select_window_size', '1134x1200'))
+        self._champ_select_window_size: str = str(
+            self._settings.get('champ_select_window_size', SettingsDialog.CHAMP_SELECT_DEFAULT_RESOLUTION)
+        )
+        if self._champ_select_window_size == '1134x1200':
+            # Migrate old default to new default while keeping user-selected custom values.
+            self._champ_select_window_size = SettingsDialog.CHAMP_SELECT_DEFAULT_RESOLUTION
+            self._settings['champ_select_window_size'] = self._champ_select_window_size
         self._in_champ_select_mode: bool = False
         self._pre_champ_select_size: str = ""
         self._search_query: str = ""
@@ -5869,9 +5883,24 @@ QMenu#trayQuickMenu::separator {
         )
         self._ingame_watch_status = next_status
         self._update_tray_watcher_status()
-        if bool(next_status.get("in_champ_select", False)):
+        in_champ_select = bool(next_status.get("in_champ_select", False))
+        in_game = bool(next_status.get("in_game", False))
+        game_phase = str(next_status.get("game_phase", "") or "").strip()
+        in_match_phases = {
+            "GameStart",
+            "InProgress",
+            "Reconnect",
+            "WaitingForStats",
+            "PreEndOfGame",
+            "EndOfGame",
+        }
+
+        if in_champ_select:
             self._maybe_refresh_champ_select_assistant(force=False)
-        elif bool(next_status.get("in_game", False)):
+        elif in_game or game_phase in in_match_phases:
+            self._show_game_panel_ingame()
+        elif self._in_champ_select_mode and bool(next_status.get("watcher_active", False)) and not game_phase:
+            # Keep the panel visible during short LCU/Live API transition gaps.
             self._show_game_panel_ingame()
         else:
             self._close_champ_select_assistant()
@@ -6799,7 +6828,21 @@ QMenu#trayQuickMenu::separator {
 
     def _maybe_refresh_champ_select_assistant(self, force: bool = False):
         """Refresh champ-select assistant content while in champ select."""
+        status = self._ingame_watch_status or {}
+        game_phase = str(status.get("game_phase", "") or "").strip()
+        in_match_phases = {
+            "GameStart",
+            "InProgress",
+            "Reconnect",
+            "WaitingForStats",
+            "PreEndOfGame",
+            "EndOfGame",
+        }
+
         if not (self.account_manager and self._logged_in_username):
+            if bool(status.get("in_game", False)) or game_phase in in_match_phases:
+                self._show_game_panel_ingame()
+                return
             self._close_champ_select_assistant()
             return
 
@@ -6809,7 +6852,11 @@ QMenu#trayQuickMenu::separator {
         self._last_champ_select_refresh_at = now
 
         matchup = RiotClientIntegration.get_champ_select_matchup(timeout_seconds=1.2)
-        if not RiotClientIntegration._is_champ_select_phase(str(matchup.get("phase", ""))):
+        matchup_phase = str(matchup.get("phase", "") or "")
+        if not RiotClientIntegration._is_champ_select_phase(matchup_phase):
+            if bool(status.get("in_game", False)) or game_phase in in_match_phases:
+                self._show_game_panel_ingame()
+                return
             self._close_champ_select_assistant()
             return
 
@@ -6881,6 +6928,8 @@ QMenu#trayQuickMenu::separator {
         """Show the inline game panel with in-game state, reusing last known champion data."""
         if not (self.main_area_stack and self.game_info_panel):
             return
+        if not self._in_champ_select_mode:
+            self._enter_champ_select_mode()
         status = self._ingame_watch_status or {}
         queue_type = str(status.get("queue_type", "") or "")
         queue_id = status.get("queue_id")
