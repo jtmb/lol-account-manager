@@ -2503,7 +2503,7 @@ class SettingsDialog(QDialog):
         save_btn.setFixedWidth(100)
         save_btn.setAutoDefault(False)
         save_btn.setDefault(False)
-        save_btn.clicked.connect(self.accept)
+        save_btn.clicked.connect(self._save_and_close)
         button_row.addWidget(save_btn)
         layout.addLayout(button_row)
 
@@ -2673,6 +2673,12 @@ class SettingsDialog(QDialog):
         """Apply settings without closing the dialog."""
         if self._apply_callback:
             self._apply_callback(self.get_values())
+
+    def _save_and_close(self):
+        """Apply settings and close the dialog."""
+        if self._apply_callback:
+            self._apply_callback(self.get_values())
+        self.accept()
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -3963,7 +3969,7 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         self._apply_theme()
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
@@ -4239,9 +4245,7 @@ class MainWindow(QMainWindow):
                 if preview_was_applied[0]:
                     self._apply_settings_values(original_settings, persist=False)
                 return
-
-            values = dialog.get_values()
-            self._apply_settings_values(values, persist=True)
+            # Save/Apply handlers inside the dialog already applied settings.
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
@@ -5223,7 +5227,7 @@ QMenu#trayQuickMenu::separator {
         indexed.sort(key=lambda pair: (not bool(getattr(pair[1], "is_pinned", False)), pair[0]))
         return [acc for _, acc in indexed]
     
-    def refresh_account_list(self):
+    def refresh_account_list(self, fetch_ranks: bool = True):
         """Refresh the account list display"""
         self.account_list.setUpdatesEnabled(False)
         try:
@@ -5283,7 +5287,7 @@ QMenu#trayQuickMenu::separator {
                     self.account_list.setItemWidget(item, widget)
 
                 self.update_account_item_states()
-                if self._show_ranks:
+                if fetch_ranks and self._show_ranks:
                     self._start_rank_fetches()
         finally:
             self.account_list.setUpdatesEnabled(True)
@@ -5291,6 +5295,9 @@ QMenu#trayQuickMenu::separator {
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
         if not self._show_ranks:
+            return
+
+        if QApplication.activeModalWidget():
             return
 
         # Stop leftover threads from a previous refresh
