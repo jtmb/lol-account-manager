@@ -1,12 +1,26 @@
 """Main application entry point"""
+import os
 import sys
 import ctypes
 import subprocess
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import QCoreApplication, QTimer
+# These must be set before QApplication is instantiated so Qt applies
+# per-monitor DPI scaling from startup.  AA_EnableHighDpiScaling makes Qt
+# track the physical DPI of each screen and scale logical pixels accordingly;
+# AA_UseHighDpiPixmaps ensures icons/pixmaps are rendered at native resolution.
+# QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough preserves fractional scale
+# factors (e.g. 1.25 for Windows 125%) instead of rounding to 1 or 2, which
+# fixes layout breaks when the window moves to a differently-scaled monitor.
+os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "PassThrough")
+
+from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 from PyQt5.QtWidgets import QApplication
+
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
 from src.config.paths import load_settings

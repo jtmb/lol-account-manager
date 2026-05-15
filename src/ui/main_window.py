@@ -2000,6 +2000,24 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 self._last_skill_matches,
             )
 
+    def changeEvent(self, event):
+        """Re-render the skill grid when the window is moved to a monitor with
+        a different DPI (QEvent.ScreenChangeInternal).  With per-monitor DPI
+        scaling enabled the widget's logical width changes, so the adaptive
+        cell sizes must be recomputed."""
+        super().changeEvent(event)
+        if event.type() == QEvent.ScreenChangeInternal:
+            if self._last_skill_priority or self._last_skill_path:
+                QTimer.singleShot(
+                    80,
+                    lambda: self._render_skill_section(
+                        self._last_skill_priority,
+                        self._last_skill_path,
+                        self._last_skill_wr,
+                        self._last_skill_matches,
+                    ),
+                )
+
     def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int, skip_keystone: bool = False):
         self._clear_layout(container_layout)
         style = self._rune_style_data_by_id.get(style_id)
