@@ -4094,99 +4094,44 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         var s = document.createElement('style');
         s.id = '_ugg_embed_hide';
         s.textContent = [
-            /* Hide ALL nav and aside globally */
+            /* Hide semantic nav/aside/header elements */
             'nav { display:none!important; visibility:hidden!important; }',
             'aside { display:none!important; visibility:hidden!important; }',
+            'header { display:none!important; visibility:hidden!important; }',
             '[role="navigation"] { display:none!important; visibility:hidden!important; }',
             '[role="complementary"] { display:none!important; visibility:hidden!important; }',
-            /* Hide elements by class patterns (CSS Modules) */
+            '[role="banner"] { display:none!important; visibility:hidden!important; }',
+            /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            '[class*="TopNav"] { display:none!important; visibility:hidden!important; }',
-            '[class*="NavBar"] { display:none!important; visibility:hidden!important; }',
-            '[class*="nav-bar"] { display:none!important; visibility:hidden!important; }',
-            '[class*="game-selector"] { display:none!important; visibility:hidden!important; }',
-            '[class*="GameSelector"] { display:none!important; visibility:hidden!important; }',
-            '[class*="GameTabs"] { display:none!important; visibility:hidden!important; }',
-            '[class*="game-tabs"] { display:none!important; visibility:hidden!important; }',
-            '[class*="HeaderNav"] { display:none!important; visibility:hidden!important; }',
-            '[class*="header-nav"] { display:none!important; visibility:hidden!important; }',
-            /* Hide any fixed/sticky header-like elements that contain game links */
-            'header { display:none!important; visibility:hidden!important; }',
-            '[role="banner"] { display:none!important; visibility:hidden!important; }',
-            /* Remove offsets caused by hidden elements */
+            /* Remove leading/trailing whitespace offsets */
             'body { margin:0!important; padding:0!important; }',
-            '[class*="Layout"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="layout"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="Container"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="container"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="ContentWrapper"] { margin-left:0!important; padding-left:0!important; width:100%!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="content-wrapper"] { margin-left:0!important; padding-left:0!important; width:100%!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="Wrapper"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[class*="wrapper"] { margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            /* Ensure main content area takes full width and starts at top */
-            'main { width:100%!important; margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }',
-            '[role="main"] { width:100%!important; margin-left:0!important; padding-left:0!important; margin-top:0!important; padding-top:0!important; }'
+            'html { margin:0!important; padding:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
     }
 
-    /* ── immediately hide any nav/aside/header in DOM ───────────────────────── */
-    document.querySelectorAll('nav, aside, header').forEach(function(el) {
-        el.style.cssText = 'display:none!important; visibility:hidden!important; height:0!important; width:0!important; margin:0!important; padding:0!important; overflow:hidden!important;';
-    });
-
-    /* ── find and hide elements containing game links (top bar) ────────────── */
-    var gameNames = ['League of Legends', 'Valorant', 'Rematch', 'Teamfight Tactics', 'Deadlock', 'World of Warcraft', 'Helldivers', 'ZXKO'];
-    var topBarElements = new Set();
-    
-    gameNames.forEach(function(gameName) {
-        var xpath = "//*[contains(text(), '" + gameName + "')]";
-        var result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-        for (var i = 0; i < result.snapshotLength; i++) {
-            var node = result.snapshotItem(i);
-            /* Walk up the tree and find a container that likely is the game-links bar */
-            var el = node;
-            for (var j = 0; j < 12; j++) {
-                if (!el.parentElement) break;
-                el = el.parentElement;
-                var style = window.getComputedStyle(el);
-                /* If element is a flex/grid row or similar container near the top, mark it */
-                if ((style.display === 'flex' || style.display === 'grid' || el.tagName === 'NAV') &&
-                    (style.position === 'relative' || style.position === 'sticky' || style.position === 'fixed' || style.position === 'static')) {
-                    topBarElements.add(el);
-                    break;
-                }
-            }
-        }
-    });
-    
-    /* Hide all found top-bar containers */
-    topBarElements.forEach(function(el) {
-        el.style.cssText = 'display:none!important; visibility:hidden!important; height:0!important; margin:0!important; padding:0!important;';
-    });
-
-    /* ── hide by finding elements containing game links via href ──────────────── */
-    ['lol', 'valorant', 'rematch', 'teamfight', 'deadlock', 'worldcraft', 'helldivers'].forEach(function(game) {
-        document.querySelectorAll('a[href*="/' + game + '"]').forEach(function(link) {
-            var container = link.closest('nav, [class*="Nav"], [class*="nav"], [class*="Bar"], [class*="bar"]');
-            if (container) {
-                container.style.cssText = 'display:none!important; visibility:hidden!important;';
-            }
-        });
-    });
-
-    /* ── hide left sidebar icons (colored squares on left, fixed-pos) ────────────── */
-    var allDivs = document.querySelectorAll('div');
-    for (var i = 0; i < allDivs.length; i++) {
-        var div = allDivs[i];
-        var style = window.getComputedStyle(div);
-        /* Sidebar is typically narrow, fixed-position, on the left */
-        if (style.position === 'fixed' && style.left === '0px' && 
-            parseInt(style.width) < 100) {
-            div.style.display = 'none';
+    /* ── hide fixed/sticky positioned elements at top (likely the game tabs bar) ─ */
+    var allEls = document.querySelectorAll('*');
+    for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        var style = window.getComputedStyle(el);
+        var pos = style.position;
+        var top = style.top;
+        var zIndex = style.zIndex;
+        
+        /* Fixed/sticky bars that are at the top viewport and have high z-index */
+        if ((pos === 'fixed' || pos === 'sticky') &&
+            (top === '0px' || top === '0') &&
+            parseInt(zIndex) > 100) {
+            el.style.cssText = 'display:none!important; visibility:hidden!important;';
         }
     }
+
+    /* ── hide nav/aside/header now in DOM ───────────────────────────── */
+    document.querySelectorAll('nav, aside, header').forEach(function(el) {
+        el.style.cssText = 'display:none!important; visibility:hidden!important;';
+    });
 })();
 """
         self._web_view.page().runJavaScript(js)
