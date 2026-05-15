@@ -5633,13 +5633,17 @@ class MainWindow(QMainWindow):
                 break
 
     def _enter_spotlight_ui_mode(self):
-        """Hide filters and main scrollbar while the spotlight panel is visible."""
+        """Hide filters, bottom buttons and main scrollbar while spotlight is visible."""
         self._filter_row_widget.hide()
+        self._button_row_widget.hide()
+        self.lol_path_label.hide()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     def _exit_spotlight_ui_mode(self):
-        """Restore filters and scrollbar when spotlight is hidden."""
+        """Restore filters, bottom buttons and scrollbar when spotlight is hidden."""
         self._filter_row_widget.show()
+        self._button_row_widget.show()
+        self.lol_path_label.show()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
     def _update_webview_zoom(self):
