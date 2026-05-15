@@ -149,16 +149,27 @@ Write-Host ""
 Write-Host "[*] Starting League of Legends Account Manager..."
 Write-Host ""
 
-$pythonW = Join-Path $PSScriptRoot "venv\Scripts\pythonw.exe"
-if (Test-Path $pythonW) {
-    & $pythonW -m src.main
+$python = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
+$appLog = Join-Path $env:TEMP "LoLAccountManager\app-run.log"
+$appLogDir = Split-Path -Parent $appLog
+if (-not (Test-Path $appLogDir)) {
+    New-Item -ItemType Directory -Path $appLogDir | Out-Null
+}
+if (Test-Path $python) {
+    & $python -X faulthandler -m src.main *> $appLog
 } else {
-    & pythonw -m src.main
+    & python -X faulthandler -m src.main *> $appLog
 }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "[!] Application error occurred"
+    Write-Host "[!] Log saved to: $appLog"
+    if (Test-Path $appLog) {
+        Write-Host ""
+        Write-Host "----- Last 80 log lines -----"
+        Get-Content -LiteralPath $appLog -Tail 80
+    }
     Read-Host "Press Enter to exit"
 }
 

@@ -113,6 +113,7 @@ if not exist "%VENV_PYTHON%" (
 
 set "VENV_PYTHONW=%CD%\venv\Scripts\pythonw.exe"
 if not exist "%VENV_PYTHONW%" set "VENV_PYTHONW=%VENV_PYTHON%"
+set "APP_LOG=%DOWNLOAD_DIR%\app-run.log"
 
 REM Install dependencies
 echo.
@@ -134,11 +135,18 @@ REM Run the application
 echo.
 echo [*] Starting League of Legends Account Manager...
 echo.
-"%VENV_PYTHONW%" -m src.main
+"%VENV_PYTHON%" -X faulthandler -m src.main > "%APP_LOG%" 2>&1
 
 if !errorlevel! neq 0 (
     echo.
     echo [ERROR] Application error occurred
+    echo [!] Log saved to:
+    echo %APP_LOG%
+    if exist "%APP_LOG%" (
+        echo.
+        echo ----- Last 80 log lines -----
+        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 80"
+    )
     pause
 )
 

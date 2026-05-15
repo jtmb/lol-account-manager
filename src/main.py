@@ -2,19 +2,28 @@
 import sys
 import ctypes
 import subprocess
+import faulthandler
 import traceback
 from datetime import datetime
 from pathlib import Path
 
 
-def _write_startup_crash_log(exc: BaseException) -> None:
+def _startup_log_path() -> Path:
     crash_dir = Path.home() / ".lol-account-manager"
     crash_dir.mkdir(parents=True, exist_ok=True)
-    crash_file = crash_dir / "last-crash.log"
-    crash_file.write_text(
-        f"[{datetime.now().isoformat()}] Startup exception\n\n{traceback.format_exc()}\n{type(exc).__name__}: {exc}",
-        encoding="utf-8",
+    return crash_dir / "last-crash.log"
+
+
+_STARTUP_LOG_PATH = _startup_log_path()
+_STARTUP_LOG_FILE = _STARTUP_LOG_PATH.open("a", encoding="utf-8")
+faulthandler.enable(file=_STARTUP_LOG_FILE, all_threads=True)
+
+
+def _write_startup_crash_log(exc: BaseException) -> None:
+    _STARTUP_LOG_FILE.write(
+        f"[{datetime.now().isoformat()}] Startup exception\n\n{traceback.format_exc()}\n{type(exc).__name__}: {exc}\n"
     )
+    _STARTUP_LOG_FILE.flush()
 
 
 try:
