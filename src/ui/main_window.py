@@ -894,6 +894,119 @@ class InGameDiagnosticsDialog(QDialog):
         super().closeEvent(event)
 
 
+class ChampSelectAssistantDialog(QDialog):
+    """Show champ-select matchup/build guidance with quick open actions."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._matchup_url = ""
+        self._fallback_url = ""
+        self.setWindowTitle("Champ Select Assistant")
+        self.setModal(False)
+        self.setMinimumSize(560, 320)
+
+        self.setStyleSheet(
+            "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
+            "QLabel#title { font-size: 13pt; font-weight: 700; color: #e2e8f0; }"
+            "QLabel#meta { color: #dbe4ff; font-size: 10pt; }"
+            "QTextEdit {"
+            "background-color: #181825; color: #dbe4ff;"
+            "border: 1px solid #313244; border-radius: 8px;"
+            "padding: 8px;"
+            "}"
+            "QPushButton {"
+            "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
+            "border-radius: 6px; padding: 6px 12px;"
+            "}"
+            "QPushButton:hover { background-color: #45475a; }"
+            "QPushButton:disabled { color: #8087a2; }"
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        self.title_label = QLabel("Champion matchup assistant")
+        self.title_label.setObjectName("title")
+        layout.addWidget(self.title_label)
+
+        self.meta_label = QLabel("Waiting for champion selection data...")
+        self.meta_label.setObjectName("meta")
+        self.meta_label.setWordWrap(True)
+        layout.addWidget(self.meta_label)
+
+        self.details_box = QTextEdit()
+        self.details_box.setReadOnly(True)
+        self.details_box.setMinimumHeight(150)
+        layout.addWidget(self.details_box, 1)
+
+        button_row = QHBoxLayout()
+        self.open_matchup_btn = QPushButton("Open Matchup Build")
+        self.open_matchup_btn.setEnabled(False)
+        self.open_matchup_btn.clicked.connect(self._open_matchup)
+        button_row.addWidget(self.open_matchup_btn)
+
+        self.open_fallback_btn = QPushButton("Open Fallback Champion Build")
+        self.open_fallback_btn.setEnabled(False)
+        self.open_fallback_btn.clicked.connect(self._open_fallback)
+        button_row.addWidget(self.open_fallback_btn)
+        button_row.addStretch()
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+        button_row.addWidget(close_btn)
+        layout.addLayout(button_row)
+
+    def update_payload(self, payload: dict):
+        my_champion = str(payload.get("my_champion", "") or "").strip()
+        enemy_champion = str(payload.get("enemy_champion", "") or "").strip()
+        queue_type = str(payload.get("queue_type", "") or "").strip()
+        rank_label = str(payload.get("rank_label", "") or "").strip() or "Unknown"
+        summary_lines = list(payload.get("summary_lines", []) or [])
+        self._matchup_url = str(payload.get("matchup_url", "") or "").strip()
+        self._fallback_url = str(payload.get("fallback_url", "") or "").strip()
+
+        if my_champion and enemy_champion:
+            self.title_label.setText(f"{my_champion} vs {enemy_champion}")
+        elif my_champion:
+            self.title_label.setText(f"{my_champion} build guidance")
+        else:
+            self.title_label.setText("Champion matchup assistant")
+
+        meta_bits = []
+        if queue_type:
+            meta_bits.append(f"Queue: {queue_type}")
+        meta_bits.append(f"Elo target: {rank_label}")
+        self.meta_label.setText(" | ".join(meta_bits))
+
+        if summary_lines:
+            self.details_box.setPlainText("\n".join(str(line) for line in summary_lines))
+        else:
+            self.details_box.setPlainText(
+                "Waiting for more champ select info.\n"
+                "Lock your champion (and enemy champion if visible) to get matchup-specific guidance."
+            )
+
+        self.open_matchup_btn.setEnabled(bool(self._matchup_url))
+        self.open_fallback_btn.setEnabled(bool(self._fallback_url))
+
+    def _open_matchup(self):
+        if not self._matchup_url:
+            return
+        try:
+            webbrowser.open_new_tab(self._matchup_url)
+        except Exception:
+            webbrowser.open(self._matchup_url)
+
+    def _open_fallback(self):
+        if not self._fallback_url:
+            return
+        try:
+            webbrowser.open_new_tab(self._fallback_url)
+        except Exception:
+            webbrowser.open(self._fallback_url)
+
+
 class MasterPasswordDialog(QDialog):
     """Dialog for setting/entering master password"""
     
@@ -3139,8 +3252,12 @@ class MainWindow(QMainWindow):
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
+        self.champ_select_assistant_dialog: Optional[ChampSelectAssistantDialog] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
+        self._rank_data_by_username: dict[str, dict] = {}
+        self._last_champ_select_signature: str = ""
+        self._last_champ_select_refresh_at: float = 0.0
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = True
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
@@ -4438,6 +4555,10 @@ QMenu#trayQuickMenu::separator {
         )
         self._ingame_watch_status = next_status
         self._update_tray_watcher_status()
+        if bool(next_status.get("in_champ_select", False)):
+            self._maybe_refresh_champ_select_assistant(force=False)
+        else:
+            self._close_champ_select_assistant()
         self.update_account_item_states()
         if self.ingame_diag_dialog:
             self.ingame_diag_dialog.refresh_status()
@@ -5234,6 +5355,7 @@ QMenu#trayQuickMenu::separator {
 
     def _on_rank_result(self, username: str, rank_data: dict):
         """Update the matching AccountListItem widget with fresh rank data."""
+        self._rank_data_by_username[str(username)] = dict(rank_data or {})
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             widget = self.account_list.itemWidget(item)
@@ -5278,6 +5400,160 @@ QMenu#trayQuickMenu::separator {
             return "Out of Game"
 
         return "Logged In"
+
+    def _normalize_champion_slug(self, champion_name: str) -> str:
+        """Normalize champion names for build-site URL paths."""
+        raw = str(champion_name or "").strip().casefold()
+        if not raw:
+            return ""
+        compact = "".join(ch for ch in raw if ch.isalnum())
+        return compact
+
+    def _resolve_logged_in_elo(self) -> tuple[str, str]:
+        """Return (u.gg rank slug, human-readable label) from cached rank data."""
+        username = str(self._logged_in_username or "").strip()
+        if not username:
+            return "overall", "Overall"
+
+        rank_data = self._rank_data_by_username.get(username, {}) or {}
+        if str(rank_data.get("status", "")).lower() != "ok":
+            return "overall", "Overall"
+
+        tier = str(rank_data.get("tier", "") or "").strip().casefold()
+        if not tier:
+            return "overall", "Overall"
+
+        tier_slug = {
+            "iron": "iron",
+            "bronze": "bronze",
+            "silver": "silver",
+            "gold": "gold",
+            "platinum": "platinum",
+            "emerald": "emerald",
+            "diamond": "diamond",
+            "master": "master",
+            "grandmaster": "grandmaster",
+            "challenger": "challenger",
+        }.get(tier, "overall")
+        label = str(rank_data.get("tier", "") or "Overall").strip() or "Overall"
+        return tier_slug, label
+
+    def _build_u_gg_build_urls(
+        self,
+        my_champion: str,
+        enemy_champion: str,
+        rank_slug: str,
+        queue_id: object,
+    ) -> tuple[str, str]:
+        """Build queue-aware matchup/fallback u.gg build URLs for current champ select."""
+        my_slug = self._normalize_champion_slug(my_champion)
+        if not my_slug:
+            return "", ""
+
+        rank_param = str(rank_slug or "overall").strip() or "overall"
+        try:
+            qid = int(queue_id)
+        except (TypeError, ValueError):
+            qid = None
+
+        queue_path = "build"
+        queue_query = f"rank={quote(rank_param, safe='')}"
+
+        # ARAM has its own build route and is not tied to ranked tiers.
+        if qid == 450:
+            queue_path = "aram-build"
+            queue_query = ""
+
+        fallback_url = f"https://u.gg/lol/champions/{my_slug}/{queue_path}"
+        if queue_query:
+            fallback_url = f"{fallback_url}?{queue_query}"
+
+        enemy_slug = self._normalize_champion_slug(enemy_champion)
+        matchup_url = ""
+        if enemy_slug:
+            matchup_query_parts = []
+            if queue_query:
+                matchup_query_parts.append(queue_query)
+            matchup_query_parts.append(f"opp={quote(enemy_slug, safe='')}")
+            matchup_url = (
+                f"https://u.gg/lol/champions/{my_slug}/{queue_path}"
+                f"?{'&'.join(matchup_query_parts)}"
+            )
+        return matchup_url, fallback_url
+
+    def _maybe_refresh_champ_select_assistant(self, force: bool = False):
+        """Refresh champ-select assistant content while in champ select."""
+        if not (self.account_manager and self._logged_in_username):
+            self._close_champ_select_assistant()
+            return
+
+        now = time.time()
+        if not force and (now - self._last_champ_select_refresh_at) < 1.4:
+            return
+        self._last_champ_select_refresh_at = now
+
+        matchup = RiotClientIntegration.get_champ_select_matchup(timeout_seconds=1.2)
+        if not RiotClientIntegration._is_champ_select_phase(str(matchup.get("phase", ""))):
+            self._close_champ_select_assistant()
+            return
+
+        my_champion = str(matchup.get("my_champion", "") or "").strip()
+        enemy_champion = str(matchup.get("enemy_champion", "") or "").strip()
+        queue_type = str(matchup.get("queue_type", "") or "").strip()
+        queue_id = matchup.get("queue_id")
+        rank_slug, rank_label = self._resolve_logged_in_elo()
+        matchup_url, fallback_url = self._build_u_gg_build_urls(my_champion, enemy_champion, rank_slug, queue_id)
+
+        summary_lines = []
+        if my_champion and enemy_champion:
+            summary_lines.append(f"Detected matchup: {my_champion} vs {enemy_champion}")
+            summary_lines.append("Open Matchup Build for matchup-specific runes/items.")
+        elif my_champion:
+            summary_lines.append(f"Detected champion: {my_champion}")
+            summary_lines.append("Opponent champion not visible yet. Using fallback champion build.")
+        else:
+            summary_lines.append("Waiting for your champion pick/lock.")
+
+        summary_lines.append(f"Elo target: {rank_label}")
+        if queue_type:
+            summary_lines.append(f"Queue: {queue_type}")
+
+        payload = {
+            "my_champion": my_champion,
+            "enemy_champion": enemy_champion,
+            "queue_type": queue_type,
+            "rank_label": rank_label,
+            "summary_lines": summary_lines,
+            "matchup_url": matchup_url,
+            "fallback_url": fallback_url,
+        }
+
+        signature = "|".join([
+            my_champion,
+            enemy_champion,
+            str(queue_id),
+            queue_type,
+            rank_slug,
+        ])
+        if signature == self._last_champ_select_signature and self.champ_select_assistant_dialog:
+            return
+        self._last_champ_select_signature = signature
+
+        if not self.champ_select_assistant_dialog:
+            self.champ_select_assistant_dialog = ChampSelectAssistantDialog(self)
+
+        self.champ_select_assistant_dialog.update_payload(payload)
+        if not self.champ_select_assistant_dialog.isVisible():
+            self.champ_select_assistant_dialog.show()
+            self.champ_select_assistant_dialog.raise_()
+            self.champ_select_assistant_dialog.activateWindow()
+
+    def _close_champ_select_assistant(self):
+        """Close champ-select assistant and clear transient refresh state."""
+        self._last_champ_select_signature = ""
+        self._last_champ_select_refresh_at = 0.0
+        if self.champ_select_assistant_dialog and self.champ_select_assistant_dialog.isVisible():
+            self.champ_select_assistant_dialog.close()
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
@@ -5759,6 +6035,7 @@ QMenu::separator {
 
     def _stop_ingame_watcher(self):
         """Stop any existing in-game watcher thread."""
+        self._close_champ_select_assistant()
         watcher = self.ingame_watch_thread
         self.ingame_watch_thread = None  # clear first so deferred finished signals don't clobber new watcher
         if watcher:
@@ -5796,6 +6073,7 @@ QMenu::separator {
 
     def _clear_ingame_watcher(self):
         """Clear completed watcher thread reference."""
+        self._close_champ_select_assistant()
         self.ingame_watch_thread = None
         self._ingame_watch_status = {
             "watcher_active": False,

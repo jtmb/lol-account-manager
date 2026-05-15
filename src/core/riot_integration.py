@@ -51,6 +51,14 @@ class RiotClientIntegration:
         2020: "Tutorial",
         490: "Quickplay",
     }
+
+    _CHAMPION_ALIAS_BY_ID: Optional[dict[int, str]] = None
+
+    @staticmethod
+    def _is_champ_select_phase(phase: str) -> bool:
+        """Return True for champ-select phases across queue variants."""
+        normalized = str(phase or "").strip().casefold()
+        return "champselect" in normalized
     
     @staticmethod
     def find_lol_launch_dir() -> Optional[Path]:
@@ -390,6 +398,138 @@ class RiotClientIntegration:
             "queue_type": queue_type,
             "summary": summary,
         })
+        return result
+
+    @staticmethod
+    def _champion_alias_by_id(timeout_seconds: float = 2.0) -> dict[int, str]:
+        """Return cached champion alias map keyed by numeric champion id."""
+        cached = RiotClientIntegration._CHAMPION_ALIAS_BY_ID
+        if isinstance(cached, dict) and cached:
+            return cached
+
+        mapping: dict[int, str] = {}
+        try:
+            response = requests.get(
+                'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json',
+                timeout=timeout_seconds,
+            )
+            if response.status_code == 200:
+                payload = response.json() or []
+                if isinstance(payload, list):
+                    for entry in payload:
+                        if not isinstance(entry, dict):
+                            continue
+                        champ_id = entry.get('id')
+                        alias = entry.get('alias') or entry.get('name')
+                        try:
+                            cid = int(champ_id)
+                        except (TypeError, ValueError):
+                            continue
+                        if alias:
+                            mapping[cid] = str(alias)
+        except Exception:
+            mapping = {}
+
+        RiotClientIntegration._CHAMPION_ALIAS_BY_ID = mapping
+        return mapping
+
+    @staticmethod
+    def _champion_name_from_id(champion_id: object) -> str:
+        try:
+            cid = int(champion_id)
+        except (TypeError, ValueError):
+            return ""
+        if cid <= 0:
+            return ""
+        mapping = RiotClientIntegration._champion_alias_by_id()
+        return str(mapping.get(cid, ""))
+
+    @staticmethod
+    def get_champ_select_matchup(timeout_seconds: float = 1.2) -> dict:
+        """Return currently selected self/enemy champions from champ select."""
+        result = {
+            "available": False,
+            "phase": "",
+            "queue_id": None,
+            "queue_type": "",
+            "my_champion_id": None,
+            "my_champion": "",
+            "enemy_champion_id": None,
+            "enemy_champion": "",
+            "enemy_candidates": [],
+        }
+
+        phase_response = RiotClientIntegration._lcu_get('/lol-gameflow/v1/gameflow-phase', timeout_seconds=timeout_seconds)
+        if not phase_response or phase_response.status_code != 200:
+            return result
+
+        try:
+            phase = str(phase_response.json() or "")
+        except ValueError:
+            phase = (phase_response.text or "").strip().strip('"')
+        result["phase"] = phase
+        if not RiotClientIntegration._is_champ_select_phase(phase):
+            return result
+
+        session_response = RiotClientIntegration._lcu_get('/lol-champ-select/v1/session', timeout_seconds=timeout_seconds)
+        if not session_response or session_response.status_code != 200:
+            return result
+
+        try:
+            session = session_response.json() or {}
+        except ValueError:
+            return result
+
+        if not isinstance(session, dict):
+            return result
+
+        local_cell = session.get('localPlayerCellId')
+        my_team = session.get('myTeam') if isinstance(session.get('myTeam'), list) else []
+        their_team = session.get('theirTeam') if isinstance(session.get('theirTeam'), list) else []
+
+        queue_id = None
+        if isinstance(session.get('gameData'), dict):
+            queue = session.get('gameData', {}).get('queue')
+            if isinstance(queue, dict):
+                queue_id = queue.get('id')
+                queue_name = str(queue.get('name') or queue.get('shortName') or "")
+                if queue_name:
+                    result['queue_type'] = queue_name
+        result['queue_id'] = queue_id
+        if not result['queue_type']:
+            result['queue_type'] = RiotClientIntegration._queue_type_label(queue_id)
+
+        my_champion_id = None
+        for player in my_team:
+            if not isinstance(player, dict):
+                continue
+            if player.get('cellId') == local_cell:
+                my_champion_id = player.get('championId') or player.get('championPickIntent')
+                break
+        result['my_champion_id'] = my_champion_id
+        result['my_champion'] = RiotClientIntegration._champion_name_from_id(my_champion_id)
+
+        enemy_candidates: list[tuple[int, str]] = []
+        for player in their_team:
+            if not isinstance(player, dict):
+                continue
+            champ_id = player.get('championId') or player.get('championPickIntent')
+            try:
+                cid = int(champ_id)
+            except (TypeError, ValueError):
+                continue
+            if cid <= 0:
+                continue
+            champ_name = RiotClientIntegration._champion_name_from_id(cid)
+            if champ_name:
+                enemy_candidates.append((cid, champ_name))
+
+        if enemy_candidates:
+            result['enemy_champion_id'] = enemy_candidates[0][0]
+            result['enemy_champion'] = enemy_candidates[0][1]
+            result['enemy_candidates'] = [name for _, name in enemy_candidates]
+
+        result['available'] = bool(result['my_champion'])
         return result
 
     @staticmethod
