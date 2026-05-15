@@ -393,6 +393,19 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
         pass
 
 
+def _hide_windows_console_window():
+    """Hide the attached Windows console window if one exists."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            SW_HIDE = 0
+            ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -3403,6 +3416,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        _hide_windows_console_window()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
