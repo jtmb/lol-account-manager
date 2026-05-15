@@ -7923,6 +7923,50 @@ QMenu#trayQuickMenu::separator {
         self._stop_ingame_watcher()
         self._show_logged_in_spotlight()
 
+    def _show_spotlight_for_account(self, account: "Account"):
+        """Show the spotlight panel for any account row (not just the logged-in one)."""
+        if not self.account_spotlight_panel:
+            return
+        self._spotlight_user_dismissed = False
+
+        # If spotlight is already in the list, just update content and return
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                profile_url = self._build_ugg_profile_overview_url(account)
+                rank_data = self._rank_data_by_username.get(account.username, {})
+                self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+                QTimer.singleShot(200, self._update_webview_zoom)
+                self._enter_spotlight_ui_mode()
+                return
+
+        # Find the row for this account and insert spotlight after it
+        target_row = -1
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if item.data(Qt.UserRole) == account.username:
+                target_row = index
+                break
+        if target_row < 0:
+            return
+
+        self.account_spotlight_panel.setParent(self.account_list_background)
+        spotlight_item = QListWidgetItem()
+        spotlight_item.setFlags(Qt.NoItemFlags)
+        spotlight_item.setSizeHint(QSize(0, 480))
+        self.account_list.insertItem(target_row + 1, spotlight_item)
+        self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
+
+        self._update_spotlight_size_hint()
+        self.account_spotlight_panel.show()
+        self._enter_spotlight_ui_mode()
+
+        profile_url = self._build_ugg_profile_overview_url(account)
+        rank_data = self._rank_data_by_username.get(account.username, {})
+        self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+        QTimer.singleShot(200, self._update_webview_zoom)
+        self.account_list.scrollToItem(spotlight_item)
+
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
         item = self.account_list.itemAt(position)
@@ -7944,8 +7988,7 @@ QMenu#trayQuickMenu::separator {
         menu.setStyleSheet(self._account_context_menu_stylesheet())
         toggle_pin_action = menu.addAction("Unpin Account" if getattr(account, "is_pinned", False) else "Pin Account")
         menu.addSeparator()
-        open_opgg_profile_action = menu.addAction("Open OP.GG Profile")
-        open_opgg_ingame_action = menu.addAction("Open Live-Game Page")
+        open_spotlight_action = menu.addAction("View Account Spotlight")
         menu.addSeparator()
         copy_username_action = menu.addAction("Copy Username")
         copy_password_action = menu.addAction("Copy Password")
@@ -7958,10 +8001,8 @@ QMenu#trayQuickMenu::separator {
                 self.refresh_account_list()
             except Exception as exc:
                 self._show_error("Pin", f"Could not update pin state: {exc}")
-        elif chosen_action == open_opgg_profile_action:
-            self._open_opgg_profile(account)
-        elif chosen_action == open_opgg_ingame_action:
-            self._open_ingame_webpage(self._build_opgg_ingame_url(account))
+        elif chosen_action == open_spotlight_action:
+            self._show_spotlight_for_account(account)
         elif chosen_action == copy_username_action:
             self.copy_to_clipboard(account.username)
         elif chosen_action == copy_password_action:
