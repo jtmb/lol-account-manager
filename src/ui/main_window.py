@@ -1355,6 +1355,25 @@ class SettingsDialog(QDialog):
         self._settings = merged_settings
         self._apply_callback = apply_callback
         self._save_requested = False
+
+        # Set dark palette HERE, before init_ui() creates any child widgets.
+        # Qt paints each widget's background using the palette before any
+        # stylesheet is applied, so this is the only way to prevent the
+        # first-frame white flash on Windows.
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        _bg = QColor(str(getattr(parent, '_app_bg_color', DEFAULT_APP_BG_COLOR)))
+        _surface = QColor(str(getattr(parent, '_app_surface_color', DEFAULT_APP_SURFACE_COLOR)))
+        _text = QColor(str(getattr(parent, '_app_text_color', DEFAULT_APP_TEXT_COLOR)))
+        _pal = QPalette()
+        _pal.setColor(QPalette.Window,      _bg)
+        _pal.setColor(QPalette.WindowText,  _text)
+        _pal.setColor(QPalette.Base,        _surface)
+        _pal.setColor(QPalette.AlternateBase, _surface)
+        _pal.setColor(QPalette.Text,        _text)
+        _pal.setColor(QPalette.Button,      _surface)
+        _pal.setColor(QPalette.ButtonText,  _text)
+        self.setPalette(_pal)
+
         self.init_ui()
 
     def _default_settings_values(self) -> dict:
@@ -1498,27 +1517,13 @@ class SettingsDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(620)
 
-        # Get theme colors from parent window
         mw = self.parent()
         app_bg = str(getattr(mw, "_app_bg_color", DEFAULT_APP_BG_COLOR))
         app_surface = str(getattr(mw, "_app_surface_color", DEFAULT_APP_SURFACE_COLOR))
         app_border = str(getattr(mw, "_app_border_color", DEFAULT_APP_BORDER_COLOR))
         app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
         app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
-        
-        # Set palette to prevent white flash on dialog creation
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(app_bg))
-        palette.setColor(QPalette.WindowText, QColor(app_text))
-        palette.setColor(QPalette.Base, QColor(app_surface))
-        palette.setColor(QPalette.AlternateBase, QColor(app_border))
-        palette.setColor(QPalette.Text, QColor(app_text))
-        palette.setColor(QPalette.Button, QColor(app_surface))
-        palette.setColor(QPalette.ButtonText, QColor(app_text))
-        palette.setColor(QPalette.BrightText, QColor(app_text))
-        self.setPalette(palette)
-        
-        # Apply stylesheet minimally
+
         self.setStyleSheet(
             f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
             f"QWidget {{ background-color: {app_bg}; color: {app_text}; }}"

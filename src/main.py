@@ -2,8 +2,27 @@
 import sys
 import ctypes
 import subprocess
+import faulthandler
+import traceback
 from pathlib import Path
 
+# --- Crash logging setup (runs before anything else) ---
+# Write to a known file so crashes survive FreeConsole() severing stderr.
+_CRASH_LOG = Path.home() / ".lol-account-manager" / "crash.log"
+_CRASH_LOG.parent.mkdir(parents=True, exist_ok=True)
+_crash_log_fd = _CRASH_LOG.open("a", encoding="utf-8", errors="replace")
+
+faulthandler.enable(file=_crash_log_fd, all_threads=True)
+
+def _excepthook(exc_type, exc_value, exc_tb):
+    """Catch unhandled Python exceptions (including ones swallowed by Qt slots)."""
+    msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    _crash_log_fd.write(msg)
+    _crash_log_fd.flush()
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = _excepthook
+# --------------------------------------------------------
 
 from PyQt5.QtCore import QCoreApplication
 from PyQt5.QtWidgets import QApplication

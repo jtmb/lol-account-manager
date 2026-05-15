@@ -150,15 +150,19 @@ echo.
 "%VENV_PYTHON%" -u -m src.main > "%APP_LOG%" 2>&1
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Application error occurred
-    echo [!] Log saved to:
-    echo %APP_LOG%
+    echo [ERROR] Application crashed (exit code !errorlevel!)
+    echo.
+    echo --- stdout/stderr log: %APP_LOG%
+    echo --- crash log: %USERPROFILE%\.lol-account-manager\crash.log
+    echo.
     if exist "%APP_LOG%" (
-        echo.
-        echo ----- Last 100 log lines -----
-        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 100"
-        timeout /t 2 /nobreak
-        start "" notepad.exe "%APP_LOG%"
+        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 60"
+    )
+    echo.
+    echo --- crash.log ---
+    if exist "%USERPROFILE%\.lol-account-manager\crash.log" (
+        powershell -NoProfile -Command "Get-Content -LiteralPath '%USERPROFILE%\.lol-account-manager\crash.log' -Tail 60"
+        start "" notepad.exe "%USERPROFILE%\.lol-account-manager\crash.log"
     )
     pause
     exit /b 1
