@@ -4120,6 +4120,18 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             '[role="main"] { max-width:none!important; width:100%!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
+        
+        /* ── set up resize listener to re-apply CSS on window resize ─── */
+        if (!window._ugg_embed_resize_listener_set) {
+            window._ugg_embed_resize_listener_set = true;
+            window.addEventListener('resize', function() {
+                /* Force elements to recalculate with new width */
+                document.querySelectorAll('[class*="Layout"], [class*="Container"], [class*="Content"], [class*="Wrapper"], main, [role="main"]').forEach(function(el) {
+                    el.style.maxWidth = 'none';
+                    el.style.width = '100%';
+                });
+            }, { passive: true });
+        }
     }
 
     /* ── hide fixed/sticky positioned elements at top (game tabs bar) ─ */
