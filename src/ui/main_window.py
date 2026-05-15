@@ -4024,14 +4024,15 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 8, 0, 0)
-        outer.setSpacing(8)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
         self._content_card = QFrame()
         self._content_card.setObjectName("spotlightContentCard")
         self._content_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content_layout = QVBoxLayout(self._content_card)
-        content_layout.setContentsMargins(6, 6, 6, 6)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
 
         self._web_view = None
         self._fallback_container = QWidget()
@@ -4066,7 +4067,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             content_layout.addWidget(self._fallback_container, 1)
 
         outer.addWidget(self._content_card, 1)
-        self.setMinimumHeight(420)
+        self.setMinimumHeight(280)
         self._apply_panel_styles()
 
     def _open_profile_in_browser(self):
@@ -4108,9 +4109,11 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove leading/trailing whitespace offsets */
-            'body { margin:0!important; padding:0!important; }',
-            'html { margin:0!important; padding:0!important; }'
+            /* Remove all unnecessary padding and margins from page root */
+            'body { margin:0!important; padding:0!important; overflow-x:hidden!important; }',
+            'html { margin:0!important; padding:0!important; }',
+            'main { margin:0!important; padding:0!important; }',
+            '[role="main"] { margin:0!important; padding:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
@@ -5545,7 +5548,7 @@ class MainWindow(QMainWindow):
             self.account_spotlight_panel.setParent(self.account_list_background)
             spotlight_item = QListWidgetItem()
             spotlight_item.setFlags(Qt.NoItemFlags)
-            spotlight_item.setSizeHint(QSize(0, 480))
+            spotlight_item.setSizeHint(QSize(0, 280))
             self.account_list.insertItem(logged_in_row + 1, spotlight_item)
             self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
@@ -5582,7 +5585,7 @@ class MainWindow(QMainWindow):
                     self.account_list.item(i).sizeHint().height()
                     for i in range(index)
                 )
-                new_h = max(380, viewport_h - used)
+                new_h = max(280, viewport_h - used)
                 if item.sizeHint().height() != new_h:
                     item.setSizeHint(QSize(0, new_h))
                     self.account_spotlight_panel.setMinimumHeight(new_h)
