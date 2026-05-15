@@ -124,6 +124,7 @@ def main():
         QCoreApplication.setApplicationName("League of Legends Account Manager")
 
         app = QApplication(sys.argv)
+        app.setStyle("Fusion")
 
         # Must be called before any window is created so that every widget's
         # initial OS-level background paint uses dark colors, preventing the

@@ -3054,6 +3054,9 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        # Avoid first-frame light paints while the window is being built.
+        self.setUpdatesEnabled(False)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         _hide_windows_console_window()
         _hide_any_python_titled_window()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
@@ -3090,6 +3093,11 @@ class MainWindow(QMainWindow):
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
         self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
+        base_pal = QPalette()
+        base_pal.setColor(QPalette.Window, QColor(self._app_bg_color))
+        base_pal.setColor(QPalette.WindowText, QColor(self._app_text_color))
+        self.setPalette(base_pal)
+        self.setAutoFillBackground(True)
         default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
@@ -3174,6 +3182,8 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._create_tray_icon()
         self._apply_theme()
+        self.setUpdatesEnabled(True)
+        self.repaint()
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
