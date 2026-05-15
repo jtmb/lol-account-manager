@@ -2937,6 +2937,7 @@ class AccountListItem(QFrame):
                 )
                 self._shadow.setBlurRadius(22)
                 self._shadow.setColor(QColor(0, 0, 0, 120))
+                self._shadow.setEnabled(True)
                 if self.graphicsEffect() is None:
                     self.setGraphicsEffect(self._shadow)
             else:
@@ -2947,8 +2948,10 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
+                # Disable rather than remove — setGraphicsEffect(None) would
+                # delete the C++ object while self._shadow still references it.
                 if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
+                    self._shadow.setEnabled(False)
             return
 
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
