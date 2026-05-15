@@ -2,12 +2,20 @@
 REM League of Legends Account Manager - Windows Launcher
 setlocal enableextensions enabledelayedexpansion
 
-REM Set colors immediately so there is no visible default console theme flash
-color 0A
-cls
+REM If __KEEP flag is set, we're in the persistent window, skip respawning
+if "%~1"=="__KEEP" (
+    shift
+    goto :main
+)
+
+REM First run: create the persistent console with colors pre-applied.
+start "" cmd /T:0A /K ""%~f0" __KEEP"
+exit /b 0
 
 :main
 set "SCRIPT_DIR=%~dp0"
+
+cls
 
 if not defined LOL_STAGED (
     set "PATH_PREFIX=%SCRIPT_DIR:~0,2%"

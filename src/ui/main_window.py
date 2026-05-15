@@ -416,7 +416,9 @@ def _reveal_after_first_show(widget):
         if not bool(widget.property("_first_show_hidden")):
             return
         widget.setProperty("_first_show_hidden", False)
-        QTimer.singleShot(0, lambda w=widget: w.setWindowOpacity(1.0) if w is not None and w.isVisible() else None)
+        # Give Qt/DWM one short beat to complete any deferred style/chrome work
+        # before making the first frame visible.
+        QTimer.singleShot(40, lambda w=widget: w.setWindowOpacity(1.0) if w is not None and w.isVisible() else None)
     except Exception:
         pass
 
@@ -3250,6 +3252,7 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._create_tray_icon()
         self._apply_theme()
+        self.ensurePolished()
         self.setUpdatesEnabled(True)
         self.repaint()
         self._session_sync_timer.start()
