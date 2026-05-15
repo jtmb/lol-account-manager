@@ -914,6 +914,164 @@ class _ImageFetchThread(QThread):
             self.image_ready.emit(self._tag, b"")
 
 
+class _UggBuildFetchThread(QThread):
+    """Fetch u.gg champion page and extract embedded build/rune data from SSR JSON."""
+
+    build_ready = pyqtSignal(dict)
+
+    def __init__(self, page_url: str, role_hint: str = "", parent=None):
+        super().__init__(parent)
+        self._page_url = str(page_url or "").strip()
+        self._role_hint = str(role_hint or "").strip().casefold()
+
+    @staticmethod
+    def _extract_ssr_data(html: str) -> Optional[dict]:
+        marker = "window.__SSR_DATA__"
+        pos = html.find(marker)
+        if pos < 0:
+            return None
+
+        eq = html.find("=", pos)
+        if eq < 0:
+            return None
+        start = html.find("{", eq)
+        if start < 0:
+            return None
+
+        depth = 0
+        in_str = False
+        escaped = False
+        end = -1
+        for i, ch in enumerate(html[start:], start=start):
+            if in_str:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+
+        if end < 0:
+            return None
+
+        try:
+            return json.loads(html[start:end + 1])
+        except Exception:
+            return None
+
+    def _pick_role_payload(self, role_map: dict) -> tuple[str, dict]:
+        if not isinstance(role_map, dict):
+            return "", {}
+
+        role_aliases = {
+            "top": "top",
+            "jungle": "jungle",
+            "jg": "jungle",
+            "mid": "mid",
+            "middle": "mid",
+            "adc": "adc",
+            "bot": "adc",
+            "bottom": "adc",
+            "support": "support",
+            "supp": "support",
+            "sup": "support",
+        }
+        wanted = role_aliases.get(self._role_hint, "")
+
+        if wanted:
+            for key, payload in role_map.items():
+                if str(key).split("_")[-1] == wanted and isinstance(payload, dict):
+                    return wanted, payload
+
+        best_role = ""
+        best_payload: dict = {}
+        best_matches = -1
+        for key, payload in role_map.items():
+            if not isinstance(payload, dict):
+                continue
+            role_name = str(key).split("_")[-1]
+            rune_data = payload.get("rec_runes") if isinstance(payload.get("rec_runes"), dict) else {}
+            matches = int(rune_data.get("matches", 0) or 0)
+            if matches > best_matches:
+                best_matches = matches
+                best_role = role_name
+                best_payload = payload
+        return best_role, best_payload
+
+    def run(self):
+        if not self._page_url:
+            self.build_ready.emit({"ok": False, "error": "Missing page URL"})
+            return
+
+        try:
+            req = Request(self._page_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=8) as resp:
+                html = resp.read().decode("utf-8", errors="ignore")
+        except Exception as exc:
+            self.build_ready.emit({"ok": False, "error": f"Failed fetching u.gg page: {exc}"})
+            return
+
+        ssr_data = self._extract_ssr_data(html)
+        if not ssr_data:
+            self.build_ready.emit({"ok": False, "error": "No SSR data found in u.gg page"})
+            return
+
+        overview_key = ""
+        for key in ssr_data.keys():
+            k = str(key)
+            if "/overview/" in k and "ap-overview" not in k and "tank-overview" not in k and "ad-overview" not in k and "crit-overview" not in k and "lethality-overview" not in k and "onhit-overview" not in k:
+                overview_key = k
+                break
+            if "overview_" in k and "_recommended::" in k:
+                overview_key = k
+                break
+
+        if not overview_key:
+            self.build_ready.emit({"ok": False, "error": "No recommended overview key in SSR data"})
+            return
+
+        overview_obj = ssr_data.get(overview_key)
+        role_map = overview_obj.get("data") if isinstance(overview_obj, dict) else None
+        if not isinstance(role_map, dict) or not role_map:
+            self.build_ready.emit({"ok": False, "error": "Recommended overview payload missing"})
+            return
+
+        picked_role, picked_payload = self._pick_role_payload(role_map)
+        if not picked_payload:
+            self.build_ready.emit({"ok": False, "error": "No role payload available"})
+            return
+
+        rec_runes = picked_payload.get("rec_runes") if isinstance(picked_payload.get("rec_runes"), dict) else {}
+        rec_shards = picked_payload.get("stat_shards") if isinstance(picked_payload.get("stat_shards"), dict) else {}
+        rec_start = picked_payload.get("rec_starting_items") if isinstance(picked_payload.get("rec_starting_items"), dict) else {}
+        rec_core = picked_payload.get("rec_core_items") if isinstance(picked_payload.get("rec_core_items"), dict) else {}
+
+        out = {
+            "ok": True,
+            "source": self._page_url,
+            "role": picked_role,
+            "matches": int(rec_runes.get("matches", 0) or 0),
+            "win_rate": float(rec_runes.get("win_rate", 0.0) or 0.0),
+            "primary_style": int(rec_runes.get("primary_style", 0) or 0),
+            "sub_style": int(rec_runes.get("sub_style", 0) or 0),
+            "perk_ids": [int(x) for x in (rec_runes.get("active_perks") or []) if str(x).isdigit()],
+            "shard_ids": [int(x) for x in (rec_shards.get("active_shards") or []) if str(x).isdigit()],
+            "starting_item_ids": [int(x) for x in (rec_start.get("ids") or []) if str(x).isdigit()],
+            "core_item_ids": [int(x) for x in (rec_core.get("ids") or []) if str(x).isdigit()],
+        }
+        self.build_ready.emit(out)
+
+
 class InClientGamePanel(AccountListBackgroundFrame):
     """Inline panel shown in place of the account list during champ select / in-game."""
 
@@ -938,6 +1096,14 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._enemy_champion_name = ""
         self._image_threads: list[_ImageFetchThread] = []
         self._portrait_cache: dict[str, QPixmap] = {}
+        self._rune_icon_cache: dict[int, QPixmap] = {}
+        self._item_icon_cache: dict[int, QPixmap] = {}
+        self._perk_icon_cache: dict[int, QPixmap] = {}
+        self._rune_icon_path_by_id: dict[int, str] = {}
+
+        self._build_fetch_thread: Optional[_UggBuildFetchThread] = None
+        self._build_cache: dict[str, dict] = {}
+        self._pending_build_key = ""
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 16, 20, 16)
@@ -969,9 +1135,175 @@ class InClientGamePanel(AccountListBackgroundFrame):
         sep.setStyleSheet("background: #313244; max-height: 1px; border: none;")
         outer.addWidget(sep)
 
-        # ── Champion portraits + names row ────────────────────────────────
+        content_row = QHBoxLayout()
+        content_row.setSpacing(12)
+
+        # Left card: selector + runes/build (one visible at a time)
+        left_card = QFrame()
+        left_card.setObjectName("gameLeftCard")
+        left_card.setStyleSheet(
+            "QFrame#gameLeftCard {"
+            "background: rgba(20, 24, 36, 0.78);"
+            "border: 1px solid #2f3548;"
+            "border-radius: 10px;"
+            "}"
+        )
+        left_layout = QVBoxLayout(left_card)
+        left_layout.setContentsMargins(12, 10, 12, 10)
+        left_layout.setSpacing(8)
+
+        selector_row = QHBoxLayout()
+        selector_row.setSpacing(6)
+        self._show_runes_btn = QPushButton("Runes")
+        self._show_runes_btn.setCheckable(True)
+        self._show_build_btn = QPushButton("Build")
+        self._show_build_btn.setCheckable(True)
+        selector_btn_style = (
+            "QPushButton {"
+            "background: #1e2333;"
+            "color: #a6adc8;"
+            "border: 1px solid #343b53;"
+            "border-radius: 6px;"
+            "padding: 4px 10px;"
+            "font-size: 9pt;"
+            "}"
+            "QPushButton:checked {"
+            "background: #2f5fd0;"
+            "color: #f5f7ff;"
+            "border: 1px solid #5787ff;"
+            "}"
+        )
+        self._show_runes_btn.setStyleSheet(selector_btn_style)
+        self._show_build_btn.setStyleSheet(selector_btn_style)
+        self._show_runes_btn.clicked.connect(lambda: self._set_left_view(0))
+        self._show_build_btn.clicked.connect(lambda: self._set_left_view(1))
+        selector_row.addWidget(self._show_runes_btn)
+        selector_row.addWidget(self._show_build_btn)
+        selector_row.addStretch()
+        left_layout.addLayout(selector_row)
+
+        self._left_stack = QStackedWidget()
+
+        # Runes page
+        runes_page = QWidget()
+        runes_layout = QVBoxLayout(runes_page)
+        runes_layout.setContentsMargins(0, 0, 0, 0)
+        runes_layout.setSpacing(8)
+
+        rune_header = QHBoxLayout()
+        rune_title = QLabel("Top Runes")
+        rune_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        rune_header.addWidget(rune_title)
+        rune_header.addStretch()
+        runes_layout.addLayout(rune_header)
+
+        self._rune_paths_row = QHBoxLayout()
+        self._rune_paths_row.setSpacing(8)
+        self._rune_path_labels: dict[int, QLabel] = {}
+        for style_id, (name, _) in self._RUNE_STYLES.items():
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            col.setAlignment(Qt.AlignHCenter)
+            icon_lbl = QLabel()
+            icon_lbl.setFixedSize(self._ICON_SIZE, self._ICON_SIZE)
+            icon_lbl.setAlignment(Qt.AlignCenter)
+            icon_lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+            icon_lbl.setToolTip(name)
+            col.addWidget(icon_lbl, 0, Qt.AlignHCenter)
+            name_lbl = QLabel(name[:4])
+            name_lbl.setAlignment(Qt.AlignCenter)
+            name_lbl.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
+            col.addWidget(name_lbl, 0, Qt.AlignHCenter)
+            self._rune_path_labels[style_id] = icon_lbl
+            self._rune_paths_row.addLayout(col)
+        self._rune_paths_row.addStretch()
+        runes_layout.addLayout(self._rune_paths_row)
+
+        self._rune_meta_label = QLabel("Build data pending...")
+        self._rune_meta_label.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+        runes_layout.addWidget(self._rune_meta_label)
+
+        self._active_perk_row = QHBoxLayout()
+        self._active_perk_row.setSpacing(6)
+        self._active_perk_labels: list[QLabel] = []
+        for _ in range(6):
+            lbl = QLabel()
+            lbl.setFixedSize(24, 24)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            self._active_perk_labels.append(lbl)
+            self._active_perk_row.addWidget(lbl)
+        self._active_perk_row.addStretch()
+        runes_layout.addLayout(self._active_perk_row)
+        runes_layout.addStretch()
+
+        # Build page
+        build_page = QWidget()
+        build_layout = QVBoxLayout(build_page)
+        build_layout.setContentsMargins(0, 0, 0, 0)
+        build_layout.setSpacing(8)
+
+        item_title = QLabel("Top Build")
+        item_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        build_layout.addWidget(item_title)
+
+        start_label = QLabel("Starting Items")
+        start_label.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+        build_layout.addWidget(start_label)
+        self._starting_items_row = QHBoxLayout()
+        self._starting_items_row.setSpacing(6)
+        self._starting_item_labels: list[QLabel] = []
+        for _ in range(4):
+            lbl = QLabel()
+            lbl.setFixedSize(28, 28)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            self._starting_item_labels.append(lbl)
+            self._starting_items_row.addWidget(lbl)
+        self._starting_items_row.addStretch()
+        build_layout.addLayout(self._starting_items_row)
+
+        core_label = QLabel("Core Items")
+        core_label.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+        build_layout.addWidget(core_label)
+        self._core_items_row = QHBoxLayout()
+        self._core_items_row.setSpacing(6)
+        self._core_item_labels: list[QLabel] = []
+        for _ in range(4):
+            lbl = QLabel()
+            lbl.setFixedSize(28, 28)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            self._core_item_labels.append(lbl)
+            self._core_items_row.addWidget(lbl)
+        self._core_items_row.addStretch()
+        build_layout.addLayout(self._core_items_row)
+        build_layout.addStretch()
+
+        self._left_stack.addWidget(runes_page)
+        self._left_stack.addWidget(build_page)
+        left_layout.addWidget(self._left_stack)
+
+        # Right card: matchup
+        right_card = QFrame()
+        right_card.setObjectName("gameRightCard")
+        right_card.setStyleSheet(
+            "QFrame#gameRightCard {"
+            "background: rgba(20, 24, 36, 0.78);"
+            "border: 1px solid #2f3548;"
+            "border-radius: 10px;"
+            "}"
+        )
+        right_layout = QVBoxLayout(right_card)
+        right_layout.setContentsMargins(12, 10, 12, 10)
+        right_layout.setSpacing(8)
+
+        matchup_title = QLabel("Champion Matchup")
+        matchup_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        right_layout.addWidget(matchup_title)
+
         matchup_row = QHBoxLayout()
-        matchup_row.setSpacing(0)
+        matchup_row.setSpacing(4)
 
         you_col = QVBoxLayout()
         you_col.setSpacing(4)
@@ -1000,7 +1332,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         vs_label = QLabel("VS")
         vs_label.setAlignment(Qt.AlignCenter)
         vs_label.setStyleSheet(
-            "color: #f38ba8; font-size: 11pt; font-weight: bold; padding: 0 12px;"
+            "color: #f38ba8; font-size: 11pt; font-weight: bold; padding: 0 8px;"
         )
         matchup_row.addWidget(vs_label)
 
@@ -1025,7 +1357,12 @@ class InClientGamePanel(AccountListBackgroundFrame):
         enemy_col.addWidget(self._enemy_champ_label)
         matchup_row.addLayout(enemy_col, 1)
 
-        outer.addLayout(matchup_row)
+        right_layout.addLayout(matchup_row)
+        right_layout.addStretch()
+
+        content_row.addWidget(left_card, 3)
+        content_row.addWidget(right_card, 2)
+        outer.addLayout(content_row)
 
         # ── Status hint ───────────────────────────────────────────────────
         self._status_label = QLabel("Waiting for champion selection…")
@@ -1034,47 +1371,45 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._status_label.setStyleSheet("color: #a6adc8; font-size: 9pt; padding: 2px 0;")
         outer.addWidget(self._status_label)
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.HLine)
-        sep2.setStyleSheet("background: #313244; max-height: 1px; border: none;")
-        outer.addWidget(sep2)
-
-        # ── Rune paths section ────────────────────────────────────────────
-        rune_header = QHBoxLayout()
-        rune_title = QLabel("Suggested Rune Paths")
-        rune_title.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
-        rune_header.addWidget(rune_title)
-        rune_header.addStretch()
-        outer.addLayout(rune_header)
-
-        # Row of rune path icons (one per style)
-        self._rune_paths_row = QHBoxLayout()
-        self._rune_paths_row.setSpacing(8)
-        self._rune_path_labels: dict[int, QLabel] = {}
-        for style_id, (name, _) in self._RUNE_STYLES.items():
-            col = QVBoxLayout()
-            col.setSpacing(2)
-            col.setAlignment(Qt.AlignHCenter)
-            icon_lbl = QLabel()
-            icon_lbl.setFixedSize(self._ICON_SIZE, self._ICON_SIZE)
-            icon_lbl.setAlignment(Qt.AlignCenter)
-            icon_lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
-            icon_lbl.setToolTip(name)
-            col.addWidget(icon_lbl, 0, Qt.AlignHCenter)
-            name_lbl = QLabel(name[:4])
-            name_lbl.setAlignment(Qt.AlignCenter)
-            name_lbl.setStyleSheet("color: #45475a; font-size: 7pt;")
-            col.addWidget(name_lbl, 0, Qt.AlignHCenter)
-            self._rune_path_labels[style_id] = icon_lbl
-            self._rune_paths_row.addLayout(col)
-        self._rune_paths_row.addStretch()
-        outer.addLayout(self._rune_paths_row)
+        self._set_left_view(0)
 
         outer.addStretch()
 
-        # Preload rune path icons
-        self._rune_icon_cache: dict[int, QPixmap] = {}
+        self._load_runes_reforged_map()
         self._load_rune_path_icons()
+        self._apply_empty_build_state("Waiting for u.gg data...")
+
+    def _load_runes_reforged_map(self):
+        """Load runeId -> icon path mapping from Data Dragon runesReforged.json."""
+        url = (
+            f"https://ddragon.leagueoflegends.com/cdn/{self._DDRAGON_VERSION}"
+            "/data/en_US/runesReforged.json"
+        )
+        try:
+            req = Request(url, headers={"User-Agent": "lol-account-manager/1.0"})
+            with urlopen(req, timeout=6) as resp:
+                raw = resp.read().decode("utf-8", errors="ignore")
+            data = json.loads(raw)
+            icon_map: dict[int, str] = {}
+            for style in data:
+                if not isinstance(style, dict):
+                    continue
+                for slot in style.get("slots", []) or []:
+                    if not isinstance(slot, dict):
+                        continue
+                    for rune in slot.get("runes", []) or []:
+                        if not isinstance(rune, dict):
+                            continue
+                        try:
+                            rid = int(rune.get("id", 0) or 0)
+                        except (TypeError, ValueError):
+                            rid = 0
+                        icon = str(rune.get("icon", "") or "").strip()
+                        if rid > 0 and icon:
+                            icon_map[rid] = icon
+            self._rune_icon_path_by_id = icon_map
+        except Exception:
+            self._rune_icon_path_by_id = {}
 
     def _load_rune_path_icons(self):
         """Start background threads to fetch rune path icons from DDragon."""
@@ -1113,6 +1448,32 @@ class InClientGamePanel(AccountListBackgroundFrame):
             if lbl:
                 lbl.setPixmap(sized)
                 lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        elif tag.startswith("rune_perk_"):
+            parts = tag.split("_")
+            if len(parts) >= 4:
+                try:
+                    perk_id = int(parts[2])
+                    slot_idx = int(parts[3])
+                except ValueError:
+                    return
+                sized = pix.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self._perk_icon_cache[perk_id] = sized
+                if 0 <= slot_idx < len(self._active_perk_labels):
+                    self._active_perk_labels[slot_idx].setPixmap(sized)
+        elif tag.startswith("item_icon_"):
+            parts = tag.split("_")
+            if len(parts) >= 5:
+                try:
+                    item_id = int(parts[2])
+                    row = parts[3]
+                    slot_idx = int(parts[4])
+                except ValueError:
+                    return
+                sized = pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self._item_icon_cache[item_id] = sized
+                labels = self._starting_item_labels if row == "start" else self._core_item_labels
+                if 0 <= slot_idx < len(labels):
+                    labels[slot_idx].setPixmap(sized)
         elif tag.startswith("portrait_"):
             champ_key = tag[len("portrait_"):]
             circular = self._make_circular(pix, self._PORTRAIT_SIZE)
@@ -1168,12 +1529,140 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._image_threads.append(t)
         t.start()
 
+    def _fetch_build_data(self, page_url: str, role_hint: str = ""):
+        key = f"{page_url}|{role_hint}"
+        self._pending_build_key = key
+        cached = self._build_cache.get(key)
+        if cached:
+            self._apply_build_data(cached)
+            return
+
+        if self._build_fetch_thread and self._build_fetch_thread.isRunning():
+            self._build_fetch_thread.terminate()
+            self._build_fetch_thread.wait(500)
+
+        self._apply_empty_build_state("Loading build data from u.gg...")
+        self._build_fetch_thread = _UggBuildFetchThread(page_url, role_hint, self)
+        self._build_fetch_thread.build_ready.connect(
+            lambda data, expected=key: self._on_build_data_ready(expected, data)
+        )
+        self._build_fetch_thread.start()
+
+    def _set_left_view(self, index: int):
+        idx = 0 if index not in (0, 1) else index
+        self._left_stack.setCurrentIndex(idx)
+        self._show_runes_btn.setChecked(idx == 0)
+        self._show_build_btn.setChecked(idx == 1)
+
+    def _on_build_data_ready(self, expected_key: str, data: dict):
+        if expected_key != self._pending_build_key:
+            return
+        if not isinstance(data, dict) or not data.get("ok"):
+            msg = str((data or {}).get("error", "No build data available") or "No build data available")
+            self._apply_empty_build_state(msg)
+            return
+        self._build_cache[expected_key] = data
+        self._apply_build_data(data)
+
+    def _apply_empty_build_state(self, message: str):
+        self._rune_meta_label.setText(message)
+        for lbl in self._active_perk_labels:
+            lbl.clear()
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        for lbl in self._starting_item_labels + self._core_item_labels:
+            lbl.clear()
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        for style_id, lbl in self._rune_path_labels.items():
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+
+    def _apply_build_data(self, data: dict):
+        role_name = str(data.get("role", "") or "").upper()
+        matches = int(data.get("matches", 0) or 0)
+        win_rate = float(data.get("win_rate", 0.0) or 0.0)
+        self._rune_meta_label.setText(
+            f"u.gg {role_name} · {win_rate:.2f}% WR · {matches:,} matches"
+        )
+
+        primary_style = int(data.get("primary_style", 0) or 0)
+        sub_style = int(data.get("sub_style", 0) or 0)
+        for style_id, lbl in self._rune_path_labels.items():
+            base = self._rune_icon_cache.get(style_id)
+            if base and not base.isNull():
+                lbl.setPixmap(base)
+            if style_id in (primary_style, sub_style):
+                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; border: 1px solid #89b4fa;")
+            else:
+                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+
+        perk_ids = list(data.get("perk_ids") or [])[:6]
+        for idx, lbl in enumerate(self._active_perk_labels):
+            lbl.clear()
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            if idx >= len(perk_ids):
+                continue
+            perk_id = int(perk_ids[idx])
+            cached = self._perk_icon_cache.get(perk_id)
+            if cached and not cached.isNull():
+                lbl.setPixmap(cached)
+                continue
+            icon_path = self._rune_icon_path_by_id.get(perk_id, "")
+            if not icon_path:
+                continue
+            icon_url = f"https://ddragon.leagueoflegends.com/cdn/img/{icon_path}"
+            tag = f"rune_perk_{perk_id}_{idx}"
+            t = _ImageFetchThread(tag, icon_url, self)
+            t.image_ready.connect(self._on_image_ready)
+            t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+            self._image_threads.append(t)
+            t.start()
+
+        start_ids = list(data.get("starting_item_ids") or [])[:len(self._starting_item_labels)]
+        for idx, lbl in enumerate(self._starting_item_labels):
+            lbl.clear()
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            if idx >= len(start_ids):
+                continue
+            item_id = int(start_ids[idx])
+            cached = self._item_icon_cache.get(item_id)
+            if cached and not cached.isNull():
+                lbl.setPixmap(cached)
+                continue
+            icon_url = f"https://ddragon.leagueoflegends.com/cdn/{self._DDRAGON_VERSION}/img/item/{item_id}.png"
+            tag = f"item_icon_{item_id}_start_{idx}"
+            t = _ImageFetchThread(tag, icon_url, self)
+            t.image_ready.connect(self._on_image_ready)
+            t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+            self._image_threads.append(t)
+            t.start()
+
+        core_ids = list(data.get("core_item_ids") or [])[:len(self._core_item_labels)]
+        for idx, lbl in enumerate(self._core_item_labels):
+            lbl.clear()
+            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            if idx >= len(core_ids):
+                continue
+            item_id = int(core_ids[idx])
+            cached = self._item_icon_cache.get(item_id)
+            if cached and not cached.isNull():
+                lbl.setPixmap(cached)
+                continue
+            icon_url = f"https://ddragon.leagueoflegends.com/cdn/{self._DDRAGON_VERSION}/img/item/{item_id}.png"
+            tag = f"item_icon_{item_id}_core_{idx}"
+            t = _ImageFetchThread(tag, icon_url, self)
+            t.image_ready.connect(self._on_image_ready)
+            t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+            self._image_threads.append(t)
+            t.start()
+
     def update_payload(self, payload: dict):
         in_game = bool(payload.get("in_game", False))
         my_champion = str(payload.get("my_champion", "") or "").strip()
         enemy_champion = str(payload.get("enemy_champion", "") or "").strip()
         queue_type = str(payload.get("queue_type", "") or "").strip()
         rank_label = str(payload.get("rank_label", "") or "").strip() or "Overall"
+        role_hint = str(payload.get("role_hint", "") or "").strip()
+        matchup_url = str(payload.get("matchup_url", "") or "").strip()
+        fallback_url = str(payload.get("fallback_url", "") or "").strip()
 
         self._my_champion_name = my_champion
         self._enemy_champion_name = enemy_champion
@@ -1238,6 +1727,12 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 hint = "Waiting for champion selection…"
 
         self._status_label.setText(hint)
+
+        build_url = fallback_url or matchup_url
+        if my_champion and build_url:
+            self._fetch_build_data(build_url, role_hint)
+        else:
+            self._apply_empty_build_state("Waiting for champion selection...")
 
 
 class MasterPasswordDialog(QDialog):
@@ -5743,6 +6238,7 @@ QMenu#trayQuickMenu::separator {
         my_champion = str(matchup.get("my_champion", "") or "").strip()
         enemy_champion = str(matchup.get("enemy_champion", "") or "").strip()
         queue_type = str(matchup.get("queue_type", "") or "").strip()
+        role_hint = str(matchup.get("role_hint", "") or "").strip()
         queue_id = matchup.get("queue_id")
         rank_slug, rank_label = self._resolve_logged_in_elo()
         matchup_url, fallback_url = self._build_u_gg_build_urls(my_champion, enemy_champion, rank_slug, queue_id)
@@ -5765,6 +6261,7 @@ QMenu#trayQuickMenu::separator {
             "my_champion": my_champion,
             "enemy_champion": enemy_champion,
             "queue_type": queue_type,
+            "role_hint": role_hint,
             "rank_label": rank_label,
             "summary_lines": summary_lines,
             "matchup_url": matchup_url,
@@ -5827,6 +6324,7 @@ QMenu#trayQuickMenu::separator {
             "my_champion": my_champion,
             "enemy_champion": enemy_champion,
             "queue_type": queue_type,
+            "role_hint": "",
             "rank_label": rank_label,
             "matchup_url": matchup_url,
             "fallback_url": fallback_url,

@@ -452,6 +452,7 @@ class RiotClientIntegration:
             "phase": "",
             "queue_id": None,
             "queue_type": "",
+            "role_hint": "",
             "my_champion_id": None,
             "my_champion": "",
             "enemy_champion_id": None,
@@ -505,6 +506,13 @@ class RiotClientIntegration:
                 continue
             if player.get('cellId') == local_cell:
                 my_champion_id = player.get('championId') or player.get('championPickIntent')
+                role_hint = (
+                    str(player.get('assignedPosition') or "").strip()
+                    or str(player.get('selectedPosition') or "").strip()
+                    or str(player.get('position') or "").strip()
+                    or str(player.get('role') or "").strip()
+                )
+                result['role_hint'] = role_hint
                 break
         result['my_champion_id'] = my_champion_id
         result['my_champion'] = RiotClientIntegration._champion_name_from_id(my_champion_id)
