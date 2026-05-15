@@ -29,11 +29,6 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 try:
-    import psutil
-except Exception:
-    psutil = None
-
-try:
     import qtawesome as qta
 except Exception:
     qta = None
@@ -407,12 +402,11 @@ def _hide_windows_console_window():
         pass
 
 
-def _hide_stray_python_console_windows():
-    """Hide stray top-level python console windows that may flash on Windows.
+def _hide_own_python_titled_windows(main_hwnd: int = 0):
+    """Hide any top-level window from this process titled like 'python'.
 
-    Some environments can briefly surface a console window titled "python"
-    during heavy UI repaints or extension hooks. We suppress only console-class
-    windows with python-like titles to avoid touching normal app windows.
+    This catches both console and accidental Qt top-level windows when they
+    surface with the default python title on Windows.
     """
     if not sys.platform.startswith("win"):
         return
@@ -423,7 +417,6 @@ def _hide_stray_python_console_windows():
     except Exception:
         return
 
-    # Always hide this process console if one is attached.
     try:
         hwnd = kernel32.GetConsoleWindow()
         if hwnd:
@@ -431,39 +424,13 @@ def _hide_stray_python_console_windows():
     except Exception:
         pass
 
-
-def _kill_stray_child_console_processes():
-    """Kill stray child console processes spawned under this app on Windows.
-
-    This targets unexpected child interpreters/shells (python/cmd/powershell)
-    that can intermittently surface a console window during UI actions.
-    """
-    if not sys.platform.startswith("win") or psutil is None:
-        return
-
     try:
-        current_pid = os.getpid()
-        parent = psutil.Process(current_pid)
-        children = parent.children(recursive=True)
-        for child in children:
-            try:
-                name = (child.name() or "").strip().lower()
-                if name in {
-                    "python.exe", "python", "py.exe", "py",
-                    "cmd.exe", "cmd", "powershell.exe", "powershell", "pwsh.exe", "pwsh",
-                }:
-                    child.terminate()
-            except Exception:
-                continue
-    except Exception:
-        pass
-
-    try:
-        get_class = user32.GetClassNameW
         get_text = user32.GetWindowTextW
         get_text_len = user32.GetWindowTextLengthW
         is_visible = user32.IsWindowVisible
+        get_pid = user32.GetWindowThreadProcessId
         show_window = user32.ShowWindow
+        current_pid = os.getpid()
 
         WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
@@ -472,9 +439,12 @@ def _kill_stray_child_console_processes():
                 if not is_visible(hwnd):
                     return True
 
-                class_buf = ctypes.create_unicode_buffer(256)
-                get_class(hwnd, class_buf, 255)
-                if class_buf.value != "ConsoleWindowClass":
+                if main_hwnd and int(hwnd) == int(main_hwnd):
+                    return True
+
+                pid = ctypes.c_ulong(0)
+                get_pid(hwnd, ctypes.byref(pid))
+                if int(pid.value) != int(current_pid):
                     return True
 
                 text_len = get_text_len(hwnd)
@@ -3439,8 +3409,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         _hide_windows_console_window()
-        _hide_stray_python_console_windows()
-        _kill_stray_child_console_processes()
+        _hide_own_python_titled_windows()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
@@ -3564,10 +3533,9 @@ class MainWindow(QMainWindow):
         if sys.platform.startswith("win"):
             self._console_guard_timer = QTimer(self)
             self._console_guard_timer.setInterval(50)
-            def _console_guard_tick():
-                _hide_stray_python_console_windows()
-                _kill_stray_child_console_processes()
-            self._console_guard_timer.timeout.connect(_console_guard_tick)
+            self._console_guard_timer.timeout.connect(
+                lambda: _hide_own_python_titled_windows(int(self.winId()))
+            )
             self._console_guard_timer.start()
         QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
@@ -4014,14 +3982,12 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         # Refresh button should not force a full stylesheet reapply.
-        _hide_stray_python_console_windows()
-        _kill_stray_child_console_processes()
+        _hide_own_python_titled_windows(int(self.winId()))
         self._apply_account_list_background()
         self.update_account_item_states()
-        self.refresh_account_list(fetch_ranks=False)
+        self.refresh_account_list(fetch_ranks=True)
         self._set_refresh_icon_normal()
-        _hide_stray_python_console_windows()
-        _kill_stray_child_console_processes()
+        _hide_own_python_titled_windows(int(self.winId()))
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4303,8 +4269,7 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
-        _hide_stray_python_console_windows()
-        _kill_stray_child_console_processes()
+        _hide_own_python_titled_windows(int(self.winId()))
         theme_before = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -4435,9 +4400,8 @@ class MainWindow(QMainWindow):
             self._apply_account_list_background()
             self.update_account_item_states()
 
-        self.refresh_account_list(fetch_ranks=False)
-        _hide_stray_python_console_windows()
-        _kill_stray_child_console_processes()
+        self.refresh_account_list(fetch_ranks=True)
+        _hide_own_python_titled_windows(int(self.winId()))
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
