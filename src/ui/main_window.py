@@ -4105,8 +4105,19 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
             /* Remove leading/trailing whitespace offsets */
-            'body { margin:0!important; padding:0!important; }',
-            'html { margin:0!important; padding:0!important; }'
+            'body { margin:0!important; padding:0!important; width:100%!important; }',
+            'html { margin:0!important; padding:0!important; width:100%!important; }',
+            /* Force responsive layout: remove max-width constraints */
+            '[class*="Layout"] { max-width:none!important; width:100%!important; }',
+            '[class*="layout"] { max-width:none!important; width:100%!important; }',
+            '[class*="Container"] { max-width:none!important; width:100%!important; }',
+            '[class*="container"] { max-width:none!important; width:100%!important; }',
+            '[class*="Content"] { max-width:none!important; width:100%!important; }',
+            '[class*="content"] { max-width:none!important; width:100%!important; }',
+            '[class*="Wrapper"] { max-width:none!important; width:100%!important; }',
+            '[class*="wrapper"] { max-width:none!important; width:100%!important; }',
+            'main { max-width:none!important; width:100%!important; }',
+            '[role="main"] { max-width:none!important; width:100%!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
     }
