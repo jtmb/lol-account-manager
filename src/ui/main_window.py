@@ -5672,16 +5672,16 @@ class MainWindow(QMainWindow):
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
-        if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
-            return
-        web_view = self.account_spotlight_panel._web_view
-        if web_view is None:
-            return
-        zoom = 1.3 if (self.isMaximized() or self.isFullScreen()) else 1.0
         try:
+            if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
+                return
+            web_view = self.account_spotlight_panel._web_view
+            if web_view is None:
+                return
+            zoom = 1.3 if (self.isMaximized() or self.isFullScreen()) else 1.0
             web_view.setZoomFactor(zoom)
         except RuntimeError:
-            # C++ object already deleted (panel was closed before timer fired)
+            # C++ object already deleted (panel or webview was closed before timer fired)
             pass
 
     def _reapply_ugg_embed_css(self):
