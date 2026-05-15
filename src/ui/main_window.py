@@ -3079,33 +3079,6 @@ class AccountListItem(QFrame):
                 label.setStyleSheet(self._tag_chip_stylesheet(text.lstrip("#")))
 
     def _refresh_logged_in_badge_style(self):
-        theme_before = (
-            self._text_zoom_percent,
-            self._app_bg_color,
-            self._app_surface_color,
-            self._app_border_color,
-            self._app_text_color,
-            self._app_accent_color,
-            self._app_hover_color,
-            self._hover_highlight_color_setting,
-            self._logged_in_gradient_color,
-            self._logged_in_gradient_intensity,
-            self._logged_in_border_width
-        )
-
-        if self._logged_in and active:
-            self.setStyleSheet(
-                "#accountListItem {"
-                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                f"stop:0 {left_active},"
-                f"stop:0.18 {mid_active},"
-                "stop:1 rgba(37, 41, 61, 170));"
-                "border: 1px solid transparent;"
-                "border-radius: 10px;"
-                "}"
-            )
-            if self.graphicsEffect() is not None:
-                self.setGraphicsEffect(None)
         """Refresh the logged-in badge style for the active theme."""
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         badge_bg_alpha = int(30 + (90 * t))
@@ -3240,83 +3213,6 @@ class AccountListItem(QFrame):
         super().leaveEvent(event)
 
     def _update_visual_state(self):
-        theme_before = (
-            self._text_zoom_percent,
-            self._app_bg_color,
-            self._app_surface_color,
-            self._app_border_color,
-            self._app_text_color,
-            self._app_accent_color,
-            self._app_hover_color,
-            self._hover_highlight_color_setting,
-            self._logged_in_gradient_color,
-            self._logged_in_gradient_intensity,
-            self._logged_in_border_width
-        )
-
-        if self._logged_in and active:
-            self.setStyleSheet(
-                "#accountListItem {"
-                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                f"stop:0 {left_active},"
-                f"stop:0.18 {mid_active},"
-                "stop:1 rgba(37, 41, 61, 170));"
-                "border: 1px solid transparent;"
-                "border-radius: 10px;"
-                "}"
-            )
-        theme_before = (
-            self._text_zoom_percent,
-            self._app_bg_color,
-            self._app_surface_color,
-            self._app_border_color,
-            self._app_text_color,
-            self._app_accent_color,
-            self._app_hover_color,
-            self._hover_highlight_color_setting,
-            self._logged_in_gradient_color,
-            self._logged_in_gradient_intensity,
-            self._logged_in_border_width
-        )
-
-        if self._logged_in and active:
-            self.setStyleSheet(
-                "#accountListItem {"
-                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                f"stop:0 {left_active},"
-                f"stop:0.18 {mid_active},"
-                "stop:1 rgba(37, 41, 61, 170));"
-                "border: 1px solid transparent;"
-                "border-radius: 10px;"
-                "}"
-            )
-        theme_before = (
-            self._text_zoom_percent,
-            self._app_bg_color,
-            self._app_surface_color,
-            self._app_border_color,
-            self._app_text_color,
-            self._app_accent_color,
-            self._app_hover_color,
-            self._hover_highlight_color_setting,
-            self._logged_in_gradient_color,
-            self._logged_in_gradient_intensity,
-            self._logged_in_border_width
-        )
-
-        if self._logged_in and active:
-            self.setStyleSheet(
-                "#accountListItem {"
-                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-                f"stop:0 {left_active},"
-                f"stop:0.18 {mid_active},"
-                "stop:1 rgba(37, 41, 61, 170));"
-                "border: 1px solid transparent;"
-                "border-radius: 10px;"
-                "}"
-            )
-            if self.graphicsEffect() is not None:
-                self.setGraphicsEffect(None)
         active = self._selected or self._hovered
         if self._dark_mode:
             t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
@@ -3324,11 +3220,6 @@ class AccountListItem(QFrame):
             mid_active = self._rgba(self._logged_in_gradient_color, int(14 + 50 * t))
             left_idle = self._rgba(self._logged_in_gradient_color, int(18 + 56 * t))
             mid_idle = self._rgba(self._logged_in_gradient_color, int(10 + 40 * t))
-            border_scale = self._logged_in_border_opacity / 100.0
-            border_active = self._rgba(self._logged_in_gradient_color, int((90 + 90 * t) * border_scale))
-            border_idle = self._rgba(self._logged_in_gradient_color, int((70 + 70 * t) * border_scale))
-            border_width = max(1, self._logged_in_border_width - 2)
-            left_border_width = self._logged_in_border_width
 
             if self._logged_in and active:
                 self.setStyleSheet(
@@ -3341,8 +3232,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
+                if self.graphicsEffect() is not None:
+                    self.setGraphicsEffect(None)
             elif self._logged_in:
                 self.setStyleSheet(
                     "#accountListItem {"
@@ -3354,8 +3245,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
+                if self.graphicsEffect() is not None:
+                    self.setGraphicsEffect(None)
             elif active:
                 hover_bg = self._rgba(self._hover_highlight_color, 170)
                 hover_border = self._rgba(self._hover_highlight_color, 118)
@@ -3368,6 +3259,8 @@ class AccountListItem(QFrame):
                 )
                 self._shadow.setBlurRadius(22)
                 self._shadow.setColor(QColor(0, 0, 0, 120))
+                if self.graphicsEffect() is None:
+                    self.setGraphicsEffect(self._shadow)
             else:
                 self.setStyleSheet(
                     "#accountListItem {"
@@ -3376,8 +3269,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                self._shadow.setBlurRadius(0)
-                self._shadow.setColor(QColor(0, 0, 0, 0))
+                if self.graphicsEffect() is not None:
+                    self.setGraphicsEffect(None)
             return
 
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
@@ -3385,11 +3278,6 @@ class AccountListItem(QFrame):
         mid_active = self._rgba(self._logged_in_gradient_color, int(24 + 56 * t))
         left_idle = self._rgba(self._logged_in_gradient_color, int(28 + 58 * t))
         mid_idle = self._rgba(self._logged_in_gradient_color, int(16 + 44 * t))
-        border_scale = self._logged_in_border_opacity / 100.0
-        border_active = self._rgba(self._logged_in_gradient_color, int((96 + 90 * t) * border_scale))
-        border_idle = self._rgba(self._logged_in_gradient_color, int((78 + 74 * t) * border_scale))
-        border_width = max(1, self._logged_in_border_width - 2)
-        left_border_width = self._logged_in_border_width
 
         if self._logged_in and active:
             self.setStyleSheet(
@@ -3402,8 +3290,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(0)
-            self._shadow.setColor(QColor(0, 0, 0, 0))
+            if self.graphicsEffect() is not None:
+                self.setGraphicsEffect(None)
         elif self._logged_in:
             self.setStyleSheet(
                 "#accountListItem {"
@@ -3415,8 +3303,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(0)
-            self._shadow.setColor(QColor(0, 0, 0, 0))
+            if self.graphicsEffect() is not None:
+                self.setGraphicsEffect(None)
         elif active:
             hover_bg = self._rgba(self._hover_highlight_color, 145)
             hover_border = self._rgba(self._hover_highlight_color, 128)
@@ -3429,6 +3317,8 @@ class AccountListItem(QFrame):
             )
             self._shadow.setBlurRadius(14)
             self._shadow.setColor(QColor(15, 23, 42, 28))
+            if self.graphicsEffect() is None:
+                self.setGraphicsEffect(self._shadow)
         else:
             self.setStyleSheet(
                 "#accountListItem {"
@@ -3437,8 +3327,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            self._shadow.setBlurRadius(0)
-            self._shadow.setColor(QColor(0, 0, 0, 0))
+            if self.graphicsEffect() is not None:
+                self.setGraphicsEffect(None)
 
 
 class MainWindow(QMainWindow):
