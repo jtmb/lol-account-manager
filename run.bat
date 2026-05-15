@@ -147,23 +147,11 @@ REM Run the application
 echo.
 echo [*] Starting League of Legends Account Manager...
 echo.
-"%VENV_PYTHON%" -u -m src.main > "%APP_LOG%" 2>&1
+"%VENV_PYTHON%" -u -m src.main
+
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Application crashed (exit code !errorlevel!)
-    echo.
-    echo --- stdout/stderr log: %APP_LOG%
-    echo --- crash log: %USERPROFILE%\.lol-account-manager\crash.log
-    echo.
-    if exist "%APP_LOG%" (
-        powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 60"
-    )
-    echo.
-    echo --- crash.log ---
-    if exist "%USERPROFILE%\.lol-account-manager\crash.log" (
-        powershell -NoProfile -Command "Get-Content -LiteralPath '%USERPROFILE%\.lol-account-manager\crash.log' -Tail 60"
-        start "" notepad.exe "%USERPROFILE%\.lol-account-manager\crash.log"
-    )
+    echo [ERROR] Application exited with an error (code !errorlevel!)
     pause
     exit /b 1
 )
