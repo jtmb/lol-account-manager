@@ -730,6 +730,7 @@ class InGameWatcherThread(QThread):
 
     ingame_detected = pyqtSignal(str)  # op.gg url
     status_updated = pyqtSignal(object)  # probe diagnostics dict
+    game_ended = pyqtSignal(object)  # latest match result dict
 
     def __init__(self, opgg_url: str, timeout_seconds: int = 21600, poll_interval_seconds: float = 3.0):
         super().__init__()
@@ -763,6 +764,10 @@ class InGameWatcherThread(QThread):
                 # This avoids duplicate opens from short local API hiccups.
                 consecutive_out_of_game_polls += 1
                 if consecutive_out_of_game_polls >= 2:
+                    if opened_for_current_game:
+                        match_result = RiotClientIntegration.get_latest_match_result(timeout_seconds=1.5)
+                        match_result["timestamp"] = time.time()
+                        self.game_ended.emit(match_result)
                     opened_for_current_game = False
 
             self.msleep(max(200, int(self._poll_interval_seconds * 1000)))
@@ -2413,8 +2418,6 @@ class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
 
     _TAG_COLOR_SLOT_BY_TEXT: dict[str, int] = {}
-    _in_game: bool = False
-    _in_game: bool = False
 
     _TAG_STYLE_PALETTES = {
         "vibrant": {
@@ -2960,12 +2963,11 @@ class AccountListItem(QFrame):
         self._hover_highlight_color = str(color or self._hover_highlight_color)
         self._update_visual_state()
 
-    def set_logged_in(self, logged_in: bool, in_game: bool = False):
+    def set_logged_in(self, logged_in: bool, status_text: str = "Logged In"):
         self._logged_in = logged_in
-        self._in_game = in_game
         self.logged_in_label.setVisible(logged_in)
         if logged_in:
-            self.logged_in_label.setText("In Game" if in_game else "Logged In")
+            self.logged_in_label.setText(str(status_text or "Logged In"))
         self._refresh_text_styles()
         self._update_visual_state()
 
@@ -3240,6 +3242,7 @@ class MainWindow(QMainWindow):
         self._tray_settings_action: Optional[QAction] = None
         self._tray_watcher_diag_action: Optional[QAction] = None
         self._tray_watcher_status_action: Optional[QAction] = None
+        self._last_notified_match_id: Optional[str] = None
         self._ingame_watch_status: dict = {
             "watcher_active": False,
             "status": "idle",
@@ -3248,6 +3251,15 @@ class MainWindow(QMainWindow):
             "status_code": None,
             "response_bytes": 0,
             "error": "",
+            "in_game": False,
+            "in_champ_select": False,
+            "queue_id": None,
+            "queue_type": "",
+            "game_phase": "",
+            "last_game_result": "",
+            "last_game_queue": "",
+            "last_game_id": None,
+            "last_game_timestamp": 0,
         }
         self._suppress_window_size_persistence = False
         if sys.platform.startswith("win"):
@@ -4417,6 +4429,10 @@ QMenu#trayQuickMenu::separator {
         if not isinstance(status, dict):
             return
         next_status = dict(status)
+        next_status.setdefault("last_game_result", self._ingame_watch_status.get("last_game_result", ""))
+        next_status.setdefault("last_game_queue", self._ingame_watch_status.get("last_game_queue", ""))
+        next_status.setdefault("last_game_id", self._ingame_watch_status.get("last_game_id"))
+        next_status.setdefault("last_game_timestamp", self._ingame_watch_status.get("last_game_timestamp", 0))
         next_status["watcher_active"] = bool(
             self.ingame_watch_thread and self.ingame_watch_thread.isRunning()
         )
@@ -4425,6 +4441,49 @@ QMenu#trayQuickMenu::separator {
         self.update_account_item_states()
         if self.ingame_diag_dialog:
             self.ingame_diag_dialog.refresh_status()
+
+    def _on_ingame_match_ended(self, result: object):
+        if not isinstance(result, dict):
+            return
+
+        if not bool(result.get("found", False)):
+            return
+
+        game_id_raw = result.get("game_id")
+        game_id = "" if game_id_raw is None else str(game_id_raw)
+        if game_id and game_id == self._last_notified_match_id:
+            return
+        if game_id:
+            self._last_notified_match_id = game_id
+
+        last_result = str(result.get("result", "") or "").strip()
+        last_queue = str(result.get("queue_type", "") or "").strip()
+        if last_result:
+            self._ingame_watch_status["last_game_result"] = last_result
+            self._ingame_watch_status["last_game_queue"] = last_queue
+            self._ingame_watch_status["last_game_id"] = game_id_raw
+            self._ingame_watch_status["last_game_timestamp"] = float(result.get("timestamp", time.time()) or time.time())
+            self.update_account_item_states()
+
+        if not (self.account_manager and self._logged_in_username):
+            return
+
+        account = self.account_manager.get_account(self._logged_in_username)
+        if not account:
+            return
+
+        summary = str(result.get("summary", "") or "").strip() or "Match finished"
+        prompt = QMessageBox(self)
+        prompt.setIcon(QMessageBox.Information)
+        prompt.setWindowTitle("Game Ended")
+        prompt.setText(f"Last game: {summary}")
+        prompt.setInformativeText("Open op.gg match stats?")
+        open_button = prompt.addButton("Open Match Stats", QMessageBox.AcceptRole)
+        prompt.addButton(QMessageBox.Close)
+        prompt.exec_()
+
+        if prompt.clickedButton() == open_button:
+            self._open_opgg_matches(account)
 
     def _run_ingame_detection_test(self) -> dict:
         result = RiotClientIntegration.probe_live_client_api(timeout_seconds=1.5)
@@ -5194,11 +5253,21 @@ QMenu#trayQuickMenu::separator {
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
                 is_logged_in = bool(self._logged_in_username) and item.data(Qt.UserRole) == self._logged_in_username
-                in_game = is_logged_in and bool(self._ingame_watch_status.get("in_game", False))
+                badge_text = self._logged_in_badge_text() if is_logged_in else "Logged In"
                 widget.set_dark_mode(self._dark_mode)
                 widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
-                widget.set_logged_in(is_logged_in, in_game)
+                widget.set_logged_in(is_logged_in, badge_text)
+
+    def _logged_in_badge_text(self) -> str:
+        """Build account badge text from the current in-game/champ-select status."""
+        status = self._ingame_watch_status or {}
+        queue_type = str(status.get("queue_type", "") or "").strip()
+        if bool(status.get("in_champ_select", False)):
+            return f"Champ Select ({queue_type})" if queue_type else "Champ Select"
+        if bool(status.get("in_game", False)):
+            return f"In Game ({queue_type})" if queue_type else "In Game"
+        return "Logged In"
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
@@ -5611,9 +5680,21 @@ QMenu::separator {
         encoded_tag = quote(tag_line, safe="")
         return f"https://op.gg/lol/summoners/{region_slug}/{encoded_name}-{encoded_tag}"
 
+    def _build_opgg_matches_url(self, account: Account) -> str:
+        """Build op.gg match history URL for an account."""
+        return f"{self._build_opgg_profile_url(account)}/matches"
+
     def _open_opgg_profile(self, account: Account):
         """Open an account's op.gg profile in the system browser."""
         url = self._build_opgg_profile_url(account)
+        try:
+            webbrowser.open_new_tab(url)
+        except Exception:
+            webbrowser.open(url)
+
+    def _open_opgg_matches(self, account: Account):
+        """Open an account's op.gg match history in the system browser."""
+        url = self._build_opgg_matches_url(account)
         try:
             webbrowser.open_new_tab(url)
         except Exception:
@@ -5631,12 +5712,22 @@ QMenu::separator {
             "status_code": None,
             "response_bytes": 0,
             "error": "",
+            "in_game": False,
+            "in_champ_select": False,
+            "queue_id": None,
+            "queue_type": "",
+            "game_phase": "",
+            "last_game_result": "",
+            "last_game_queue": "",
+            "last_game_id": None,
+            "last_game_timestamp": 0,
             "opgg_url": opgg_url,
         }
         self._update_tray_watcher_status()
         self.ingame_watch_thread = InGameWatcherThread(opgg_url)
         self.ingame_watch_thread.status_updated.connect(self._on_ingame_watch_status)
         self.ingame_watch_thread.ingame_detected.connect(self._open_ingame_webpage)
+        self.ingame_watch_thread.game_ended.connect(self._on_ingame_match_ended)
         self.ingame_watch_thread.finished.connect(self._clear_ingame_watcher)
         self.ingame_watch_thread.start()
 
@@ -5664,6 +5755,7 @@ QMenu::separator {
             try:
                 watcher.status_updated.disconnect()
                 watcher.ingame_detected.disconnect()
+                watcher.game_ended.disconnect()
                 watcher.finished.disconnect()
             except Exception:
                 pass
@@ -5678,6 +5770,15 @@ QMenu::separator {
             "status_code": None,
             "response_bytes": 0,
             "error": "",
+            "in_game": False,
+            "in_champ_select": False,
+            "queue_id": None,
+            "queue_type": "",
+            "game_phase": "",
+            "last_game_result": "",
+            "last_game_queue": "",
+            "last_game_id": None,
+            "last_game_timestamp": 0,
         }
         self._update_tray_watcher_status()
         if self.ingame_diag_dialog:
@@ -5694,6 +5795,15 @@ QMenu::separator {
             "status_code": None,
             "response_bytes": 0,
             "error": "",
+            "in_game": False,
+            "in_champ_select": False,
+            "queue_id": None,
+            "queue_type": "",
+            "game_phase": "",
+            "last_game_result": "",
+            "last_game_queue": "",
+            "last_game_id": None,
+            "last_game_timestamp": 0,
         }
         self._update_tray_watcher_status()
         if self.ingame_diag_dialog:

@@ -7,7 +7,7 @@ import requests
 import urllib3
 from pathlib import Path
 from typing import Optional, Tuple
-from src.config.paths import get_riot_client_path, get_lol_path
+from src.config.paths import get_riot_client_path, get_lol_path, get_lol_executable
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -33,6 +33,23 @@ class RiotClientIntegration:
         'LeagueClientUx',
         'LeagueClientUxRender',
         'League of Legends',
+    }
+
+    QUEUE_TYPE_BY_ID = {
+        0: "Custom",
+        400: "Normal Draft",
+        420: "Ranked Solo/Duo",
+        430: "Normal Blind",
+        440: "Ranked Flex",
+        450: "ARAM",
+        700: "Clash",
+        900: "URF",
+        1700: "Arena",
+        1900: "Pick URF",
+        2000: "Tutorial",
+        2010: "Tutorial",
+        2020: "Tutorial",
+        490: "Quickplay",
     }
     
     @staticmethod
@@ -97,6 +114,10 @@ class RiotClientIntegration:
             "status_code": None,
             "response_bytes": 0,
             "in_game": False,
+            "in_champ_select": False,
+            "game_phase": "",
+            "queue_id": None,
+            "queue_type": "",
             "summary": "No response",
             "error": "",
         }
@@ -125,21 +146,251 @@ class RiotClientIntegration:
                 "in_game": in_game,
                 "summary": summary,
             })
-            return result
         except requests.Timeout:
             result.update({
                 "status": "timeout",
                 "summary": "Timeout contacting Live Client API",
                 "error": "timeout",
             })
-            return result
         except requests.RequestException as exc:
             result.update({
                 "status": "unreachable",
                 "summary": "Live Client API unavailable",
                 "error": str(exc),
             })
+
+        gameflow = RiotClientIntegration._probe_lcu_gameflow(timeout_seconds=min(timeout_seconds, 1.2))
+        if gameflow:
+            phase = str(gameflow.get("game_phase") or "")
+            queue_id = gameflow.get("queue_id")
+            queue_type = str(gameflow.get("queue_type") or "")
+            in_champ_select = bool(gameflow.get("in_champ_select", False))
+
+            result.update({
+                "game_phase": phase,
+                "queue_id": queue_id,
+                "queue_type": queue_type,
+                "in_champ_select": in_champ_select,
+            })
+
+            if not result.get("in_game") and in_champ_select:
+                result["status"] = "champ_select"
+                if queue_type:
+                    result["summary"] = f"In champ select ({queue_type})"
+                else:
+                    result["summary"] = "In champ select"
+            elif result.get("in_game") and queue_type:
+                result["summary"] = f"In game ({queue_type})"
+
+        return result
+
+    @staticmethod
+    def _get_lol_lockfile_path() -> Optional[Path]:
+        """Return League Client lockfile path when available."""
+        candidates = []
+        lol_executable = get_lol_executable()
+        if lol_executable:
+            candidates.append(lol_executable.parent / 'lockfile')
+            candidates.append(lol_executable.parent.parent / 'lockfile')
+        lol_path = get_lol_path()
+        if lol_path:
+            candidates.append(lol_path / 'lockfile')
+
+        for candidate in candidates:
+            try:
+                if candidate and candidate.exists():
+                    return candidate
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _read_lol_lockfile() -> Optional[Tuple[int, str, str]]:
+        """Parse League lockfile and return (port, password, protocol)."""
+        lockfile = RiotClientIntegration._get_lol_lockfile_path()
+        if not lockfile:
+            return None
+
+        try:
+            raw = lockfile.read_text(encoding='utf-8').strip()
+            # Format: <name>:<pid>:<port>:<password>:<protocol>
+            parts = raw.split(':')
+            if len(parts) < 5:
+                return None
+            port = int(parts[2])
+            password = parts[3]
+            protocol = parts[4] or 'https'
+            return port, password, protocol
+        except Exception:
+            return None
+
+    @staticmethod
+    def _lcu_get(endpoint: str, timeout_seconds: float = 1.2) -> Optional[requests.Response]:
+        """GET an authenticated LCU endpoint using League lockfile credentials."""
+        lock_data = RiotClientIntegration._read_lol_lockfile()
+        if not lock_data:
+            return None
+
+        port, password, protocol = lock_data
+        base_url = f"{protocol}://127.0.0.1:{port}"
+        try:
+            return requests.get(
+                f"{base_url}{endpoint}",
+                auth=('riot', password),
+                timeout=timeout_seconds,
+                verify=False,
+            )
+        except requests.RequestException:
+            return None
+
+    @staticmethod
+    def _queue_type_label(queue_id: Optional[int]) -> str:
+        if queue_id is None:
+            return ""
+        try:
+            qid = int(queue_id)
+        except (TypeError, ValueError):
+            return ""
+        return RiotClientIntegration.QUEUE_TYPE_BY_ID.get(qid, f"Queue {qid}")
+
+    @staticmethod
+    def _probe_lcu_gameflow(timeout_seconds: float = 1.2) -> Optional[dict]:
+        """Return champion-select and queue diagnostics from League Client API."""
+        phase_resp = RiotClientIntegration._lcu_get('/lol-gameflow/v1/gameflow-phase', timeout_seconds=timeout_seconds)
+        session_resp = RiotClientIntegration._lcu_get('/lol-gameflow/v1/session', timeout_seconds=timeout_seconds)
+        if not phase_resp and not session_resp:
+            return None
+
+        phase = ""
+        if phase_resp and phase_resp.status_code == 200:
+            try:
+                phase = str(phase_resp.json() or "")
+            except ValueError:
+                phase = (phase_resp.text or "").strip().strip('"')
+
+        queue_id = None
+        queue_type = ""
+        if session_resp and session_resp.status_code == 200:
+            try:
+                session = session_resp.json() or {}
+            except ValueError:
+                session = {}
+
+            game_data = session.get('gameData') if isinstance(session, dict) else {}
+            if isinstance(game_data, dict):
+                queue = game_data.get('queue') if isinstance(game_data.get('queue'), dict) else {}
+                if isinstance(queue, dict):
+                    queue_id = queue.get('id')
+                    queue_type = str(queue.get('name') or queue.get('shortName') or "")
+
+        if not queue_type:
+            queue_type = RiotClientIntegration._queue_type_label(queue_id)
+
+        return {
+            'game_phase': phase,
+            'queue_id': queue_id,
+            'queue_type': queue_type,
+            'in_champ_select': phase == 'ChampSelect',
+        }
+
+    @staticmethod
+    def get_latest_match_result(timeout_seconds: float = 1.5) -> dict:
+        """Return latest completed match result for the currently logged-in player."""
+        result = {
+            "found": False,
+            "game_id": None,
+            "result": "",
+            "queue_id": None,
+            "queue_type": "",
+            "summary": "No recent match found",
+            "error": "",
+        }
+
+        resp = RiotClientIntegration._lcu_get(
+            '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=1',
+            timeout_seconds=timeout_seconds,
+        )
+        if not resp:
+            result["error"] = "match_history_unreachable"
             return result
+        if resp.status_code != 200:
+            result["error"] = f"http_{resp.status_code}"
+            return result
+
+        try:
+            payload = resp.json() or {}
+        except ValueError:
+            result["error"] = "invalid_json"
+            return result
+
+        games = payload.get('games') if isinstance(payload, dict) else None
+        if not isinstance(games, list) or not games:
+            result["summary"] = "No recent games"
+            return result
+
+        game = games[0] if isinstance(games[0], dict) else {}
+        game_id = game.get('gameId')
+        queue_id = game.get('queueId')
+        queue_type = RiotClientIntegration._queue_type_label(queue_id)
+
+        duration = game.get('gameDuration')
+        try:
+            duration_seconds = float(duration)
+            if duration_seconds > 100000:
+                duration_seconds = duration_seconds / 1000.0
+        except (TypeError, ValueError):
+            duration_seconds = 0.0
+
+        participants = game.get('participants') if isinstance(game, dict) else []
+        identity = RiotClientIntegration.get_riot_session_identity(timeout_seconds=0.8) or {}
+        target_puuid = str(identity.get('puuid') or "").strip().lower()
+
+        chosen = None
+        if isinstance(participants, list):
+            for p in participants:
+                if not isinstance(p, dict):
+                    continue
+                p_puuid = str(p.get('puuid') or "").strip().lower()
+                if target_puuid and p_puuid and p_puuid == target_puuid:
+                    chosen = p
+                    break
+            if chosen is None:
+                for p in participants:
+                    if isinstance(p, dict) and isinstance(p.get('stats'), dict) and 'win' in p.get('stats', {}):
+                        chosen = p
+                        break
+
+        stats = chosen.get('stats') if isinstance(chosen, dict) and isinstance(chosen.get('stats'), dict) else {}
+        win_value = stats.get('win')
+        if isinstance(win_value, bool):
+            did_win = win_value
+        elif isinstance(win_value, str):
+            did_win = win_value.strip().lower() == 'true'
+        else:
+            did_win = None
+
+        if duration_seconds and duration_seconds < 300:
+            outcome = "Remake"
+        elif did_win is True:
+            outcome = "Win"
+        elif did_win is False:
+            outcome = "Loss"
+        else:
+            outcome = "Unknown"
+
+        summary = outcome
+        if queue_type:
+            summary = f"{summary} ({queue_type})"
+
+        result.update({
+            "found": True,
+            "game_id": game_id,
+            "result": outcome,
+            "queue_id": queue_id,
+            "queue_type": queue_type,
+            "summary": summary,
+        })
+        return result
 
     @staticmethod
     def _get_riot_lockfile_path() -> Optional[Path]:
