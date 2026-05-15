@@ -4108,22 +4108,38 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Aggressive body collapse */
-            'body, html { margin:0!important; padding:0!important; }'
+            /* Remove top spacing left behind by hidden fixed nav */
+            'body, html { margin:0!important; padding:0!important; }',
+            'body { padding-top:0!important; margin-top:0!important; }',
+            /* Zero out padding-top on direct body children (nav spacer divs) */
+            'body > div { padding-top:0!important; margin-top:0!important; }',
+            'body > div > div:first-child { padding-top:0!important; margin-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
-        /* ── immediate aggressive pass ─── */
+        /* ── immediate pass: strip top spacing ─── */
         setTimeout(function() {
-            /* Zero out margins */
             document.body.style.margin = '0';
             document.body.style.padding = '0';
             document.body.style.marginTop = '0';
             document.body.style.paddingTop = '0';
             document.documentElement.style.margin = '0';
             document.documentElement.style.padding = '0';
-            
-            /* Scroll everything to absolute top */
+
+            /* Walk direct children of body and zero any padding-top / margin-top
+               that was reserved for the now-hidden fixed navbar */
+            var bodyKids = document.body.children;
+            for (var i = 0; i < bodyKids.length; i++) {
+                bodyKids[i].style.paddingTop = '0';
+                bodyKids[i].style.marginTop = '0';
+                /* One level deeper (common React root pattern) */
+                var grandKids = bodyKids[i].children;
+                if (grandKids.length > 0) {
+                    grandKids[0].style.paddingTop = '0';
+                    grandKids[0].style.marginTop = '0';
+                }
+            }
+
             window.scrollTo(0, 0);
             document.documentElement.scrollTop = 0;
             document.body.scrollTop = 0;
@@ -4144,10 +4160,22 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             });
         }, 100);
         
-        /* ── third pass: scroll to top ─── */
+        /* ── third pass: re-apply top spacing removal after React renders ─── */
         setTimeout(function() {
             document.body.style.margin = '0';
             document.body.style.padding = '0';
+            document.body.style.paddingTop = '0';
+            document.body.style.marginTop = '0';
+            var bodyKids = document.body.children;
+            for (var i = 0; i < bodyKids.length; i++) {
+                bodyKids[i].style.paddingTop = '0';
+                bodyKids[i].style.marginTop = '0';
+                var grandKids = bodyKids[i].children;
+                if (grandKids.length > 0) {
+                    grandKids[0].style.paddingTop = '0';
+                    grandKids[0].style.marginTop = '0';
+                }
+            }
             window.scrollTo(0, 0);
         }, 300);
         
