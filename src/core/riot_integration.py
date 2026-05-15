@@ -4,9 +4,12 @@ import time
 import os
 import psutil
 import requests
+import urllib3
 from pathlib import Path
 from typing import Optional, Tuple
 from src.config.paths import get_riot_client_path, get_lol_path
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 try:
     import win32con
