@@ -1347,55 +1347,21 @@ class SettingsDialog(QDialog):
         parent=None,
         settings: Optional[dict] = None,
         apply_callback: Optional[Callable[[dict], None]] = None,
-        preview_callback: Optional[Callable[[dict], None]] = None,
     ):
         super().__init__(parent)
         merged_settings = dict(SETTINGS_PANEL_DEFAULTS)
         if settings:
             merged_settings.update(settings)
         self._settings = merged_settings
-        self._custom_theme_presets = self._custom_theme_presets_from_settings(merged_settings)
-        self._theme_color_values: dict[str, str] = {}
-        self._theme_color_swatches: dict[str, QLabel] = {}
-        self._theme_color_previous_values: dict[str, str] = {}
         self._apply_callback = apply_callback
-        self._preview_callback = preview_callback
         self._save_requested = False
         self.init_ui()
 
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
 
-    def _custom_theme_presets_from_settings(self, values: dict) -> list[tuple[str, dict]]:
-        raw = values.get("custom_theme_presets", [])
-        if not isinstance(raw, list):
-            return []
-        presets: list[tuple[str, dict]] = []
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name", "")).strip()
-            colors = item.get("colors", {})
-            if not name or not isinstance(colors, dict):
-                continue
-            preset = {
-                "app_bg_color": self._sanitize_theme_color(str(colors.get("app_bg_color", DEFAULT_APP_BG_COLOR)), DEFAULT_APP_BG_COLOR),
-                "app_surface_color": self._sanitize_theme_color(str(colors.get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)), DEFAULT_APP_SURFACE_COLOR),
-                "app_border_color": self._sanitize_theme_color(str(colors.get("app_border_color", DEFAULT_APP_BORDER_COLOR)), DEFAULT_APP_BORDER_COLOR),
-                "app_text_color": self._sanitize_theme_color(str(colors.get("app_text_color", DEFAULT_APP_TEXT_COLOR)), DEFAULT_APP_TEXT_COLOR),
-                "app_accent_color": self._sanitize_theme_color(str(colors.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)), DEFAULT_APP_ACCENT_COLOR),
-                "app_hover_color": self._sanitize_theme_color(str(colors.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)), DEFAULT_APP_HOVER_COLOR),
-            }
-            presets.append((name, preset))
-        return presets
-
-    @staticmethod
-    def _sanitize_theme_color(value: str, fallback: str) -> str:
-        candidate = QColor(str(value or "").strip())
-        return candidate.name() if candidate.isValid() else fallback
-
     def _all_app_color_presets(self) -> list[tuple[str, dict]]:
-        return list(self.APP_COLOR_PRESETS) + list(self._custom_theme_presets)
+        return list(self.APP_COLOR_PRESETS)
 
     def _populate_theme_presets(self):
         if not hasattr(self, "app_theme_combo"):
@@ -1422,137 +1388,7 @@ class SettingsDialog(QDialog):
         self.champion_splash_opacity_combo.setEnabled(splash_enabled)
 
     def _on_theme_preset_changed(self, _index: int):
-        self._set_theme_creator_values(self._selected_app_preset())
         self._sync_champion_splash_availability()
-
-    def _set_theme_creator_values(self, preset: dict):
-        if not preset:
-            return
-        defaults = {
-            "app_bg_color": DEFAULT_APP_BG_COLOR,
-            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
-        }
-        defaults["app_hover_color"] = DEFAULT_APP_HOVER_COLOR
-        for key, fallback in defaults.items():
-            self._set_theme_color_value(
-                key,
-                self._sanitize_theme_color(str(preset.get(key, fallback)), fallback),
-                track_undo=True,
-            )
-
-    def _update_theme_color_swatch(self, key: str):
-        swatch = self._theme_color_swatches.get(key)
-        value = self._theme_color_values.get(key, "")
-        if swatch is None:
-            return
-        object_name = f"theme_swatch_{key}"
-        swatch.setStyleSheet(
-            f"#{object_name} {{"
-            f"background-color: {value};"
-            "border: 1px solid #666;"
-            "border-radius: 4px;"
-            "}"
-        )
-        swatch.setToolTip(value)
-
-    def _set_theme_color_value(self, key: str, value: str, track_undo: bool = True):
-        normalized = self._sanitize_theme_color(value, self._theme_color_values.get(key, DEFAULT_APP_ACCENT_COLOR))
-        current = self._theme_color_values.get(key)
-        if track_undo and current and current != normalized:
-            self._theme_color_previous_values[key] = current
-        self._theme_color_values[key] = normalized
-        self._update_theme_color_swatch(key)
-
-    def _undo_theme_color(self, key: str):
-        previous = self._theme_color_previous_values.get(key)
-        if not previous:
-            return
-        current = self._theme_color_values.get(key)
-        self._theme_color_values[key] = previous
-        self._theme_color_previous_values[key] = current or previous
-        self._update_theme_color_swatch(key)
-
-    def _current_theme_creator_values(self) -> Optional[dict]:
-        defaults = {
-            "app_bg_color": DEFAULT_APP_BG_COLOR,
-            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
-            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
-        }
-        values: dict[str, str] = {}
-        for key, fallback in defaults.items():
-            raw = str(self._theme_color_values.get(key, fallback)).strip()
-            color = QColor(raw)
-            if not color.isValid():
-                QMessageBox.warning(self, "Theme Creator", f"Invalid color for {key}: {raw}")
-                return None
-            values[key] = color.name()
-            self._theme_color_values[key] = values[key]
-            self._update_theme_color_swatch(key)
-        return values
-
-    def _pick_theme_color(self, key: str):
-        start = QColor(str(self._theme_color_values.get(key, "")).strip())
-        if not start.isValid():
-            start = QColor(DEFAULT_APP_ACCENT_COLOR)
-        picked = QColorDialog.getColor(start, self, f"Pick {key}")
-        if picked.isValid():
-            self._set_theme_color_value(key, picked.name(), track_undo=True)
-
-    def _save_custom_theme_preset(self):
-        colors = self._current_theme_creator_values()
-        if colors is None:
-            return
-
-        name, ok = QInputDialog.getText(self, "Save Theme", "Preset name:")
-        if not ok:
-            return
-        preset_name = str(name or "").strip()
-        if not preset_name:
-            QMessageBox.warning(self, "Theme Creator", "Preset name cannot be empty.")
-            return
-
-        builtin_names = {label for label, _ in self.APP_COLOR_PRESETS}
-        if preset_name in builtin_names:
-            QMessageBox.warning(self, "Theme Creator", "That name is reserved by a built-in preset.")
-            return
-
-        replaced = False
-        for idx, (label, _preset) in enumerate(self._custom_theme_presets):
-            if label == preset_name:
-                self._custom_theme_presets[idx] = (preset_name, colors)
-                replaced = True
-                break
-        if not replaced:
-            self._custom_theme_presets.append((preset_name, colors))
-
-        self._settings["custom_theme_presets"] = [
-            {"name": label, "colors": preset}
-            for label, preset in self._custom_theme_presets
-        ]
-        self._populate_theme_presets()
-        index = self.app_theme_combo.findText(preset_name)
-        if index >= 0:
-            self.app_theme_combo.setCurrentIndex(index)
-
-    def _preview_theme_creator(self):
-        colors = self._current_theme_creator_values()
-        if colors is None:
-            return
-        if not self._preview_callback:
-            return
-        preview_values = self.get_values()
-        preview_values.update(colors)
-        self._preview_callback(preview_values)
-
-    def _reset_theme_creator_to_selected_preset(self):
-        self._set_theme_creator_values(self._selected_app_preset())
-        self.apply_settings()
 
     @staticmethod
     def _set_combo_to_data(combo: QComboBox, target_value, fallback_index: int = 0):
@@ -1623,9 +1459,7 @@ class SettingsDialog(QDialog):
             "app_accent_color": str(values.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
             "app_hover_color": str(values.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
         })
-        self._custom_theme_presets = self._custom_theme_presets_from_settings(values)
         self._populate_theme_presets()
-        self._set_theme_creator_values(self._selected_app_preset())
 
         self.show_images_checkbox.setEnabled(self.show_ranks_checkbox.isChecked())
         self.rank_icon_size_combo.setEnabled(self.show_ranks_checkbox.isChecked())
@@ -2096,73 +1930,6 @@ class SettingsDialog(QDialog):
         self.champion_splash_combo.currentIndexChanged.connect(lambda _index: self._sync_champion_splash_availability())
         self._sync_champion_splash_availability()
 
-        theme_creator_label = QLabel("Theme creator")
-        theme_creator_label.setStyleSheet("font-weight: 600;")
-        advanced_layout.addWidget(theme_creator_label)
-
-        creator_tip = QLabel("Click a color swatch to pick a color, then save as a preset.")
-        creator_tip.setWordWrap(True)
-        advanced_layout.addWidget(creator_tip)
-
-        theme_fields = [
-            ("app_bg_color", "Background"),
-            ("app_surface_color", "Surface"),
-            ("app_border_color", "Border"),
-            ("app_text_color", "Text"),
-            ("app_accent_color", "Accent"),
-            ("app_hover_color", "Button hover"),
-        ]
-        defaults = {
-            "app_bg_color": DEFAULT_APP_BG_COLOR,
-            "app_surface_color": DEFAULT_APP_SURFACE_COLOR,
-            "app_border_color": DEFAULT_APP_BORDER_COLOR,
-            "app_text_color": DEFAULT_APP_TEXT_COLOR,
-            "app_accent_color": DEFAULT_APP_ACCENT_COLOR,
-            "app_hover_color": DEFAULT_APP_HOVER_COLOR,
-        }
-        for key, label in theme_fields:
-            row = QHBoxLayout()
-            row.addWidget(QLabel(f"{label}:"))
-            swatch = ClickableIconLabel("")
-            swatch.setFixedSize(48, 22)
-            swatch.setCursor(Qt.PointingHandCursor)
-            swatch.setObjectName(f"theme_swatch_{key}")
-            swatch.clicked.connect(lambda k=key: self._pick_theme_color(k))
-            self._theme_color_swatches[key] = swatch
-            self._theme_color_values[key] = self._sanitize_theme_color(
-                str(self._selected_app_preset().get(key, defaults[key])),
-                defaults[key],
-            )
-            self._theme_color_previous_values[key] = self._theme_color_values[key]
-            self._update_theme_color_swatch(key)
-            row.addWidget(swatch)
-            undo_btn = QPushButton("Undo")
-            undo_btn.setAutoDefault(False)
-            undo_btn.setDefault(False)
-            undo_btn.clicked.connect(lambda _checked=False, k=key: self._undo_theme_color(k))
-            row.addWidget(undo_btn)
-            row.addStretch()
-            advanced_layout.addLayout(row)
-
-        creator_actions_row = QHBoxLayout()
-        reset_btn = QPushButton("Reset")
-        reset_btn.setAutoDefault(False)
-        reset_btn.setDefault(False)
-        reset_btn.clicked.connect(self._reset_theme_creator_to_selected_preset)
-        creator_actions_row.addWidget(reset_btn)
-        preview_theme_btn = QPushButton("Preview preset")
-        preview_theme_btn.setAutoDefault(False)
-        preview_theme_btn.setDefault(False)
-        preview_theme_btn.clicked.connect(self._preview_theme_creator)
-        creator_actions_row.addWidget(preview_theme_btn)
-        save_theme_btn = QPushButton("Save custom preset")
-        save_theme_btn.setAutoDefault(False)
-        save_theme_btn.setDefault(False)
-        save_theme_btn.clicked.connect(self._save_custom_theme_preset)
-        creator_actions_row.addWidget(save_theme_btn)
-        creator_actions_row.addStretch()
-        advanced_layout.addLayout(creator_actions_row)
-
         gradient_intensity_row = QHBoxLayout()
         gradient_intensity_row.addWidget(QLabel("Logged-in gradient intensity:"))
         self.logged_in_gradient_intensity_combo = QComboBox()
@@ -2463,7 +2230,6 @@ class SettingsDialog(QDialog):
                     break
         if champion_splash_skin is None:
             champion_splash_skin = 0
-        theme_creator_colors = self._current_theme_creator_values() or {}
         return {
             "start_on_windows_startup": self.startup_checkbox.isChecked(),
             "start_minimized_to_tray": self.start_minimized_checkbox.isChecked(),
@@ -2500,16 +2266,12 @@ class SettingsDialog(QDialog):
             "rank_text_brightness": int(self.rank_text_brightness_combo.currentData()),
             "auto_backup_enabled": self.auto_backup_checkbox.isChecked(),
             "auto_backup_keep_count": int(self.auto_backup_keep_combo.currentData()),
-            "app_bg_color": str(theme_creator_colors.get("app_bg_color", self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR))),
-            "app_surface_color": str(theme_creator_colors.get("app_surface_color", self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR))),
-            "app_border_color": str(theme_creator_colors.get("app_border_color", self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR))),
-            "app_text_color": str(theme_creator_colors.get("app_text_color", self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR))),
-            "app_accent_color": str(theme_creator_colors.get("app_accent_color", self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR))),
-            "app_hover_color": str(theme_creator_colors.get("app_hover_color", self._selected_app_preset().get("app_hover_color", DEFAULT_APP_HOVER_COLOR))),
-            "custom_theme_presets": [
-                {"name": label, "colors": preset}
-                for label, preset in self._custom_theme_presets
-            ],
+            "app_bg_color": str(self._selected_app_preset().get("app_bg_color", DEFAULT_APP_BG_COLOR)),
+            "app_surface_color": str(self._selected_app_preset().get("app_surface_color", DEFAULT_APP_SURFACE_COLOR)),
+            "app_border_color": str(self._selected_app_preset().get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
+            "app_text_color": str(self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
+            "app_accent_color": str(self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+            "app_hover_color": str(self._selected_app_preset().get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
         }
 
     def apply_settings(self):
@@ -4088,24 +3850,15 @@ class MainWindow(QMainWindow):
         original_settings = dict(self._settings)
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
-        preview_was_applied = [False]
-
-        def _preview_callback(values):
-            preview_was_applied[0] = True
-            self._apply_settings_values(values, persist=False)
-
         dialog = SettingsDialog(
             self,
             settings=dialog_settings,
             apply_callback=self._apply_settings_values,
-            preview_callback=_preview_callback,
         )
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
         try:
             if dialog.exec_() != QDialog.Accepted:
-                if preview_was_applied[0]:
-                    self._apply_settings_values(original_settings, persist=False)
                 return
             if getattr(dialog, "_save_requested", False):
                 self._apply_settings_values(dialog.get_values())
