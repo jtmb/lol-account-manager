@@ -3,6 +3,13 @@ REM League of Legends Account Manager - Windows Launcher
 setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 
+if not defined LOL_KEEP_OPEN (
+    start "League of Legends Account Manager" cmd /k "set LOL_KEEP_OPEN=1&& call \"%~f0\" __KEEP_OPEN"
+    exit /b 0
+)
+
+if /I "%~1"=="__KEEP_OPEN" shift
+
 if not defined LOL_STAGED (
     set "PATH_PREFIX=%SCRIPT_DIR:~0,2%"
     if /I "!PATH_PREFIX!"=="\\" (
