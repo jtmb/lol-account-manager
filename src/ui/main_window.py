@@ -5602,9 +5602,9 @@ class MainWindow(QMainWindow):
             self.account_list.insertItem(logged_in_row + 1, spotlight_item)
             self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
-        self._update_spotlight_size_hint()
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
+        QTimer.singleShot(0, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
@@ -5621,14 +5621,12 @@ class MainWindow(QMainWindow):
 
     def _update_spotlight_size_hint(self):
         """Resize the spotlight list item so it fills the viewport height below
-        the logged-in account row, expanding/shrinking as the window changes."""
+        the account row, expanding/shrinking as the window changes."""
         if not self.account_spotlight_panel:
             return
         viewport_h = self.account_list.viewport().height()
         if viewport_h <= 0:
             return
-        # Find the spotlight item and the logged-in account item before it.
-        logged_in_row_h = 0
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
@@ -5644,6 +5642,13 @@ class MainWindow(QMainWindow):
                     self.account_list.doItemsLayout()
                     self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
+                # Always restore scroll position after doItemsLayout resets it
+                if index > 0:
+                    row_above = self.account_list.item(index - 1)
+                    if row_above:
+                        self.account_list.scrollToItem(
+                            row_above, self.account_list.PositionAtTop
+                        )
                 break
 
     def _on_home_button_clicked(self):
@@ -7991,9 +7996,11 @@ QMenu#trayQuickMenu::separator {
         self.account_list.insertItem(target_row + 1, spotlight_item)
         self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
-        self._update_spotlight_size_hint()
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
+        # Compute size AFTER entering spotlight mode so the full viewport
+        # height (filter/button rows now hidden) is used.
+        QTimer.singleShot(0, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
