@@ -5752,10 +5752,15 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # Update spotlight size and reapply CSS for every resize
-        # (both manual drag and maximize button result in resizeEvent)
+        # Update spotlight size on every resize (manual drag or maximize/restore).
         QTimer.singleShot(10, self._update_spotlight_size_hint)
         QTimer.singleShot(100, self._reapply_ugg_embed_css)
+        # After a window-state change, Qt issues an extra resize; use it to
+        # reapply zoom and CSS for the new dimensions.
+        if getattr(self, '_should_reapply_css_on_resize', False):
+            QTimer.singleShot(50, self._update_webview_zoom)
+            QTimer.singleShot(150, self._reapply_ugg_embed_css)
+            self._should_reapply_css_on_resize = False
         if self._suppress_window_size_persistence:
             return
         if self.isMaximized() or self.isFullScreen():
@@ -5789,16 +5794,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(80, self._apply_champ_select_window_size)
         else:
             self._maybe_reapply_layout_for_dpi()
-    
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        
-        # After maximize, Qt continues to resize the window. Catch this to reapply CSS.
-        if getattr(self, '_should_reapply_css_on_resize', False):
-            QTimer.singleShot(50, self._update_webview_zoom)
-            QTimer.singleShot(50, self._reapply_ugg_embed_css)
-            self._should_reapply_css_on_resize = False
-    
+
     def toggle_theme(self):
         """Force dark mode."""
         self._dark_mode = True
