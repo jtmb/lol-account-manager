@@ -344,9 +344,9 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
     """Apply Windows 11 title bar/chrome colors to a top-level window."""
     if not sys.platform.startswith("win"):
         return
-    # Disabled by default because some systems crash in DwmSetWindowAttribute.
-    # Re-enable only when explicitly requested.
-    if os.environ.get("LOLAM_ENABLE_WIN11_CHROME", "0") != "1":
+    # Enabled by default to keep dark non-white window chrome.
+    # Set LOLAM_DISABLE_WIN11_CHROME=1 to opt out for troubleshooting.
+    if os.environ.get("LOLAM_DISABLE_WIN11_CHROME", "0") == "1":
         return
 
     try:
