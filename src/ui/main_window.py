@@ -1508,7 +1508,7 @@ class SettingsDialog(QDialog):
         app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
         app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
         self.setStyleSheet(
-            "QDialog, QWidget, QTabWidget, QTabBar {"
+            "QDialog, QWidget {"
             f"background-color: {app_bg};"
             f"color: {app_text};"
             "}"
@@ -1519,13 +1519,7 @@ class SettingsDialog(QDialog):
             "border-radius: 4px;"
             "padding: 4px;"
             "}"
-            "QCheckBox, QLabel {"
-            f"color: {app_text};"
-            f"background-color: transparent;"
-            "}"
             "QPushButton {"
-            f"color: {app_text};"
-            f"background-color: {app_surface};"
             f"border: 1px solid {app_border};"
             "border-radius: 5px;"
             "padding: 5px 10px;"
@@ -1533,20 +1527,7 @@ class SettingsDialog(QDialog):
             "QPushButton:hover {"
             f"background-color: {app_hover};"
             "}"
-            "QTabBar::tab {"
-            f"background-color: {app_surface};"
-            f"color: {app_text};"
-            f"border: 1px solid {app_border};"
-            "padding: 4px 12px;"
-            "}"
-            "QTabBar::tab:selected {"
-            f"background-color: {app_bg};"
-            f"color: {app_text};"
-            "}"
         )
-        # Force the style to be applied before widgets are created
-        self.style().polish(self)
-        QApplication.processEvents()
 
         layout = QVBoxLayout()
 
