@@ -1374,6 +1374,15 @@ class SettingsDialog(QDialog):
         _pal.setColor(QPalette.ButtonText,  _text)
         self.setPalette(_pal)
 
+        # Pre-apply a dialog background before HWND creation to avoid a
+        # first-frame light theme flash.
+        app_bg = str(getattr(parent, '_app_bg_color', DEFAULT_APP_BG_COLOR))
+        app_text = str(getattr(parent, '_app_text_color', DEFAULT_APP_TEXT_COLOR))
+        self.setAutoFillBackground(True)
+        self.setStyleSheet(
+            f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
+        )
+
         # Force HWND creation so we can apply dark-mode chrome to the title bar
         # *before* the dialog is shown — prevents the white title bar flash.
         self.create()
