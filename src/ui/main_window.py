@@ -1108,7 +1108,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
     """Inline panel shown in place of the account list during champ select / in-game."""
 
     _PORTRAIT_SIZE = 80
-    _ICON_SIZE = 28
+    _ICON_SIZE = 32          # rune style path icons
+    _ACTIVE_PERK_SIZE = 32   # selected perk icons in the active row
+    _PERK_TREE_SIZE = 30     # perk icons inside the rune tree grid
+    _ITEM_ICON_SIZE = 36     # item chips (starting/core/stage)
     _DDRAGON_VERSION = "16.10.1"
 
     # Rune style ID → (name, icon-filename-base)
@@ -1232,16 +1235,17 @@ class InClientGamePanel(AccountListBackgroundFrame):
         runes_layout.addLayout(rune_header)
 
         self._rune_paths_row = QHBoxLayout()
-        self._rune_paths_row.setSpacing(8)
+        self._rune_paths_row.setSpacing(10)
         self._rune_path_labels: dict[int, QLabel] = {}
         for style_id, (name, _) in self._RUNE_STYLES.items():
             col = QVBoxLayout()
-            col.setSpacing(2)
+            col.setSpacing(3)
             col.setAlignment(Qt.AlignHCenter)
             icon_lbl = QLabel()
             icon_lbl.setFixedSize(self._ICON_SIZE, self._ICON_SIZE)
+            icon_lbl.setScaledContents(True)
             icon_lbl.setAlignment(Qt.AlignCenter)
-            icon_lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+            icon_lbl.setStyleSheet("border-radius: 5px; background: #1e1e2e; opacity: 0.4;")
             icon_lbl.setToolTip(name)
             col.addWidget(icon_lbl, 0, Qt.AlignHCenter)
             name_lbl = QLabel(name[:4])
@@ -1258,13 +1262,14 @@ class InClientGamePanel(AccountListBackgroundFrame):
         runes_layout.addWidget(self._rune_meta_label)
 
         self._active_perk_row = QHBoxLayout()
-        self._active_perk_row.setSpacing(6)
+        self._active_perk_row.setSpacing(8)
         self._active_perk_labels: list[QLabel] = []
         for _ in range(6):
             lbl = QLabel()
-            lbl.setFixedSize(24, 24)
+            lbl.setFixedSize(self._ACTIVE_PERK_SIZE, self._ACTIVE_PERK_SIZE)
+            lbl.setScaledContents(True)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 6px; background: #1e1e2e;")
             self._active_perk_labels.append(lbl)
             self._active_perk_row.addWidget(lbl)
         self._active_perk_row.addStretch()
@@ -1275,44 +1280,52 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._rune_tree_label.setStyleSheet("color: #94a0be; font-size: 8pt;")
         runes_layout.addWidget(self._rune_tree_label)
 
-        self._rune_slots_stack = QVBoxLayout()
-        self._rune_slots_stack.setSpacing(8)
+        # Side-by-side primary + secondary trees (matches in-client layout)
+        self._rune_slots_stack = QHBoxLayout()
+        self._rune_slots_stack.setSpacing(14)
 
         self._primary_slots_col = QVBoxLayout()
-        self._primary_slots_col.setSpacing(4)
+        self._primary_slots_col.setSpacing(6)
         self._primary_slots_title = QLabel("Primary Tree")
-        self._primary_slots_title.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
+        self._primary_slots_title.setStyleSheet(
+            "color: #cdd6f4; font-size: 8pt; font-weight: bold;"
+            "background: #1e2030; border-radius: 4px; padding: 2px 6px;"
+        )
         self._primary_slots_col.addWidget(self._primary_slots_title)
         self._primary_slots_body = QVBoxLayout()
-        self._primary_slots_body.setSpacing(4)
+        self._primary_slots_body.setSpacing(6)
         self._primary_slots_col.addLayout(self._primary_slots_body)
+        self._primary_slots_col.addStretch()
 
         self._secondary_slots_col = QVBoxLayout()
-        self._secondary_slots_col.setSpacing(4)
+        self._secondary_slots_col.setSpacing(6)
         self._secondary_slots_title = QLabel("Secondary Tree")
-        self._secondary_slots_title.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
+        self._secondary_slots_title.setStyleSheet(
+            "color: #cdd6f4; font-size: 8pt; font-weight: bold;"
+            "background: #1e2030; border-radius: 4px; padding: 2px 6px;"
+        )
         self._secondary_slots_col.addWidget(self._secondary_slots_title)
         self._secondary_slots_body = QVBoxLayout()
-        self._secondary_slots_body.setSpacing(4)
+        self._secondary_slots_body.setSpacing(6)
         self._secondary_slots_col.addLayout(self._secondary_slots_body)
+        self._secondary_slots_col.addStretch()
 
-        self._rune_slots_stack.addLayout(self._primary_slots_col)
-        self._rune_slots_stack.addLayout(self._secondary_slots_col)
-        runes_layout.addLayout(self._rune_slots_stack)
+        self._rune_slots_stack.addLayout(self._primary_slots_col, 3)
+        self._rune_slots_stack.addLayout(self._secondary_slots_col, 2)
+        runes_layout.addLayout(self._rune_slots_stack, 1)
 
         self._shard_row = QHBoxLayout()
-        self._shard_row.setSpacing(6)
+        self._shard_row.setSpacing(8)
         self._shard_labels: list[QLabel] = []
         for _ in range(3):
             lbl = QLabel("—")
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setFixedSize(24, 24)
-            lbl.setStyleSheet("color: #a6adc8; border-radius: 4px; background: #1e1e2e;")
+            lbl.setFixedSize(28, 28)
+            lbl.setStyleSheet("color: #a6adc8; border-radius: 5px; background: #1e1e2e; font-size: 8pt;")
             self._shard_labels.append(lbl)
             self._shard_row.addWidget(lbl)
         self._shard_row.addStretch()
         runes_layout.addLayout(self._shard_row)
-        runes_layout.addStretch()
 
         # Build page
         build_page = QWidget()
@@ -1332,7 +1345,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._starting_item_labels: list[QLabel] = []
         for _ in range(4):
             lbl = QLabel()
-            lbl.setFixedSize(32, 32)
+            lbl.setFixedSize(self._ITEM_ICON_SIZE, self._ITEM_ICON_SIZE)
+            lbl.setScaledContents(True)
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
             self._starting_item_labels.append(lbl)
@@ -1352,14 +1366,15 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._core_item_labels: list[QLabel] = []
         for _ in range(4):
             lbl = QLabel()
-            lbl.setFixedSize(36, 36)
+            lbl.setFixedSize(self._ITEM_ICON_SIZE + 4, self._ITEM_ICON_SIZE + 4)
+            lbl.setScaledContents(True)
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setStyleSheet("border-radius: 7px; background: #171b29; border: 1px solid #4a5f93;")
             self._core_item_labels.append(lbl)
             self._core_items_row.addWidget(lbl)
             if _ < 2:
                 arr = QLabel("→")
-                arr.setStyleSheet("color: #7fa0ff; font-size: 10pt; font-weight: bold; padding: 0 2px;")
+                arr.setStyleSheet("color: #7fa0ff; font-size: 11pt; font-weight: bold; padding: 0 2px;")
                 arr.setAlignment(Qt.AlignCenter)
                 self._core_items_row.addWidget(arr)
         self._core_items_row.addStretch()
@@ -1381,7 +1396,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
             icon_labels: list[QLabel] = []
             for _ in range(3):
                 il = QLabel()
-                il.setFixedSize(32, 32)
+                il.setFixedSize(self._ITEM_ICON_SIZE, self._ITEM_ICON_SIZE)
+                il.setScaledContents(True)
                 il.setAlignment(Qt.AlignCenter)
                 il.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
                 icon_labels.append(il)
@@ -1396,15 +1412,13 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for _ in range(3):
                 vl = QLabel("—")
                 vl.setAlignment(Qt.AlignCenter)
-                vl.setFixedWidth(32)
+                vl.setFixedWidth(self._ITEM_ICON_SIZE)
                 vl.setStyleSheet("color: #8ea2d0; font-size: 7pt;")
                 value_labels.append(vl)
                 value_row.addWidget(vl)
             value_row.addStretch()
             build_layout.addLayout(value_row)
             self._stage_option_value_labels[stage_num] = value_labels
-
-        build_layout.addStretch()
 
         self._left_stack.addWidget(runes_page)
         self._left_stack.addWidget(build_page)
@@ -1484,11 +1498,11 @@ class InClientGamePanel(AccountListBackgroundFrame):
         matchup_row.addLayout(enemy_col, 1)
 
         right_layout.addLayout(matchup_row)
-        right_layout.addStretch()
+        right_layout.addStretch(1)
 
         content_row.addWidget(left_card, 3)
         content_row.addWidget(right_card, 2)
-        outer.addLayout(content_row)
+        outer.addLayout(content_row, 3)
 
         # Bottom card: dedicated skill section
         skill_card = QFrame()
@@ -1534,17 +1548,17 @@ class InClientGamePanel(AccountListBackgroundFrame):
         path_col.addLayout(path_header)
 
         self._skill_path_grid = QGridLayout()
-        self._skill_path_grid.setHorizontalSpacing(4)
+        self._skill_path_grid.setHorizontalSpacing(3)
         self._skill_path_grid.setVerticalSpacing(4)
-        path_col.addLayout(self._skill_path_grid)
+        path_col.addLayout(self._skill_path_grid, 1)
 
         self._skill_path_meta = QLabel("—")
         self._skill_path_meta.setStyleSheet("color: #94a0be; font-size: 8pt;")
         path_col.addWidget(self._skill_path_meta)
 
         skill_layout.addLayout(priority_col, 1)
-        skill_layout.addLayout(path_col, 4)
-        outer.addWidget(skill_card)
+        skill_layout.addLayout(path_col, 5)
+        outer.addWidget(skill_card, 2)
 
         # ── Status hint ───────────────────────────────────────────────────
         self._status_label = QLabel("Waiting for champion selection…")
@@ -1602,14 +1616,21 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
     def _load_rune_path_icons(self):
         """Start background threads to fetch rune path icons from DDragon."""
-        for style_id, (name, icon_base) in self._RUNE_STYLES.items():
+        for style_id, (name, _) in self._RUNE_STYLES.items():
             if style_id in self._rune_icon_cache:
                 continue
-            url = (
-                f"https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data"
-                f"/global/default/v1/perk-images/styles/"
-                f"{style_id}_{name.lower()}.png"
-            )
+            # Prefer the icon path embedded in the DDragon runesReforged data
+            style_data = self._rune_style_data_by_id.get(style_id, {})
+            icon_path = str(style_data.get("icon", "") or "").strip()
+            if icon_path:
+                url = f"https://ddragon.leagueoflegends.com/cdn/img/{icon_path}"
+            else:
+                # Fallback: Community Dragon style icon
+                url = (
+                    f"https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data"
+                    f"/global/default/v1/perk-images/styles/"
+                    f"{style_id}_{name.lower()}.png"
+                )
             t = _ImageFetchThread(f"rune_style_{style_id}", url, self)
             t.image_ready.connect(self._on_image_ready)
             t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
@@ -1637,6 +1658,17 @@ class InClientGamePanel(AccountListBackgroundFrame):
             if lbl:
                 lbl.setPixmap(sized)
                 lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        elif tag.startswith("rune_perk_generic_"):
+            # NOTE: must be checked BEFORE the plain rune_perk_ branch
+            try:
+                perk_id = int(tag[len("rune_perk_generic_"):])
+            except ValueError:
+                return
+            sized = pix.scaled(self._PERK_TREE_SIZE, self._PERK_TREE_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._perk_icon_cache[perk_id] = sized
+            targets = self._pending_perk_targets.pop(perk_id, [])
+            for lbl in targets:
+                lbl.setPixmap(sized)
         elif tag.startswith("rune_perk_"):
             parts = tag.split("_")
             if len(parts) >= 4:
@@ -1645,20 +1677,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
                     slot_idx = int(parts[3])
                 except ValueError:
                     return
-                sized = pix.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                sized = pix.scaled(self._ACTIVE_PERK_SIZE, self._ACTIVE_PERK_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self._perk_icon_cache[perk_id] = sized
                 if 0 <= slot_idx < len(self._active_perk_labels):
                     self._active_perk_labels[slot_idx].setPixmap(sized)
-        elif tag.startswith("rune_perk_generic_"):
-            try:
-                perk_id = int(tag[len("rune_perk_generic_"):])
-            except ValueError:
-                return
-            sized = pix.scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self._perk_icon_cache[perk_id] = sized
-            targets = self._pending_perk_targets.pop(perk_id, [])
-            for lbl in targets:
-                lbl.setPixmap(sized)
         elif tag.startswith("item_icon_"):
             parts = tag.split("_")
             if len(parts) >= 5:
@@ -1668,7 +1690,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                     slot_idx = int(parts[4])
                 except ValueError:
                     return
-                sized = pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                sized = pix.scaled(self._ITEM_ICON_SIZE, self._ITEM_ICON_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self._item_icon_cache[item_id] = sized
                 labels = self._starting_item_labels if row == "start" else self._core_item_labels
                 if 0 <= slot_idx < len(labels):
@@ -1682,7 +1704,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                     slot_idx = int(parts[4])
                 except ValueError:
                     return
-                sized = pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                sized = pix.scaled(self._ITEM_ICON_SIZE, self._ITEM_ICON_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self._item_icon_cache[item_id] = sized
                 labels = self._stage_option_icon_labels.get(stage_num, [])
                 if 0 <= slot_idx < len(labels):
@@ -1814,10 +1836,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 s = str(skill).upper().strip()
                 bubble = QLabel(s or "—")
                 bubble.setAlignment(Qt.AlignCenter)
-                bubble.setFixedSize(28, 28)
+                bubble.setFixedSize(32, 32)
                 color = color_by_skill.get(s, "#5b6078")
                 bubble.setStyleSheet(
-                    f"border-radius: 14px; background: #1e1e2e; border: 1px solid {color}; color: {color}; font-weight: bold;"
+                    f"border-radius: 16px; background: #1e1e2e; border: 2px solid {color}; color: {color}; font-weight: bold; font-size: 10pt;"
                 )
                 self._skill_priority_row.addWidget(bubble)
                 if idx < min(2, len(skill_priority) - 1):
@@ -1834,17 +1856,19 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         # Grid headers
         row_skills = ["Q", "W", "E", "R"]
+        self._skill_path_grid.setColumnStretch(0, 0)  # row label col fixed
         for col in range(1, 19):
             header = QLabel(str(col))
             header.setAlignment(Qt.AlignCenter)
-            header.setFixedSize(22, 16)
+            header.setMinimumWidth(22)
             header.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
             self._skill_path_grid.addWidget(header, 0, col)
+            self._skill_path_grid.setColumnStretch(col, 1)
 
         for row_idx, skill in enumerate(row_skills, start=1):
             row_lbl = QLabel(skill)
             row_lbl.setAlignment(Qt.AlignCenter)
-            row_lbl.setFixedSize(22, 22)
+            row_lbl.setFixedSize(24, 24)
             row_lbl.setStyleSheet(
                 f"border-radius: 4px; background: #1e1e2e; color: {color_by_skill.get(skill, '#cdd6f4')}; font-weight: bold;"
             )
@@ -1853,7 +1877,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for lv in range(1, 19):
                 cell = QLabel("")
                 cell.setAlignment(Qt.AlignCenter)
-                cell.setFixedSize(22, 22)
+                cell.setMinimumSize(22, 24)
                 cell.setStyleSheet("border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: 7pt;")
 
                 if lv <= len(skill_path):
@@ -1900,12 +1924,14 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 if rid <= 0:
                     continue
                 lbl = QLabel()
-                lbl.setFixedSize(22, 22)
+                lbl.setMinimumSize(self._PERK_TREE_SIZE, self._PERK_TREE_SIZE)
+                lbl.setMaximumSize(self._PERK_TREE_SIZE * 2, self._PERK_TREE_SIZE * 2)
+                lbl.setScaledContents(True)
                 lbl.setAlignment(Qt.AlignCenter)
                 if rid in active_ids:
-                    lbl.setStyleSheet("border-radius: 11px; background: #1e1e2e; border: 1px solid #58a6ff;")
+                    lbl.setStyleSheet(f"border-radius: {self._PERK_TREE_SIZE // 2}px; background: #1e1e2e; border: 2px solid #58a6ff;")
                 else:
-                    lbl.setStyleSheet("border-radius: 11px; background: #1e1e2e; border: 1px solid #30374b;")
+                    lbl.setStyleSheet(f"border-radius: {self._PERK_TREE_SIZE // 2}px; background: #1e1e2e; border: 1px solid #30374b; opacity: 0.7;")
                 row.addWidget(lbl)
                 self._set_perk_icon(lbl, rid)
             row.addStretch()
