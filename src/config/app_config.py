@@ -46,6 +46,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "rank_text_brightness": 100,
         "auto_backup_enabled": True,
         "auto_backup_keep_count": 20,
+        "app_theme_preset": "Default Dark",
         "app_bg_color": "#1e1e2e",
         "app_surface_color": "#181825",
         "app_border_color": "#313244",

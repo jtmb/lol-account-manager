@@ -1491,7 +1491,11 @@ class SettingsDialog(QDialog):
         self.app_theme_combo.clear()
         for label, preset in self._all_app_color_presets():
             self.app_theme_combo.addItem(label, preset)
-        self.app_theme_combo.setCurrentIndex(self._find_app_theme_preset_index())
+        saved_preset = str(self._settings.get("app_theme_preset", "")).strip()
+        index = self.app_theme_combo.findText(saved_preset)
+        if index < 0:
+            index = self._find_app_theme_preset_index()
+        self.app_theme_combo.setCurrentIndex(index)
         self.app_theme_combo.blockSignals(False)
 
     def _is_classic_light_selected(self) -> bool:
@@ -2364,6 +2368,7 @@ class SettingsDialog(QDialog):
             "app_text_color": str(self._selected_app_preset().get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
             "app_accent_color": str(self._selected_app_preset().get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
             "app_hover_color": str(self._selected_app_preset().get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
+            "app_theme_preset": str(self.app_theme_combo.currentText()).strip() if hasattr(self, "app_theme_combo") else "Default Dark",
         }
 
     def apply_settings(self):
@@ -2389,6 +2394,7 @@ class SettingsDialog(QDialog):
             "app_border_color": str(self._settings.get("app_border_color", DEFAULT_APP_BORDER_COLOR)),
             "app_text_color": str(self._settings.get("app_text_color", DEFAULT_APP_TEXT_COLOR)),
             "app_accent_color": str(self._settings.get("app_accent_color", DEFAULT_APP_ACCENT_COLOR)),
+            "app_hover_color": str(self._settings.get("app_hover_color", DEFAULT_APP_HOVER_COLOR)),
         }
         all_presets = self._all_app_color_presets()
         for index in range(len(all_presets)):
