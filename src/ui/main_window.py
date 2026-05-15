@@ -2019,7 +2019,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         scaling enabled the widget's logical width changes, so the adaptive
         cell sizes must be recomputed."""
         super().changeEvent(event)
-        if event.type() == QEvent.ScreenChangeInternal:
+        screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
+        if screen_change_type is not None and event.type() == screen_change_type:
             if self._last_skill_priority or self._last_skill_path:
                 QTimer.singleShot(
                     80,
@@ -5162,7 +5163,12 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if event.type() == QEvent.ScreenChangeInternal and self._in_champ_select_mode:
+        screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
+        if (
+            screen_change_type is not None
+            and event.type() == screen_change_type
+            and self._in_champ_select_mode
+        ):
             QTimer.singleShot(80, self._apply_champ_select_window_size)
     
     def toggle_theme(self):
