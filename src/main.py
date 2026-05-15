@@ -5,11 +5,27 @@ import subprocess
 import traceback
 from datetime import datetime
 from pathlib import Path
-from PyQt5.QtCore import QCoreApplication
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtGui import QIcon, QPalette, QColor
-from src.ui.main_window import MainWindow
-from src.config.paths import load_settings
+
+
+def _write_startup_crash_log(exc: BaseException) -> None:
+    crash_dir = Path.home() / ".lol-account-manager"
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    crash_file = crash_dir / "last-crash.log"
+    crash_file.write_text(
+        f"[{datetime.now().isoformat()}] Startup exception\n\n{traceback.format_exc()}\n{type(exc).__name__}: {exc}",
+        encoding="utf-8",
+    )
+
+
+try:
+    from PyQt5.QtCore import QCoreApplication
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtGui import QIcon, QPalette, QColor
+    from src.ui.main_window import MainWindow
+    from src.config.paths import load_settings
+except Exception as exc:
+    _write_startup_crash_log(exc)
+    raise
 
 
 def _detach_console() -> None:
@@ -146,14 +162,8 @@ def main():
             window.show()
 
         sys.exit(app.exec_())
-    except Exception:
-        crash_dir = Path.home() / ".lol-account-manager"
-        crash_dir.mkdir(parents=True, exist_ok=True)
-        crash_file = crash_dir / "last-crash.log"
-        crash_file.write_text(
-            f"[{datetime.now().isoformat()}] Unhandled startup exception\n\n{traceback.format_exc()}",
-            encoding="utf-8",
-        )
+    except Exception as exc:
+        _write_startup_crash_log(exc)
         raise
 
 
