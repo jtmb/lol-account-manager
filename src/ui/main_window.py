@@ -4105,8 +4105,16 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         (document.head || document.documentElement).appendChild(s);
     }
 
+    /* Track whether the user has scrolled — if so, never force-scroll back to top */
+    if (!window._ugg_user_scrolled) {
+        window._ugg_user_scrolled = false;
+        window.addEventListener('scroll', function() {
+            window._ugg_user_scrolled = true;
+        }, { passive: true, once: true });
+    }
+
     /* ── 2. Core cleanup function ────────────────────────────────────── */
-    function cleanup() {
+    function cleanup(allowScroll) {
         /* Hide fixed/sticky bars and sidebars */
         document.querySelectorAll('*').forEach(function(el) {
             var cs = window.getComputedStyle(el);
@@ -4150,21 +4158,26 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         document.body.style.setProperty('padding', '0', 'important');
         document.documentElement.style.setProperty('margin', '0', 'important');
         document.documentElement.style.setProperty('padding', '0', 'important');
-        window.scrollTo(0, 0);
+
+        /* Only scroll to top before the user has scrolled */
+        if (allowScroll && !window._ugg_user_scrolled) {
+            window.scrollTo(0, 0);
+        }
     }
 
     /* ── 3. Run immediately and after React finishes rendering ───────── */
-    cleanup();
-    setTimeout(cleanup, 300);
-    setTimeout(cleanup, 800);
-    setTimeout(cleanup, 2000);
+    cleanup(true);
+    setTimeout(function(){ cleanup(true); }, 300);
+    setTimeout(function(){ cleanup(true); }, 800);
+    setTimeout(function(){ cleanup(true); }, 2000);
 
     /* ── 4. MutationObserver: re-run cleanup when React mutates the DOM ─ */
     if (!window._ugg_observer) {
         var _debounce_timer = null;
         window._ugg_observer = new MutationObserver(function() {
             clearTimeout(_debounce_timer);
-            _debounce_timer = setTimeout(cleanup, 150);
+            /* Never force-scroll on observer-triggered runs */
+            _debounce_timer = setTimeout(function(){ cleanup(false); }, 150);
         });
         window._ugg_observer.observe(document.documentElement, {
             childList: true, subtree: true,
