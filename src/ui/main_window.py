@@ -1498,35 +1498,23 @@ class SettingsDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(620)
 
-        # Apply a dark fallback before child widgets are created so the dialog
-        # never flashes a light frame on first paint.
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        # Get theme colors from parent window
         mw = self.parent()
         app_bg = str(getattr(mw, "_app_bg_color", DEFAULT_APP_BG_COLOR))
         app_surface = str(getattr(mw, "_app_surface_color", DEFAULT_APP_SURFACE_COLOR))
         app_border = str(getattr(mw, "_app_border_color", DEFAULT_APP_BORDER_COLOR))
         app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
         app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
+        
+        # Apply stylesheet minimally
         self.setStyleSheet(
-            "QDialog, QWidget {"
-            f"background-color: {app_bg};"
-            f"color: {app_text};"
-            "}"
-            "QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {"
-            f"background-color: {app_surface};"
-            f"color: {app_text};"
-            f"border: 1px solid {app_border};"
-            "border-radius: 4px;"
-            "padding: 4px;"
-            "}"
-            "QPushButton {"
-            f"border: 1px solid {app_border};"
-            "border-radius: 5px;"
-            "padding: 5px 10px;"
-            "}"
-            "QPushButton:hover {"
-            f"background-color: {app_hover};"
-            "}"
+            f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QWidget {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QLineEdit {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
+            f"QComboBox {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
+            f"QCheckBox {{ color: {app_text}; }}"
+            f"QPushButton {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 5px 10px; }}"
+            f"QPushButton:hover {{ background-color: {app_hover}; }}"
         )
 
         layout = QVBoxLayout()

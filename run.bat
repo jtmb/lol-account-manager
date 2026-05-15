@@ -1,15 +1,20 @@
 @echo off
 REM League of Legends Account Manager - Windows Launcher
-REM Uses cmd /k to spawn a persistent console window instead of closing when done.
+setlocal enableextensions enabledelayedexpansion
+
+REM If __KEEP flag is set, we're in the persistent window, skip respawning
+if "%~1"=="__KEEP" (
+    shift
+    goto :main
+)
+
+REM First run: spawn persistent cmd window
+cmd /k "%~f0" __KEEP
+exit /b 0
+
+:main
 setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
-
-if not "%~1"=="__NO_SPAWN" (
-    REM First run: spawn a new persistent cmd window
-    cmd /k "%~f0" __NO_SPAWN
-    exit /b 0
-)
-shift
 
 if not defined LOL_STAGED (
     set "PATH_PREFIX=%SCRIPT_DIR:~0,2%"
@@ -142,17 +147,13 @@ echo [+] Dependencies installed
 REM Run the application
 echo.
 echo [*] Starting League of Legends Account Manager...
-echo [DEBUG] Writing log to: %APP_LOG%
-echo [DEBUG] Python executable: "%VENV_PYTHON%"
-echo [DEBUG] Command: "%VENV_PYTHON%" -X faulthandler -m src.main
 echo.
 "%VENV_PYTHON%" -X faulthandler -m src.main > "%APP_LOG%" 2>&1
 set "APP_EXIT=%errorlevel%"
-echo [DEBUG] Python exited with code: !APP_EXIT!
 
 if !APP_EXIT! neq 0 (
     echo.
-    echo [ERROR] Application error occurred (exit code: !APP_EXIT!)
+    echo [ERROR] Application error occurred
     echo [!] Log saved to:
     echo %APP_LOG%
     if exist "%APP_LOG%" (
@@ -160,8 +161,6 @@ if !APP_EXIT! neq 0 (
         echo ----- Last 80 log lines -----
         powershell -NoProfile -Command "Get-Content -LiteralPath '%APP_LOG%' -Tail 80"
         start "" notepad.exe "%APP_LOG%"
-    ) else (
-        echo [ERROR] Log file was not created at expected location!
     )
     pause
     exit /b 1
