@@ -1381,6 +1381,11 @@ class SettingsDialog(QDialog):
 
         self.init_ui()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        if sys.platform.startswith("win"):
+            QTimer.singleShot(0, lambda: _apply_windows11_chrome(self, True))
+
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
 
