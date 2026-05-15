@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import QCoreApplication, QTimer, Qt
+from PyQt5.QtCore import QCoreApplication, QTimer
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
@@ -163,17 +163,9 @@ def main():
         if bool(settings.get("start_minimized_to_tray", False)):
             window.hide()
         else:
-            if sys.platform.startswith("win"):
-                # Prime native creation/style passes off-screen so the first
-                # visible frame is already fully themed.
-                window.setAttribute(Qt.WA_DontShowOnScreen, True)
-                window.show()
-                app.processEvents()
-                window.hide()
-                window.setAttribute(Qt.WA_DontShowOnScreen, False)
-                QTimer.singleShot(0, window.show)
-            else:
-                window.show()
+            window.show()
+            window.raise_()
+            window.activateWindow()
 
         sys.exit(app.exec_())
     except Exception:
