@@ -4107,9 +4107,10 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
 
     def _run_hide_script(self):
         """Inject CSS + directly force-hide u.gg navigation chrome."""
-        if self._web_view is None:
-            return
-        js = r"""
+        try:
+            if self._web_view is None:
+                return
+            js = r"""
 (function() {
     /* ── 1. Inject persistent style tag (runs once) ─────────────────── */
     if (!document.getElementById('_ugg_embed_hide')) {
@@ -4204,7 +4205,9 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
     }
 })();
 """
-        self._web_view.page().runJavaScript(js)
+            self._web_view.page().runJavaScript(js)
+        except RuntimeError:
+            pass
 
     def _apply_panel_styles(self):
         text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
@@ -7495,11 +7498,25 @@ QMenu#trayQuickMenu::separator {
         """Refresh the account list display"""
         self.account_list.setUpdatesEnabled(False)
         try:
-            # Re-parent spotlight panel before clear() so Qt doesn't delete it
-            # (QAbstractItemView::clear() calls deleteLater on all item widgets).
+            # Remove the spotlight item via takeItem() BEFORE clear() so that
+            # Qt's QAbstractItemView::reset() (triggered by clear()) sees an
+            # already-invalid QPersistentModelIndex and does NOT call deleteLater()
+            # on the panel widget.  Simple setParent() alone is not reliable across
+            # all Qt 5.x builds; takeItem() guarantees the index is invalidated.
             if self.account_spotlight_panel:
                 try:
-                    self.account_spotlight_panel.setParent(self.account_list_background)
+                    spotlight_found = False
+                    for idx in range(self.account_list.count()):
+                        item = self.account_list.item(idx)
+                        if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                            # Reparent first so Qt never treats the panel as a
+                            # viewport child scheduled for deletion.
+                            self.account_spotlight_panel.setParent(self.account_list_background)
+                            self.account_list.takeItem(idx)
+                            spotlight_found = True
+                            break
+                    if not spotlight_found:
+                        self.account_spotlight_panel.setParent(self.account_list_background)
                     self.account_spotlight_panel.hide()
                     self._exit_spotlight_ui_mode()
                 except RuntimeError:
