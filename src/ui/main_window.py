@@ -3981,7 +3981,9 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self._perform_refresh_ui)
 
     def _perform_refresh_ui(self):
-        self._apply_theme()
+        # Refresh button should not force a full stylesheet reapply.
+        self._apply_account_list_background()
+        self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
 
@@ -4265,6 +4267,32 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
+        theme_before = (
+            self._text_zoom_percent,
+            self._app_bg_color,
+            self._app_surface_color,
+            self._app_border_color,
+            self._app_text_color,
+            self._app_accent_color,
+            self._app_hover_color,
+            self._hover_highlight_color_setting,
+            self._logged_in_gradient_color,
+            self._logged_in_gradient_intensity,
+            self._logged_in_border_width,
+            self._logged_in_border_opacity,
+            self._champion_splash_enabled,
+            self._champion_splash_champion,
+            self._champion_splash_skin,
+            self._champion_splash_opacity,
+            self._row_density,
+            self._tag_size,
+            self._tag_chip_style,
+            self._rank_icon_size,
+            self._rank_text_brightness,
+            self._show_rank_images,
+            self._show_tags,
+        )
+
         self._settings.update(values)
         self._start_minimized_to_tray = bool(values.get('start_minimized_to_tray', self._start_minimized_to_tray))
         self._close_behavior = str(values.get('close_behavior', self._close_behavior))
@@ -4337,8 +4365,39 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        self._apply_theme()
-        self.refresh_account_list()
+        theme_after = (
+            self._text_zoom_percent,
+            self._app_bg_color,
+            self._app_surface_color,
+            self._app_border_color,
+            self._app_text_color,
+            self._app_accent_color,
+            self._app_hover_color,
+            self._hover_highlight_color_setting,
+            self._logged_in_gradient_color,
+            self._logged_in_gradient_intensity,
+            self._logged_in_border_width,
+            self._logged_in_border_opacity,
+            self._champion_splash_enabled,
+            self._champion_splash_champion,
+            self._champion_splash_skin,
+            self._champion_splash_opacity,
+            self._row_density,
+            self._tag_size,
+            self._tag_chip_style,
+            self._rank_icon_size,
+            self._rank_text_brightness,
+            self._show_rank_images,
+            self._show_tags,
+        )
+
+        if theme_before != theme_after:
+            self._apply_theme()
+        else:
+            self._apply_account_list_background()
+            self.update_account_item_states()
+
+        self.refresh_account_list(fetch_ranks=False)
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
