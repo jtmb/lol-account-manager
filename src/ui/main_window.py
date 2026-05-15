@@ -5648,11 +5648,12 @@ class MainWindow(QMainWindow):
         Setting height = full list height ensures that, once the account
         row above is scrolled to the top, all rows below the spotlight are
         pushed off-screen regardless of any spacing/DPI differences."""
-        if not self.account_spotlight_panel:
-            return
-        # Use the list widget height (more reliable than viewport() which may
-        # lag behind layout changes by one event-loop iteration).
-        list_h = self.account_list.height()
+        try:
+            if not self.account_spotlight_panel:
+                return
+            # Use the list widget height (more reliable than viewport() which may
+            # lag behind layout changes by one event-loop iteration).
+            list_h = self.account_list.height()
         if list_h <= 0:
             return
         new_h = max(380, list_h)
@@ -5674,6 +5675,9 @@ class MainWindow(QMainWindow):
                             row_above, self.account_list.PositionAtTop
                         )
                 break
+        except RuntimeError:
+            # C++ object deleted before the deferred timer fired.
+            self.account_spotlight_panel = None
 
     def _on_home_button_clicked(self):
         """Exit spotlight mode and return to the normal home view."""
@@ -5733,14 +5737,17 @@ class MainWindow(QMainWindow):
 
     def _reapply_ugg_embed_css(self):
         """Dispatch resize event to trigger u.gg's responsive layout."""
-        if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
-            return
-        if self.account_spotlight_panel._web_view is not None:
-            # Only dispatch resize - don't re-apply CSS which breaks layout
-            js = r"""
+        try:
+            if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
+                return
+            if self.account_spotlight_panel._web_view is not None:
+                # Only dispatch resize - don't re-apply CSS which breaks layout
+                js = r"""
 window.dispatchEvent(new Event('resize', { bubbles: true }));
 """
-            self.account_spotlight_panel._web_view.page().runJavaScript(js)
+                self.account_spotlight_panel._web_view.page().runJavaScript(js)
+        except RuntimeError:
+            pass
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
