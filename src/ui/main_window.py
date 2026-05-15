@@ -4030,6 +4030,7 @@ class AccountListItem(QFrame):
         rank_icon_size: int = 34,
         rank_text_brightness: int = 100,
         tag_chip_style: str = "vibrant",
+        ui_scale: float = 1.0,
     ):
         super().__init__(parent)
         self.account = account
@@ -4046,7 +4047,11 @@ class AccountListItem(QFrame):
         self._rank_icon_size = max(24, min(48, int(rank_icon_size)))
         self._rank_text_brightness = max(70, min(140, int(rank_text_brightness)))
         self._tag_chip_style = tag_chip_style if tag_chip_style in self._TAG_STYLE_PALETTES else "vibrant"
+        self._ui_scale = max(1.0, min(2.0, float(ui_scale)))
         self.init_ui()
+
+    def _scale_px(self, value: int) -> int:
+        return max(1, int(round(int(value) * self._ui_scale)))
 
     def _tag_size_preset(self) -> dict:
         presets = {
@@ -4241,7 +4246,7 @@ class AccountListItem(QFrame):
         rank_layout.setSpacing(density["rank_spacing"])
 
         self.rank_icon_label = QLabel()
-        self.rank_icon_label.setFixedSize(self._rank_icon_size, self._rank_icon_size)
+        self.rank_icon_label.setFixedSize(self._scale_px(self._rank_icon_size), self._scale_px(self._rank_icon_size))
         self.rank_icon_label.setScaledContents(False)
         self.rank_icon_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.rank_icon_label.setStyleSheet("background: transparent; border: none;")
@@ -4250,8 +4255,8 @@ class AccountListItem(QFrame):
         self.logged_in_label.setAttribute(Qt.WA_TranslucentBackground, True)
         self.logged_in_label.setVisible(False)
         self.logged_in_label.setAlignment(Qt.AlignCenter)
-        self.logged_in_label.setFixedHeight(density["logged_in_height"])
-        self.logged_in_label.setMinimumWidth(78)
+        self.logged_in_label.setFixedHeight(self._scale_px(density["logged_in_height"]))
+        self.logged_in_label.setMinimumWidth(self._scale_px(78))
         rank_layout.addWidget(self.logged_in_label)
         rank_layout.addWidget(self.rank_icon_label)
 
@@ -4262,7 +4267,7 @@ class AccountListItem(QFrame):
         self.rank_label.setStyleSheet(
             "background: transparent; border: none; color: #8b93a8; font-size: 11px;"
         )
-        self.rank_label.setMinimumWidth(density["rank_min_width"])
+        self.rank_label.setMinimumWidth(self._scale_px(density["rank_min_width"]))
         rank_layout.addWidget(self.rank_label)
 
         self.rank_widget = rank_widget
@@ -4377,26 +4382,39 @@ class AccountListItem(QFrame):
         badge_bg_alpha = int(30 + (90 * t))
         badge_border_alpha = int(70 + (130 * t))
         badge_fg = "#eef5ff" if self._dark_mode else "#1e3a8a"
+        badge_radius = self._scale_px(10)
+        badge_font_px = 9.5 * self._ui_scale
+        badge_pad_x = self._scale_px(9)
         if self._dark_mode:
             self.logged_in_label.setStyleSheet(
                 f"background-color: {self._rgba(self._logged_in_gradient_color, badge_bg_alpha)};"
                 f"border: 1px solid {self._rgba(self._logged_in_gradient_color, badge_border_alpha)};"
-                "border-radius: 10px;"
+                f"border-radius: {badge_radius}px;"
                 f"color: {badge_fg};"
-                "font-size: 9.5px;"
+                f"font-size: {badge_font_px:.1f}px;"
                 "font-weight: 700;"
-                "padding: 0px 9px;"
+                f"padding: 0px {badge_pad_x}px;"
             )
         else:
             self.logged_in_label.setStyleSheet(
                 f"background-color: {self._rgba(self._logged_in_gradient_color, max(20, badge_bg_alpha - 20))};"
                 f"border: 1px solid {self._rgba(self._logged_in_gradient_color, max(45, badge_border_alpha - 25))};"
-                "border-radius: 10px;"
+                f"border-radius: {badge_radius}px;"
                 f"color: {badge_fg};"
-                "font-size: 9.5px;"
+                f"font-size: {badge_font_px:.1f}px;"
                 "font-weight: 700;"
-                "padding: 0px 9px;"
+                f"padding: 0px {badge_pad_x}px;"
             )
+
+    def apply_ui_scale(self, ui_scale: float):
+        """Apply monitor-scale adjustments for fixed-size row elements."""
+        self._ui_scale = max(1.0, min(2.0, float(ui_scale)))
+        density = self._row_density_preset()
+        self.rank_icon_label.setFixedSize(self._scale_px(self._rank_icon_size), self._scale_px(self._rank_icon_size))
+        self.logged_in_label.setFixedHeight(self._scale_px(density["logged_in_height"]))
+        self.logged_in_label.setMinimumWidth(self._scale_px(78))
+        self.rank_label.setMinimumWidth(self._scale_px(density["rank_min_width"]))
+        self._refresh_logged_in_badge_style()
 
     def _hex_to_rgb(self, color: str) -> tuple[int, int, int]:
         raw = (color or "#4f7cff").strip().lstrip('#')
@@ -4747,6 +4765,8 @@ class MainWindow(QMainWindow):
             self._champ_select_window_size = SettingsDialog.CHAMP_SELECT_DEFAULT_RESOLUTION
             self._settings['champ_select_window_size'] = self._champ_select_window_size
         self._in_champ_select_mode: bool = False
+        self._last_screen_scale_factor: float = 1.0
+        self._dpi_resize_in_progress: bool = False
         self._pre_champ_select_size: str = ""
         self._search_query: str = ""
         self._tag_filter_value: str = "__all__"
@@ -5102,6 +5122,7 @@ class MainWindow(QMainWindow):
         """Apply champ-select size scaled for the monitor's DPI setting."""
         base_w, base_h = _parse_resolution(self._champ_select_window_size, fallback=(941, 1053))
         scale = self._current_screen_scale_factor()
+        self._last_screen_scale_factor = scale
         width = max(660, int(round(base_w * scale)))
         height = max(480, int(round(base_h * scale)))
 
@@ -5111,12 +5132,32 @@ class MainWindow(QMainWindow):
         finally:
             self._suppress_window_size_persistence = False
 
+    def _maybe_reapply_layout_for_dpi(self):
+        """Re-apply active layout dimensions after crossing into another monitor scale."""
+        if self._dpi_resize_in_progress:
+            return
+
+        current_scale = self._current_screen_scale_factor()
+        if abs(current_scale - self._last_screen_scale_factor) < 0.01:
+            return
+
+        self._dpi_resize_in_progress = True
+        try:
+            self._last_screen_scale_factor = current_scale
+            if self._in_champ_select_mode:
+                self._apply_champ_select_window_size()
+            else:
+                self._apply_account_list_scale(current_scale)
+        finally:
+            self._dpi_resize_in_progress = False
+
     def _enter_champ_select_mode(self):
         """Resize window and hide home-page UI elements for champ select."""
         if self._in_champ_select_mode:
             return
         self._in_champ_select_mode = True
         self._pre_champ_select_size = f"{self.width()}x{self.height()}"
+        self._last_screen_scale_factor = self._current_screen_scale_factor()
         self._apply_champ_select_window_size()
         self._filter_row_widget.hide()
         self._saved_accounts_label.hide()
@@ -5131,6 +5172,7 @@ class MainWindow(QMainWindow):
         restore = self._pre_champ_select_size or self._window_size
         self._pre_champ_select_size = ""
         self._apply_window_size(restore)
+        self._apply_account_list_scale(self._current_screen_scale_factor())
         self._filter_row_widget.show()
         self._saved_accounts_label.show()
         self._button_row_widget.show()
@@ -5161,6 +5203,10 @@ class MainWindow(QMainWindow):
         self._window_size_mode = 'custom'
         self._window_resize_save_timer.start()
 
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        self._maybe_reapply_layout_for_dpi()
+
     def changeEvent(self, event):
         super().changeEvent(event)
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
@@ -5170,6 +5216,8 @@ class MainWindow(QMainWindow):
             and self._in_champ_select_mode
         ):
             QTimer.singleShot(80, self._apply_champ_select_window_size)
+        else:
+            self._maybe_reapply_layout_for_dpi()
     
     def toggle_theme(self):
         """Force dark mode."""
@@ -6633,6 +6681,8 @@ QMenu#trayQuickMenu::separator {
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._last_screen_scale_factor = self._current_screen_scale_factor()
+        self._apply_account_list_scale(self._last_screen_scale_factor)
         self._apply_title_bar_theme()
         _reveal_after_first_show(self)
 
@@ -6738,12 +6788,31 @@ QMenu#trayQuickMenu::separator {
 
         return True
 
-    def _account_row_height(self) -> int:
-        return {
+    def _account_row_height_for_scale(self, scale: float) -> int:
+        base = {
             "compact": 74,
             "comfortable": 84,
             "spacious": 96,
         }.get(self._row_density, 84)
+        return max(64, int(round(base * max(1.0, min(2.0, float(scale))))))
+
+    def _account_row_height(self) -> int:
+        return self._account_row_height_for_scale(self._current_screen_scale_factor())
+
+    def _apply_account_list_scale(self, scale: float):
+        """Re-size account row widgets for the current monitor scale."""
+        row_height = self._account_row_height_for_scale(scale)
+        row_gap = max(4, int(round(6 * max(1.0, min(2.0, float(scale))))))
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            widget = self.account_list.itemWidget(item)
+            if not isinstance(widget, AccountListItem):
+                continue
+            item.setSizeHint(QSize(0, row_height + row_gap))
+            widget.setFixedHeight(row_height)
+            widget.apply_ui_scale(scale)
+        self.account_list.doItemsLayout()
+        self.account_list.viewport().update()
 
     def _sorted_accounts(self, accounts: list[Account]) -> list[Account]:
         """Return accounts sorted by current mode with pinned accounts first."""
@@ -6816,9 +6885,10 @@ QMenu#trayQuickMenu::separator {
                 self.edit_btn.setEnabled(False)
                 self.delete_btn.setEnabled(False)
             else:
-                row_gap = 6
+                current_scale = self._current_screen_scale_factor()
+                row_gap = max(4, int(round(6 * max(1.0, min(2.0, float(current_scale))))))
                 for account in filtered_accounts:
-                    row_height = self._account_row_height()
+                    row_height = self._account_row_height_for_scale(current_scale)
                     item = QListWidgetItem()
                     item.setData(Qt.UserRole, account.username)
                     item.setSizeHint(QSize(0, row_height + row_gap))
@@ -6842,6 +6912,7 @@ QMenu#trayQuickMenu::separator {
                         row_density=self._row_density,
                         rank_icon_size=self._rank_icon_size,
                         rank_text_brightness=self._rank_text_brightness,
+                        ui_scale=current_scale,
                     )
                     widget.setFixedHeight(row_height)
                     self.account_list.setItemWidget(item, widget)
