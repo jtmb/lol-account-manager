@@ -4016,6 +4016,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._profile_url = ""
         self._active_username = ""
         self._loaded_profile_url = ""
@@ -4028,11 +4029,13 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
 
         self._content_card = QFrame()
         self._content_card.setObjectName("spotlightContentCard")
+        self._content_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content_layout = QVBoxLayout(self._content_card)
         content_layout.setContentsMargins(6, 6, 6, 6)
 
         self._web_view = None
         self._fallback_container = QWidget()
+        self._fallback_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         fallback_layout = QVBoxLayout(self._fallback_container)
         fallback_layout.setContentsMargins(20, 16, 20, 16)
         fallback_layout.setSpacing(8)
@@ -4054,12 +4057,13 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
                 self._web_view = QWebEngineView(self)
                 self._web_view.setContextMenuPolicy(Qt.NoContextMenu)
                 self._web_view.loadFinished.connect(self._inject_hide_css)
-                content_layout.addWidget(self._web_view)
+                self._web_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                content_layout.addWidget(self._web_view, 1)
             except Exception:
                 self._web_view = None
 
         if self._web_view is None:
-            content_layout.addWidget(self._fallback_container)
+            content_layout.addWidget(self._fallback_container, 1)
 
         outer.addWidget(self._content_card, 1)
         self.setMinimumHeight(420)
@@ -5596,6 +5600,8 @@ class MainWindow(QMainWindow):
                 if item.sizeHint().height() != new_h:
                     item.setSizeHint(QSize(0, new_h))
                     self.account_spotlight_panel.setMinimumHeight(new_h)
+                    self.account_list.doItemsLayout()
+                    self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
                 break
 
@@ -5607,42 +5613,33 @@ class MainWindow(QMainWindow):
         if self.account_spotlight_panel._web_view is not None:
             js = r"""
 (function() {
-    var applyStyles = function() {
-        /* Force all layout containers to full width */
-        document.querySelectorAll('body, html, [class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
+    /* Remove all max-width constraints that might prevent full width */
+    var style = document.createElement('style');
+    style.textContent = [
+        '* { max-width: none !important; }',
+        'body, html { width: 100% !important; margin: 0 !important; padding: 0 !important; }',
+        '[style*="max-width"] { max-width: none !important; }',
+        '[style*="width: "] { width: 100% !important; }'
+    ].join(' ');
+    document.head.appendChild(style);
+    
+    /* Force all elements to recalculate with full viewport */
+    document.querySelectorAll('*').forEach(function(el) {
+        if (el.style.maxWidth && el.style.maxWidth !== 'none') {
+            el.style.maxWidth = 'none';
+        }
+        var computedStyle = window.getComputedStyle(el);
+        if (computedStyle.maxWidth && computedStyle.maxWidth !== 'none') {
             el.style.maxWidth = 'none !important';
-            el.style.width = '100% !important';
-            el.style.boxSizing = 'border-box';
-        });
-        /* Force specific u.gg containers */
-        document.querySelectorAll('[class*="ProfileContainer"], [class*="profile-container"], [class*="PageContainer"], [class*="page-container"]').forEach(function(el) {
-            el.style.maxWidth = 'none !important';
-            el.style.width = '100% !important';
-        });
-    };
+        }
+    });
     
-    /* Apply immediately */
-    applyStyles();
+    /* Dispatch synthetic resize event to trigger React re-layout */
+    window.dispatchEvent(new Event('resize', { bubbles: true }));
+    window.dispatchEvent(new Event('orientationchange', { bubbles: true }));
     
-    /* Re-apply on DOM mutations (React re-renders) */
-    if (!window._ugg_observer) {
-        var observer = new MutationObserver(function() {
-            applyStyles();
-        });
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['style', 'class']
-        });
-        window._ugg_observer = observer;
-    }
-    
-    /* Also watch for window resize and re-apply */
-    if (!window._ugg_resize_applied) {
-        window._ugg_resize_applied = true;
-        window.addEventListener('resize', applyStyles, { passive: true });
-    }
+    /* Force browser layout recalculation */
+    void document.documentElement.offsetHeight;
 })();
 """
             self.account_spotlight_panel._web_view.page().runJavaScript(js)
@@ -5681,6 +5678,7 @@ class MainWindow(QMainWindow):
         
         # Re-run the u.gg embed CSS when window is maximized/restored
         if event.type() == QEvent.WindowStateChange:
+            QTimer.singleShot(100, self._update_spotlight_size_hint)
             QTimer.singleShot(300, self._reapply_ugg_embed_css)
         
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
