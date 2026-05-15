@@ -2,15 +2,9 @@
 REM League of Legends Account Manager - Windows Launcher
 setlocal enableextensions enabledelayedexpansion
 
-REM If __KEEP flag is set, we're in the persistent window, skip respawning
-if "%~1"=="__KEEP" (
-    shift
-    goto :main
-)
-
-REM First run: re-exec inside cmd /k so the window stays open after the app exits
-cmd /k "%~f0" __KEEP
-exit /b 0
+REM Set colors immediately so there is no visible default console theme flash
+color 0A
+cls
 
 :main
 set "SCRIPT_DIR=%~dp0"
@@ -39,10 +33,6 @@ set "DOWNLOAD_DIR=%TEMP%\LoLAccountManager"
 if not exist "%DOWNLOAD_DIR%" mkdir "%DOWNLOAD_DIR%" >nul 2>&1
 set "INSTALLER=%DOWNLOAD_DIR%\python-installer.exe"
 set "PYTHON_URL=https://www.python.org/ftp/python/3.11.8/python-3.11.8-amd64.exe"
-
-REM Colors and formatting
-color 0A
-cls
 
 echo.
 echo ====================================================

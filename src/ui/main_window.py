@@ -397,6 +397,30 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
         pass
 
 
+def _arm_first_show_reveal(widget):
+    """Hide a top-level window until its first show cycle is complete."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        widget.setProperty("_first_show_hidden", True)
+        widget.setWindowOpacity(0.0)
+    except Exception:
+        pass
+
+
+def _reveal_after_first_show(widget):
+    """Reveal a window that was hidden during initial paint setup."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        if not bool(widget.property("_first_show_hidden")):
+            return
+        widget.setProperty("_first_show_hidden", False)
+        QTimer.singleShot(0, lambda w=widget: w.setWindowOpacity(1.0) if w is not None and w.isVisible() else None)
+    except Exception:
+        pass
+
+
 def _hide_windows_console_window():
     """Hide the attached Windows console window if one exists."""
     if not sys.platform.startswith("win"):
@@ -899,6 +923,7 @@ class MasterPasswordDialog(QDialog):
             self.create()
             _apply_windows11_chrome(self, True)
             self.setProperty("_chrome_preapplied", True)
+            _arm_first_show_reveal(self)
         
         layout = QVBoxLayout()
         
@@ -933,6 +958,10 @@ class MasterPasswordDialog(QDialog):
         
         layout.addLayout(button_layout)
         self.setLayout(layout)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        _reveal_after_first_show(self)
 
 
 class LaunchProgressDialog(QDialog):
@@ -1429,6 +1458,7 @@ class SettingsDialog(QDialog):
         # the dialog is being constructed and styled.
         self.setAttribute(Qt.WA_NativeWindow, True)
         self.setUpdatesEnabled(False)
+        _arm_first_show_reveal(self)
 
         # Force HWND creation so we can apply dark-mode chrome to the title bar
         # *before* the dialog is shown — prevents the white title bar flash.
@@ -1444,6 +1474,7 @@ class SettingsDialog(QDialog):
         if sys.platform.startswith("win"):
             _apply_windows11_chrome(self, True)
         super().showEvent(event)
+        _reveal_after_first_show(self)
 
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
@@ -3211,6 +3242,7 @@ class MainWindow(QMainWindow):
             self.create()
             _apply_windows11_chrome(self, self._dark_mode)
             self.setProperty("_chrome_preapplied", True)
+            _arm_first_show_reveal(self)
         self.init_ui()
         app = QApplication.instance()
         if app:
@@ -4870,6 +4902,7 @@ QMenu#trayQuickMenu::separator {
     def showEvent(self, event):
         super().showEvent(event)
         self._apply_title_bar_theme()
+        _reveal_after_first_show(self)
 
     def check_master_password(self):
         """Check if master password is set, if not show setup dialog"""
