@@ -402,6 +402,52 @@ def _hide_windows_console_window():
         pass
 
 
+def _hide_any_python_titled_window():
+    """Hide any visible top-level window titled like 'python' on Windows.
+
+    This is intentionally broad because the flashing popup has persisted across
+    multiple code paths and can be external to Qt's own window lifecycle.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        user32 = ctypes.windll.user32
+    except Exception:
+        return
+
+    try:
+        get_text = user32.GetWindowTextW
+        get_text_len = user32.GetWindowTextLengthW
+        is_visible = user32.IsWindowVisible
+        show_window = user32.ShowWindow
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+        def _enum_cb(hwnd, _lparam):
+            try:
+                if not is_visible(hwnd):
+                    return True
+
+                text_len = get_text_len(hwnd)
+                if text_len <= 0:
+                    return True
+
+                text_buf = ctypes.create_unicode_buffer(text_len + 1)
+                get_text(hwnd, text_buf, text_len + 1)
+                title = (text_buf.value or "").strip().lower()
+
+                if title == "python" or title.startswith("python "):
+                    show_window(hwnd, 0)
+            except Exception:
+                pass
+            return True
+
+        user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -2618,6 +2664,9 @@ class SettingsDialog(QDialog):
         # under an active modal, which can create transient top-level flashes.
         if self._apply_callback:
             QTimer.singleShot(0, lambda: self._apply_callback(values))
+        QTimer.singleShot(25, _hide_any_python_titled_window)
+        QTimer.singleShot(75, _hide_any_python_titled_window)
+        QTimer.singleShot(150, _hide_any_python_titled_window)
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -3348,6 +3397,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         _hide_windows_console_window()
+        _hide_any_python_titled_window()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
@@ -3468,6 +3518,12 @@ class MainWindow(QMainWindow):
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
+        if sys.platform.startswith("win"):
+            # Continuous low-cost suppression for intermittent popup flashes.
+            self._python_popup_guard_timer = QTimer(self)
+            self._python_popup_guard_timer.setInterval(60)
+            self._python_popup_guard_timer.timeout.connect(_hide_any_python_titled_window)
+            self._python_popup_guard_timer.start()
         QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
             QTimer.singleShot(4000, self._check_for_updates)
@@ -3913,10 +3969,15 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         # Refresh button should not force a full stylesheet reapply.
+        _hide_any_python_titled_window()
         self._apply_account_list_background()
         self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=True)
         self._set_refresh_icon_normal()
+        # Burst suppression to catch delayed popup creation.
+        QTimer.singleShot(25, _hide_any_python_titled_window)
+        QTimer.singleShot(75, _hide_any_python_titled_window)
+        QTimer.singleShot(150, _hide_any_python_titled_window)
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4198,6 +4259,7 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
+        _hide_any_python_titled_window()
         theme_before = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -4329,6 +4391,9 @@ class MainWindow(QMainWindow):
             self.update_account_item_states()
 
         self.refresh_account_list(fetch_ranks=True)
+        QTimer.singleShot(25, _hide_any_python_titled_window)
+        QTimer.singleShot(75, _hide_any_python_titled_window)
+        QTimer.singleShot(150, _hide_any_python_titled_window)
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
