@@ -4053,6 +4053,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             try:
                 self._web_view = QWebEngineView(self)
                 self._web_view.setContextMenuPolicy(Qt.NoContextMenu)
+                self._web_view.loadFinished.connect(self._inject_hide_css)
                 content_layout.addWidget(self._web_view)
             except Exception:
                 self._web_view = None
@@ -4071,6 +4072,34 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             webbrowser.open_new_tab(self._profile_url)
         except Exception:
             webbrowser.open(self._profile_url)
+
+    def _inject_hide_css(self, ok: bool):
+        """Inject CSS into the loaded u.gg page to hide site chrome that is
+        not relevant in the embedded spotlight view (top nav, left sidebar)."""
+        if not ok or self._web_view is None:
+            return
+        css = (
+            # Top navigation bar (game switcher row)
+            ".navigation-bar, .nav-bar, nav.main-nav, header > nav,"
+            " div[class*='NavigationBar'], div[class*='navigation-bar'] { display: none !important; }"
+            # Left sidebar icon panel
+            " .sidebar-icons, .sidebar-left, .main-sidebar, aside.sidebar,"
+            " div[class*='SidebarIcons'], div[class*='sidebar-icons'],"
+            " div[class*='SideBar'], div[class*='side-bar'] { display: none !important; }"
+            # Collapse left margin/padding freed by removing the sidebar
+            " .main-content, .content-section, .profile-container,"
+            " div[class*='MainContent'], div[class*='main-content'] { margin-left: 0 !important; padding-left: 0 !important; }"
+        )
+        js = r"""
+(function() {
+    if (document.getElementById('_ugg_embed_hide')) return;
+    var s = document.createElement('style');
+    s.id = '_ugg_embed_hide';
+    s.textContent = """ + repr(css) + r""";
+    (document.head || document.documentElement).appendChild(s);
+})();
+"""
+        self._web_view.page().runJavaScript(js)
 
     def _apply_panel_styles(self):
         text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
