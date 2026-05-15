@@ -2413,6 +2413,8 @@ class AccountListItem(QFrame):
     """Custom widget for displaying account in list"""
 
     _TAG_COLOR_SLOT_BY_TEXT: dict[str, int] = {}
+    _in_game: bool = False
+    _in_game: bool = False
 
     _TAG_STYLE_PALETTES = {
         "vibrant": {
@@ -2958,9 +2960,12 @@ class AccountListItem(QFrame):
         self._hover_highlight_color = str(color or self._hover_highlight_color)
         self._update_visual_state()
 
-    def set_logged_in(self, logged_in: bool):
+    def set_logged_in(self, logged_in: bool, in_game: bool = False):
         self._logged_in = logged_in
+        self._in_game = in_game
         self.logged_in_label.setVisible(logged_in)
+        if logged_in:
+            self.logged_in_label.setText("In Game" if in_game else "Logged In")
         self._refresh_text_styles()
         self._update_visual_state()
 
@@ -4417,6 +4422,7 @@ QMenu#trayQuickMenu::separator {
         )
         self._ingame_watch_status = next_status
         self._update_tray_watcher_status()
+        self.update_account_item_states()
         if self.ingame_diag_dialog:
             self.ingame_diag_dialog.refresh_status()
 
@@ -5188,10 +5194,11 @@ QMenu#trayQuickMenu::separator {
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
                 is_logged_in = bool(self._logged_in_username) and item.data(Qt.UserRole) == self._logged_in_username
+                in_game = is_logged_in and bool(self._ingame_watch_status.get("in_game", False))
                 widget.set_dark_mode(self._dark_mode)
                 widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
-                widget.set_logged_in(is_logged_in)
+                widget.set_logged_in(is_logged_in, in_game)
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
