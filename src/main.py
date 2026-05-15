@@ -3,9 +3,10 @@ import sys
 import ctypes
 import subprocess
 from pathlib import Path
+from typing import Optional
 
-from PyQt5.QtCore import QCoreApplication
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QCoreApplication, QTimer, QObject, QEvent
+from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
@@ -135,6 +136,28 @@ def _apply_dark_palette(app: QApplication, settings: Optional[dict] = None) -> N
     )
 
 
+class _FirstPaintGuard(QObject):
+    """Hide first-frame paints for top-level windows on Windows.
+
+    Some Windows/Qt combinations briefly paint a default light frame before
+    per-window styles are fully realized. This guard keeps newly shown windows
+    invisible for one event-loop tick, then reveals them after styling settles.
+    """
+
+    def eventFilter(self, obj, event):
+        if not sys.platform.startswith("win"):
+            return False
+        try:
+            if event.type() == QEvent.Show and isinstance(obj, QWidget) and obj.isWindow():
+                if not bool(obj.property("_first_paint_guard_done")):
+                    obj.setProperty("_first_paint_guard_done", True)
+                    obj.setWindowOpacity(0.0)
+                    QTimer.singleShot(0, lambda w=obj: w.setWindowOpacity(1.0) if w is not None else None)
+        except Exception:
+            pass
+        return False
+
+
 def main():
     """Run the application"""
     try:
@@ -147,6 +170,10 @@ def main():
 
         app = QApplication(sys.argv)
         app.setStyle("Fusion")
+        if sys.platform.startswith("win"):
+            guard = _FirstPaintGuard(app)
+            app.installEventFilter(guard)
+            app._first_paint_guard = guard
 
         settings = load_settings()
 

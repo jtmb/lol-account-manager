@@ -1387,6 +1387,7 @@ class SettingsDialog(QDialog):
         # the dialog is being constructed and styled.
         self.setAttribute(Qt.WA_NativeWindow, True)
         self.setUpdatesEnabled(False)
+        self.setWindowOpacity(0.0)
 
         # Force HWND creation so we can apply dark-mode chrome to the title bar
         # *before* the dialog is shown — prevents the white title bar flash.
@@ -1401,6 +1402,11 @@ class SettingsDialog(QDialog):
         super().showEvent(event)
         if sys.platform.startswith("win"):
             QTimer.singleShot(0, lambda: _apply_windows11_chrome(self, True))
+        QTimer.singleShot(0, self._reveal_after_first_paint)
+
+    def _reveal_after_first_paint(self):
+        if self.windowOpacity() < 1.0:
+            self.setWindowOpacity(1.0)
 
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
