@@ -4111,19 +4111,27 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         (document.head || document.documentElement).appendChild(s);
     }
 
-    /* ── hide fixed/sticky positioned elements at top (likely the game tabs bar) ─ */
+    /* ── hide fixed/sticky positioned elements at top (game tabs bar) ─ */
     var allEls = document.querySelectorAll('*');
     for (var i = 0; i < allEls.length; i++) {
         var el = allEls[i];
         var style = window.getComputedStyle(el);
         var pos = style.position;
         var top = style.top;
+        var left = style.left;
         var zIndex = style.zIndex;
         
-        /* Fixed/sticky bars that are at the top viewport and have high z-index */
+        /* Fixed/sticky bars at the top viewport with high z-index */
         if ((pos === 'fixed' || pos === 'sticky') &&
             (top === '0px' || top === '0') &&
             parseInt(zIndex) > 100) {
+            el.style.cssText = 'display:none!important; visibility:hidden!important;';
+        }
+        
+        /* Fixed/sticky sidebar on the left (narrow width, left: 0) */
+        if ((pos === 'fixed' || pos === 'sticky') &&
+            (left === '0px' || left === '0') &&
+            parseInt(style.width) < 100) {
             el.style.cssText = 'display:none!important; visibility:hidden!important;';
         }
     }
