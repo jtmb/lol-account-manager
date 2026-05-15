@@ -3,12 +3,15 @@ REM League of Legends Account Manager - Windows Launcher
 setlocal enableextensions enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 
-if not defined LOL_KEEP_OPEN (
-    start "League of Legends Account Manager" cmd /k "set LOL_KEEP_OPEN=1&& cd /d %~dp0 && call run.bat __KEEP_OPEN"
+REM Check if we're already in the persistent console window (indicated by __KEEP_OPEN argument)
+if /I "%~1"=="__KEEP_OPEN" (
+    REM This is the recursive call in the persistent window, skip the start block
+    shift
+) else (
+    REM First run: spawn a new persistent cmd window
+    start "League of Legends Account Manager" cmd /k "cd /d %~dp0 && call run.bat __KEEP_OPEN"
     exit /b 0
 )
-
-if /I "%~1"=="__KEEP_OPEN" shift
 
 if not defined LOL_STAGED (
     set "PATH_PREFIX=%SCRIPT_DIR:~0,2%"
