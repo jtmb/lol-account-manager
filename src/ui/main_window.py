@@ -5581,6 +5581,7 @@ class MainWindow(QMainWindow):
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
         self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+        QTimer.singleShot(200, self._update_webview_zoom)
 
         # Keep the logged-in account row selected.
         for index in range(self.account_list.count()):
@@ -5616,6 +5617,16 @@ class MainWindow(QMainWindow):
                     self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
                 break
+
+    def _update_webview_zoom(self):
+        """Zoom the embedded webview based on window state."""
+        if not (self.account_spotlight_panel and self.account_spotlight_panel._web_view):
+            return
+        if self.isMaximized() or self.isFullScreen():
+            zoom = 1.3
+        else:
+            zoom = 1.0
+        self.account_spotlight_panel._web_view.setZoomFactor(zoom)
 
     def _reapply_ugg_embed_css(self):
         """Dispatch resize event to trigger u.gg's responsive layout."""
@@ -5672,6 +5683,7 @@ class MainWindow(QMainWindow):
         # Re-run the u.gg embed CSS when window is maximized/restored
         if event.type() == QEvent.WindowStateChange:
             QTimer.singleShot(100, self._update_spotlight_size_hint)
+            QTimer.singleShot(200, self._update_webview_zoom)
             QTimer.singleShot(300, self._reapply_ugg_embed_css)
             # Set flag to trigger additional CSS reapply on next resize
             self._should_reapply_css_on_resize = True
@@ -5691,6 +5703,7 @@ class MainWindow(QMainWindow):
         
         # After maximize, Qt continues to resize the window. Catch this to reapply CSS.
         if getattr(self, '_should_reapply_css_on_resize', False):
+            QTimer.singleShot(50, self._update_webview_zoom)
             QTimer.singleShot(50, self._reapply_ugg_embed_css)
             self._should_reapply_css_on_resize = False
     
