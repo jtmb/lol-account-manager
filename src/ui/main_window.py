@@ -29,6 +29,11 @@ from urllib.request import Request, urlopen
 from urllib.parse import quote
 
 try:
+    import psutil
+except Exception:
+    psutil = None
+
+try:
     import qtawesome as qta
 except Exception:
     qta = None
@@ -423,6 +428,33 @@ def _hide_stray_python_console_windows():
         hwnd = kernel32.GetConsoleWindow()
         if hwnd:
             user32.ShowWindow(hwnd, 0)
+    except Exception:
+        pass
+
+
+def _kill_stray_child_console_processes():
+    """Kill stray child console processes spawned under this app on Windows.
+
+    This targets unexpected child interpreters/shells (python/cmd/powershell)
+    that can intermittently surface a console window during UI actions.
+    """
+    if not sys.platform.startswith("win") or psutil is None:
+        return
+
+    try:
+        current_pid = os.getpid()
+        parent = psutil.Process(current_pid)
+        children = parent.children(recursive=True)
+        for child in children:
+            try:
+                name = (child.name() or "").strip().lower()
+                if name in {
+                    "python.exe", "python", "py.exe", "py",
+                    "cmd.exe", "cmd", "powershell.exe", "powershell", "pwsh.exe", "pwsh",
+                }:
+                    child.terminate()
+            except Exception:
+                continue
     except Exception:
         pass
 
@@ -3408,6 +3440,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         _hide_windows_console_window()
         _hide_stray_python_console_windows()
+        _kill_stray_child_console_processes()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
@@ -3531,7 +3564,10 @@ class MainWindow(QMainWindow):
         if sys.platform.startswith("win"):
             self._console_guard_timer = QTimer(self)
             self._console_guard_timer.setInterval(50)
-            self._console_guard_timer.timeout.connect(_hide_stray_python_console_windows)
+            def _console_guard_tick():
+                _hide_stray_python_console_windows()
+                _kill_stray_child_console_processes()
+            self._console_guard_timer.timeout.connect(_console_guard_tick)
             self._console_guard_timer.start()
         QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
@@ -3979,11 +4015,13 @@ class MainWindow(QMainWindow):
     def _perform_refresh_ui(self):
         # Refresh button should not force a full stylesheet reapply.
         _hide_stray_python_console_windows()
+        _kill_stray_child_console_processes()
         self._apply_account_list_background()
         self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
         _hide_stray_python_console_windows()
+        _kill_stray_child_console_processes()
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4266,6 +4304,7 @@ class MainWindow(QMainWindow):
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
         _hide_stray_python_console_windows()
+        _kill_stray_child_console_processes()
         theme_before = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -4398,6 +4437,7 @@ class MainWindow(QMainWindow):
 
         self.refresh_account_list(fetch_ranks=False)
         _hide_stray_python_console_windows()
+        _kill_stray_child_console_processes()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
@@ -4839,7 +4879,10 @@ QMenu#trayQuickMenu::separator {
             "del \"%~f0\"\n"
         )
         script_path.write_text(script, encoding="utf-8")
-        subprocess.Popen(["cmd", "/c", str(script_path)])
+        popen_kwargs = {}
+        if sys.platform.startswith("win"):
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        subprocess.Popen(["cmd", "/c", str(script_path)], **popen_kwargs)
 
     def _stage_windows_directory_update_and_restart(self, source_dir: Path):
         """Copy extracted onedir build over current app directory after exit."""
@@ -4865,7 +4908,10 @@ QMenu#trayQuickMenu::separator {
             "del \"%~f0\"\n"
         )
         script_path.write_text(script, encoding="utf-8")
-        subprocess.Popen(["cmd", "/c", str(script_path)])
+        popen_kwargs = {}
+        if sys.platform.startswith("win"):
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        subprocess.Popen(["cmd", "/c", str(script_path)], **popen_kwargs)
 
     def _replace_binary_and_restart(self, downloaded_asset: Path, latest_tag: str):
         """Directly replace portable app binary and restart when possible."""
@@ -4915,7 +4961,10 @@ QMenu#trayQuickMenu::separator {
         os.chmod(str(current_exe), 0o755)
         self._settings["last_seen_release_tag"] = latest_tag
         save_settings(self._settings)
-        subprocess.Popen([str(current_exe)])
+        popen_kwargs = {}
+        if sys.platform.startswith("win"):
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        subprocess.Popen([str(current_exe)], **popen_kwargs)
         self._quitting_to_exit = True
         QApplication.quit()
 

@@ -1,7 +1,9 @@
 """Main application entry point"""
 import sys
 import ctypes
+import subprocess
 from pathlib import Path
+from PyQt5.QtCore import QCoreApplication
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
@@ -28,6 +30,47 @@ def _detach_console() -> None:
         ctypes.windll.kernel32.FreeConsole()
     except Exception:
         pass
+
+
+def _install_no_console_subprocess_guard() -> None:
+    """Force python/cmd child processes to start without a visible console.
+
+    Some Windows environments can surface transient console windows for child
+    python/cmd processes even when the parent is a GUI app. This guard patches
+    subprocess.Popen at startup and applies CREATE_NO_WINDOW for those command
+    types unless the caller already provided explicit creation flags.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    original_popen = subprocess.Popen
+
+    def _looks_like_console_python_or_cmd(command) -> bool:
+        try:
+            if isinstance(command, (list, tuple)):
+                head = str(command[0] if command else "")
+            else:
+                head = str(command or "")
+            name = head.replace('"', '').strip().lower().rsplit('\\', 1)[-1]
+            return name in {
+                'python', 'python.exe', 'py', 'py.exe', 'cmd', 'cmd.exe',
+                'powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'
+            }
+        except Exception:
+            return False
+
+    def guarded_popen(*args, **kwargs):
+        try:
+            command = kwargs.get("args", args[0] if args else None)
+            if _looks_like_console_python_or_cmd(command):
+                flags = int(kwargs.get("creationflags", 0) or 0)
+                flags |= getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                kwargs["creationflags"] = flags
+        except Exception:
+            pass
+        return original_popen(*args, **kwargs)
+
+    subprocess.Popen = guarded_popen
 
 
 def _resource_path(relative_path: str) -> Path:
@@ -77,6 +120,10 @@ def main():
     """Run the application"""
     # Detach the Windows console before anything else so it can never flash.
     _detach_console()
+    _install_no_console_subprocess_guard()
+
+    # Ensure accidental top-level Qt windows never use the default "python" title.
+    QCoreApplication.setApplicationName("League of Legends Account Manager")
 
     app = QApplication(sys.argv)
 
