@@ -2,12 +2,12 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
-    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget, QGroupBox,
+    QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
     QStackedWidget, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF, QUrl
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
 from pathlib import Path
 from typing import Optional, Callable
@@ -34,6 +34,11 @@ try:
 except Exception:
     qta = None
 
+try:
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+except Exception:
+    QWebEngineView = None
+
 if sys.platform.startswith("win"):
     import winreg
 
@@ -41,7 +46,6 @@ from src.core.account_manager import AccountManager, Account
 from src.core.riot_integration import RiotClientIntegration
 from src.core.opgg_service import fetch_rank
 from src.core.opgg_service import OPGG_REGION_MAP
-from src.core.game_stats import GameStatsTracker
 from src.security.encryption import PasswordEncryption
 from src.config.paths import (
     get_lol_executable,
@@ -4007,105 +4011,185 @@ class SettingsDialog(QDialog):
         return super().eventFilter(obj, event)
 
 
-class PostGameStatsPanel(AccountListBackgroundFrame):
-    """Panel for displaying post-game statistics and account spotlight"""
-    
+class AccountSpotlightPanel(AccountListBackgroundFrame):
+    """Auto-loaded spotlight view for the currently logged-in account."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.game_stats_tracker = None
-        self.current_username = ""
-        self.init_ui()
-    
-    def init_ui(self):
-        """Initialize the post-game stats UI"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
-        
-        # Title
-        title = QLabel("Account Spotlight")
-        title_font = title.font()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        layout.addWidget(title)
-        
-        # Stats summary (wins, losses, KDA, etc.)
-        summary_group = QGroupBox("Summary Statistics")
-        summary_layout = QGridLayout()
-        
-        self.wins_label = QLabel("Wins: 0")
-        self.losses_label = QLabel("Losses: 0")
-        self.winrate_label = QLabel("Win Rate: 0%")
-        self.avg_kda_label = QLabel("Avg KDA: 0.0")
-        self.avg_damage_label = QLabel("Avg Damage: 0")
-        self.avg_gold_label = QLabel("Avg Gold: 0")
-        self.avg_cs_label = QLabel("Avg CS: 0")
-        self.total_games_label = QLabel("Total Games: 0")
-        
-        summary_layout.addWidget(self.wins_label, 0, 0)
-        summary_layout.addWidget(self.losses_label, 0, 1)
-        summary_layout.addWidget(self.winrate_label, 0, 2)
-        summary_layout.addWidget(self.total_games_label, 1, 0)
-        summary_layout.addWidget(self.avg_kda_label, 1, 1)
-        summary_layout.addWidget(self.avg_damage_label, 1, 2)
-        summary_layout.addWidget(self.avg_gold_label, 2, 0)
-        summary_layout.addWidget(self.avg_cs_label, 2, 1)
-        
-        summary_group.setLayout(summary_layout)
-        layout.addWidget(summary_group)
-        
-        # Recent games list
-        games_group = QGroupBox("Recent Games")
-        games_layout = QVBoxLayout()
-        
-        self.games_list = QListWidget()
-        self.games_list.setMaximumHeight(300)
-        games_layout.addWidget(self.games_list)
-        
-        games_group.setLayout(games_layout)
-        layout.addWidget(games_group)
-        
-        layout.addStretch()
-    
-    def update_stats(self, username: str, game_stats_tracker):
-        """Update displayed stats for an account"""
-        self.current_username = username
-        self.game_stats_tracker = game_stats_tracker
-        
-        if not game_stats_tracker:
+        self._profile_url = ""
+        self._active_username = ""
+        self._is_dark_mode = True
+        self._base_color = DEFAULT_APP_SURFACE_COLOR
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(12, 8, 12, 8)
+        outer.setSpacing(8)
+
+        self._header_card = QFrame()
+        self._header_card.setObjectName("spotlightHeaderCard")
+        header_layout = QHBoxLayout(self._header_card)
+        header_layout.setContentsMargins(14, 10, 14, 10)
+        header_layout.setSpacing(12)
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(2)
+        self._title_label = QLabel("Account Spotlight")
+        self._title_label.setStyleSheet("font-size: 11pt; font-weight: 700;")
+        self._identity_label = QLabel("Not logged in")
+        self._identity_label.setStyleSheet("font-size: 10pt; font-weight: 600;")
+        self._riot_id_label = QLabel("")
+        self._riot_id_label.setStyleSheet("font-size: 9pt;")
+        left_col.addWidget(self._title_label)
+        left_col.addWidget(self._identity_label)
+        left_col.addWidget(self._riot_id_label)
+        header_layout.addLayout(left_col, 1)
+
+        right_col = QVBoxLayout()
+        right_col.setSpacing(2)
+        self._rank_label = QLabel("Rank: —")
+        self._rank_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._rank_label.setStyleSheet("font-size: 10pt; font-weight: 700;")
+        self._record_label = QLabel("")
+        self._record_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._record_label.setStyleSheet("font-size: 9pt;")
+        right_col.addWidget(self._rank_label)
+        right_col.addWidget(self._record_label)
+        header_layout.addLayout(right_col, 0)
+
+        outer.addWidget(self._header_card)
+
+        self._content_card = QFrame()
+        self._content_card.setObjectName("spotlightContentCard")
+        content_layout = QVBoxLayout(self._content_card)
+        content_layout.setContentsMargins(6, 6, 6, 6)
+
+        self._web_view = None
+        self._fallback_container = QWidget()
+        fallback_layout = QVBoxLayout(self._fallback_container)
+        fallback_layout.setContentsMargins(20, 16, 20, 16)
+        fallback_layout.setSpacing(8)
+        self._fallback_message = QLabel(
+            "Embedded profile view is unavailable in this build.\n"
+            "Open the same u.gg profile in your browser."
+        )
+        self._fallback_message.setWordWrap(True)
+        self._fallback_message.setAlignment(Qt.AlignCenter)
+        self._fallback_open_btn = QPushButton("Open u.gg Profile")
+        self._fallback_open_btn.clicked.connect(self._open_profile_in_browser)
+        fallback_layout.addStretch()
+        fallback_layout.addWidget(self._fallback_message)
+        fallback_layout.addWidget(self._fallback_open_btn, 0, Qt.AlignHCenter)
+        fallback_layout.addStretch()
+
+        if QWebEngineView is not None:
+            try:
+                self._web_view = QWebEngineView(self)
+                self._web_view.setContextMenuPolicy(Qt.NoContextMenu)
+                content_layout.addWidget(self._web_view)
+            except Exception:
+                self._web_view = None
+
+        if self._web_view is None:
+            content_layout.addWidget(self._fallback_container)
+
+        outer.addWidget(self._content_card, 1)
+        self._apply_panel_styles()
+
+    def _open_profile_in_browser(self):
+        if not self._profile_url:
             return
-        
-        # Get summary stats
-        summary = game_stats_tracker.get_account_summary(username)
-        recent_games = game_stats_tracker.get_account_stats(username, limit=10)
-        
-        # Update summary
-        self.wins_label.setText(f"Wins: {summary['wins']}")
-        self.losses_label.setText(f"Losses: {summary['losses']}")
-        self.winrate_label.setText(f"Win Rate: {summary['win_rate']:.1f}%")
-        self.avg_kda_label.setText(f"Avg KDA: {summary['avg_kda']:.2f}")
-        self.avg_damage_label.setText(f"Avg Damage: {summary['avg_damage']:,}")
-        self.avg_gold_label.setText(f"Avg Gold: {summary['avg_gold']:,}")
-        self.avg_cs_label.setText(f"Avg CS: {summary['avg_cs']}")
-        self.total_games_label.setText(f"Total Games: {summary['total_games']}")
-        
-        # Update recent games
-        self.games_list.clear()
-        for game in recent_games:
-            result_text = game.game_result.upper() if game.game_result else "UNKNOWN"
-            result_color = "#90EE90" if game.game_result == "victory" else "#FF6B6B"
-            
-            game_item_text = (
-                f"[{result_text}] {game.player_champion} - "
-                f"KDA: {game.player_kills}/{game.player_deaths}/{game.player_assists} - "
-                f"Damage: {game.player_damage:,} - "
-                f"Gold: {game.player_gold:,} - "
-                f"CS: {game.player_cs}"
+        try:
+            webbrowser.open_new_tab(self._profile_url)
+        except Exception:
+            webbrowser.open(self._profile_url)
+
+    def _apply_panel_styles(self):
+        text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
+        text_muted = "#9fb0d5" if self._is_dark_mode else "#4b5563"
+        header_bg = "rgba(16, 21, 33, 0.82)" if self._is_dark_mode else "rgba(241, 245, 249, 0.95)"
+        content_bg = "rgba(10, 14, 24, 0.86)" if self._is_dark_mode else "rgba(248, 250, 252, 0.98)"
+        border = "#2f3a55" if self._is_dark_mode else "#cbd5e1"
+        accent = "#8ab4ff" if self._is_dark_mode else "#2563eb"
+
+        self.setStyleSheet(
+            "QFrame#spotlightHeaderCard {"
+            f"background: {header_bg};"
+            f"border: 1px solid {border};"
+            "border-radius: 10px;"
+            "}"
+            "QFrame#spotlightContentCard {"
+            f"background: {content_bg};"
+            f"border: 1px solid {border};"
+            "border-radius: 10px;"
+            "}"
+            f"QLabel {{ color: {text_main}; }}"
+            f"QLabel#spotlightMuted {{ color: {text_muted}; }}"
+            "QPushButton {"
+            f"background: {accent};"
+            "color: #ffffff;"
+            "border: none;"
+            "border-radius: 6px;"
+            "padding: 6px 12px;"
+            "font-weight: 600;"
+            "}"
+            "QPushButton:hover { background: #6b95e8; }"
+        )
+
+        self._riot_id_label.setObjectName("spotlightMuted")
+        self._record_label.setObjectName("spotlightMuted")
+
+    def set_dark_mode(self, enabled: bool):
+        self._is_dark_mode = bool(enabled)
+        self._apply_panel_styles()
+
+    def set_base_color(self, color: str):
+        self._base_color = str(color or DEFAULT_APP_SURFACE_COLOR)
+
+    def set_account(self, account: Optional[Account], rank_data: Optional[dict], profile_url: str):
+        self._profile_url = str(profile_url or "").strip()
+        if not account:
+            self._active_username = ""
+            self._identity_label.setText("Not logged in")
+            self._riot_id_label.setText("")
+            self._rank_label.setText("Rank: —")
+            self._record_label.setText("")
+            return
+
+        self._active_username = account.username
+        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
+        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
+        self._identity_label.setText(display_name)
+        self._riot_id_label.setText(f"Riot ID: {display_name}#{tag_line}")
+
+        rank = dict(rank_data or {})
+        tier = str(rank.get("tier", "") or "").strip()
+        division = str(rank.get("rank", "") or "").strip()
+        lp = rank.get("lp")
+        wins = rank.get("wins")
+        losses = rank.get("losses")
+        wr = rank.get("win_rate")
+
+        if tier and division:
+            lp_text = f" {int(lp)} LP" if str(lp).strip() else ""
+            self._rank_label.setText(f"{tier} {division}{lp_text}")
+        elif tier:
+            self._rank_label.setText(tier)
+        else:
+            self._rank_label.setText("Rank: Unranked")
+
+        if str(wins).strip() and str(losses).strip():
+            wr_text = f" · {float(wr):.0f}% WR" if str(wr).strip() else ""
+            self._record_label.setText(f"{int(wins)}W {int(losses)}L{wr_text}")
+        else:
+            self._record_label.setText("")
+
+        if self._web_view is not None and self._profile_url:
+            self._web_view.setUrl(QUrl(self._profile_url))
+        elif self._profile_url:
+            self._fallback_message.setText(
+                "Embedded profile view is unavailable in this build.\n"
+                "Open the same u.gg profile in your browser."
             )
-            item = QListWidgetItem(game_item_text)
-            item.setForeground(QColor(result_color))
-            self.games_list.addItem(item)
 
 
 class AccountListItem(QFrame):
@@ -4852,8 +4936,7 @@ class MainWindow(QMainWindow):
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
         self.game_info_panel: Optional[InClientGamePanel] = None
-        self.post_game_stats_panel: Optional[PostGameStatsPanel] = None
-        self.game_stats_tracker: GameStatsTracker = GameStatsTracker()
+        self.account_spotlight_panel: Optional[AccountSpotlightPanel] = None
         self.main_area_stack: Optional[QStackedWidget] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
@@ -5124,11 +5207,11 @@ class MainWindow(QMainWindow):
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
         self.game_info_panel = InClientGamePanel()
-        self.post_game_stats_panel = PostGameStatsPanel()
+        self.account_spotlight_panel = AccountSpotlightPanel()
         self.main_area_stack = QStackedWidget()
         self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
         self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
-        self.main_area_stack.addWidget(self.post_game_stats_panel)    # index 2: post-game stats
+        self.main_area_stack.addWidget(self.account_spotlight_panel)  # index 2: logged-in spotlight
         layout.addWidget(self.main_area_stack)
         
         # Apply clipping mask to account list viewport
@@ -5157,11 +5240,6 @@ class MainWindow(QMainWindow):
         self.delete_btn.clicked.connect(self.delete_account)
         self.delete_btn.setEnabled(False)
         button_layout.addWidget(self.delete_btn)
-        
-        self.view_stats_btn = QPushButton("View Stats")
-        self.view_stats_btn.clicked.connect(self.show_account_spotlight)
-        self.view_stats_btn.setEnabled(False)
-        button_layout.addWidget(self.view_stats_btn)
         
         layout.addWidget(self._button_row_widget)
         
@@ -5263,6 +5341,9 @@ class MainWindow(QMainWindow):
         if self.game_info_panel:
             self.game_info_panel.set_dark_mode(self._dark_mode)
             self.game_info_panel.set_base_color(self._app_surface_color)
+        if self.account_spotlight_panel:
+            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+            self.account_spotlight_panel.set_base_color(self._app_surface_color)
 
     def _apply_window_size(self, resolution: str):
         """Resize the window without treating it as a user-initiated custom resize."""
@@ -5382,33 +5463,61 @@ class MainWindow(QMainWindow):
         self.lol_path_label.show()
         self.update_account_item_states()
 
-    def show_account_spotlight(self):
-        """Show post-game statistics and account spotlight for selected account"""
-        selected = self.account_list.currentItem()
-        if not selected:
+    def _build_ugg_profile_overview_url(self, account: Account) -> str:
+        """Build u.gg profile overview URL for the given account."""
+        region_code = str(getattr(account, "region", "NA") or "NA").upper()
+        region_map = {
+            "NA": "na1",
+            "EUW": "euw1",
+            "EUNE": "eun1",
+            "KR": "kr",
+            "LAN": "la1",
+            "LAS": "la2",
+            "BR": "br1",
+            "JP": "jp1",
+            "OCE": "oc1",
+            "TR": "tr1",
+            "RU": "ru",
+            "ME": "me1",
+            "PH": "ph2",
+            "SG": "sg2",
+            "TH": "th2",
+            "TW": "tw2",
+            "VN": "vn2",
+        }
+        region_id = region_map.get(region_code, region_code.lower())
+        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
+        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
+        encoded_name = quote(display_name, safe="")
+        encoded_tag = quote(tag_line.lower(), safe="")
+        return f"https://u.gg/lol/profile/{region_id}/{encoded_name}-{encoded_tag}/overview"
+
+    def _show_logged_in_spotlight(self):
+        """Auto-open spotlight for the currently logged-in account."""
+        if not self.main_area_stack or self._in_champ_select_mode:
             return
-        
-        username = selected.data(Qt.UserRole)
-        if not username:
+
+        if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
+            self.main_area_stack.setCurrentIndex(0)
             return
-        
-        # Update post-game stats panel
-        if self.post_game_stats_panel:
-            self.post_game_stats_panel.update_stats(username, self.game_stats_tracker)
-            # Switch to post-game stats view
-            self.main_area_stack.setCurrentWidget(self.post_game_stats_panel)
-            
-            # Add a button to go back to account list
-            if not hasattr(self, '_spotlight_back_btn'):
-                self._spotlight_back_btn = QPushButton("← Back to Accounts")
-                self._spotlight_back_btn.clicked.connect(self.close_account_spotlight)
-                # Insert at the beginning of post-game panel layout
-                layout = self.post_game_stats_panel.layout()
-                layout.insertWidget(0, self._spotlight_back_btn)
-    
-    def close_account_spotlight(self):
-        """Close account spotlight and return to account list"""
-        self.main_area_stack.setCurrentIndex(0)
+
+        account = self.account_manager.get_account(self._logged_in_username)
+        if not account:
+            self.main_area_stack.setCurrentIndex(0)
+            return
+
+        profile_url = self._build_ugg_profile_overview_url(account)
+        rank_data = self._rank_data_by_username.get(account.username, {})
+        self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+
+        # Keep the logged-in account selected in the list, while spotlight stays visible below.
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if item.data(Qt.UserRole) == account.username:
+                self.account_list.setCurrentItem(item)
+                break
+
+        self.main_area_stack.setCurrentIndex(2)
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
@@ -6287,6 +6396,7 @@ QMenu#trayQuickMenu::separator {
         self.launch_btn.setEnabled(False)
         self.edit_btn.setEnabled(False)
         self.delete_btn.setEnabled(False)
+        self._show_logged_in_spotlight()
 
         if hide_window:
             self.hide()
@@ -7154,6 +7264,8 @@ QMenu#trayQuickMenu::separator {
                     self._start_rank_fetches()
         finally:
             self.account_list.setUpdatesEnabled(True)
+            if not self._in_champ_select_mode:
+                self._show_logged_in_spotlight()
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
@@ -7198,6 +7310,8 @@ QMenu#trayQuickMenu::separator {
             if isinstance(widget, AccountListItem) and widget.account.username == username:
                 widget.set_rank(rank_data)
                 break
+        if self._logged_in_username and username == self._logged_in_username and not self._in_champ_select_mode:
+            self._show_logged_in_spotlight()
 
     def on_account_selected(self):
         """Handle account selection"""
@@ -7207,7 +7321,6 @@ QMenu#trayQuickMenu::separator {
             self.launch_btn.setEnabled(username is not None)
             self.edit_btn.setEnabled(username is not None)
             self.delete_btn.setEnabled(username is not None)
-            self.view_stats_btn.setEnabled(username is not None)
 
     def update_account_item_states(self):
         """Refresh hover/selected visuals for account rows."""
@@ -7421,7 +7534,7 @@ QMenu#trayQuickMenu::separator {
         if self.main_area_stack:
             if self.main_area_stack.currentIndex() == 1:
                 self._exit_champ_select_mode()
-            self.main_area_stack.setCurrentIndex(0)
+            self._show_logged_in_spotlight()
 
     def _show_game_panel_ingame(self):
         """Show the inline game panel with in-game state, reusing last known champion data."""
@@ -7534,6 +7647,7 @@ QMenu#trayQuickMenu::separator {
                     account = self.account_manager.get_account(matched_username)
                     if account:
                         self._start_ingame_watcher(account)
+            self._show_logged_in_spotlight()
             return
 
         if not self._logged_in_username:
@@ -7548,6 +7662,7 @@ QMenu#trayQuickMenu::separator {
         self._session_miss_count = 0
         self.update_account_item_states()
         self._stop_ingame_watcher()
+        self._show_logged_in_spotlight()
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
@@ -7760,6 +7875,7 @@ QMenu::separator {
                 if self._logged_in_username == username:
                     self._logged_in_username = None
                 self.refresh_account_list()
+                self._show_logged_in_spotlight()
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
                 self._show_error("Error", f"Failed to delete account: {str(e)}")
@@ -7841,6 +7957,7 @@ QMenu::separator {
                 self._logged_in_username = account.username
                 self._session_miss_count = 0
                 self.refresh_account_list()
+                self._show_logged_in_spotlight()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
         else:
