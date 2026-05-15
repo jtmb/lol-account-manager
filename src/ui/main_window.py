@@ -4108,17 +4108,14 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove padding/margin from page root and major containers */
+            /* Remove leading/trailing whitespace offsets */
             'body { margin:0!important; padding:0!important; }',
             'html { margin:0!important; padding:0!important; }',
-            'main { margin:0!important; padding:0!important; }',
-            '[role="main"] { margin:0!important; padding:0!important; }',
-            /* Remove padding from major content sections */
-            'section { margin:0!important; padding:0!important; }',
-            'article { margin:0!important; padding:0!important; }',
-            'div[class*="content"] { margin:0!important; padding:0!important; }',
-            'div[class*="wrapper"] { margin:0!important; padding:0!important; }',
-            'div[class*="container"] { margin:0!important; padding:0!important; }'
+            /* Remove margin from top-level divs that create vertical space */
+            'body > div { margin-top:0!important; margin-bottom:0!important; }',
+            /* Allow content to flow from top */
+            'main { margin-top:0!important; }',
+            '[role="main"] { margin-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
@@ -4131,22 +4128,6 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             }, { passive: true });
         }
     }
-
-    /* ── remove margins/padding from deep content elements ─── */
-    setTimeout(function() {
-        document.querySelectorAll('[class*="content"], [class*="section"], [class*="container"], [class*="wrapper"]').forEach(function(el) {
-            if (el.style.padding) el.style.padding = '0';
-            if (el.style.margin) el.style.margin = '0';
-            if (el.style.paddingTop) el.style.paddingTop = '0';
-            if (el.style.paddingBottom) el.style.paddingBottom = '0';
-            if (el.style.paddingLeft) el.style.paddingLeft = '0';
-            if (el.style.paddingRight) el.style.paddingRight = '0';
-            if (el.style.marginTop) el.style.marginTop = '0';
-            if (el.style.marginBottom) el.style.marginBottom = '0';
-            if (el.style.marginLeft) el.style.marginLeft = '0';
-            if (el.style.marginRight) el.style.marginRight = '0';
-        });
-    }, 100);
 
     /* ── hide fixed/sticky positioned elements at top (game tabs bar) ─ */
     var allEls = document.querySelectorAll('*');
