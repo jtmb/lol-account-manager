@@ -1141,6 +1141,9 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._build_fetch_thread: Optional[_UggBuildFetchThread] = None
         self._build_cache: dict[str, dict] = {}
         self._pending_build_key = ""
+        self._auto_role_hint = ""
+        self._manual_role_hint = ""
+        self._last_build_url = ""
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 16, 20, 16)
@@ -1216,6 +1219,32 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._show_build_btn.clicked.connect(lambda: self._set_left_view(1))
         selector_row.addWidget(self._show_runes_btn)
         selector_row.addWidget(self._show_build_btn)
+
+        self._role_tab_buttons: dict[str, QPushButton] = {}
+        role_btn_style = (
+            "QPushButton {"
+            "background: #151b2a;"
+            "color: #8ea2d0;"
+            "border: 1px solid #2c344b;"
+            "border-radius: 5px;"
+            "padding: 2px 8px;"
+            "font-size: 8pt;"
+            "font-weight: bold;"
+            "}"
+            "QPushButton:checked {"
+            "background: #2f5fd0;"
+            "color: #f5f7ff;"
+            "border: 1px solid #6a90ff;"
+            "}"
+        )
+        for role_key, role_label in (("top", "TOP"), ("jungle", "JG"), ("mid", "MID"), ("adc", "ADC"), ("support", "SUP")):
+            role_btn = QPushButton(role_label)
+            role_btn.setCheckable(True)
+            role_btn.setStyleSheet(role_btn_style)
+            role_btn.setToolTip(f"Show {role_label} rune/build recommendation")
+            role_btn.clicked.connect(lambda _checked=False, role=role_key: self._set_manual_role(role))
+            self._role_tab_buttons[role_key] = role_btn
+            selector_row.addWidget(role_btn)
         selector_row.addStretch()
         left_layout.addLayout(selector_row)
 
@@ -1550,7 +1579,13 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._skill_path_grid = QGridLayout()
         self._skill_path_grid.setHorizontalSpacing(3)
         self._skill_path_grid.setVerticalSpacing(4)
-        path_col.addLayout(self._skill_path_grid)
+        self._skill_path_grid_wrap = QWidget()
+        self._skill_path_grid_wrap.setMaximumWidth(620)
+        skill_grid_wrap_layout = QVBoxLayout(self._skill_path_grid_wrap)
+        skill_grid_wrap_layout.setContentsMargins(0, 0, 0, 0)
+        skill_grid_wrap_layout.setSpacing(0)
+        skill_grid_wrap_layout.addLayout(self._skill_path_grid)
+        path_col.addWidget(self._skill_path_grid_wrap, 0, Qt.AlignLeft)
         path_col.addStretch()
 
         self._skill_path_meta = QLabel("—")
@@ -1791,6 +1826,42 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._show_build_btn.setChecked(idx == 1)
 
     @staticmethod
+    def _normalize_role_hint(raw_role: str) -> str:
+        role = str(raw_role or "").strip().casefold()
+        aliases = {
+            "top": "top",
+            "jungle": "jungle",
+            "jg": "jungle",
+            "mid": "mid",
+            "middle": "mid",
+            "adc": "adc",
+            "bot": "adc",
+            "bottom": "adc",
+            "support": "support",
+            "supp": "support",
+            "sup": "support",
+            "utility": "support",
+        }
+        return aliases.get(role, "")
+
+    def _effective_role_hint(self) -> str:
+        return self._manual_role_hint or self._auto_role_hint
+
+    def _sync_role_tab_state(self):
+        active_role = self._effective_role_hint()
+        for role_key, btn in self._role_tab_buttons.items():
+            btn.setChecked(role_key == active_role)
+
+    def _set_manual_role(self, role_key: str):
+        normalized = self._normalize_role_hint(role_key)
+        if not normalized:
+            return
+        self._manual_role_hint = normalized
+        self._sync_role_tab_state()
+        if self._my_champion_name and self._last_build_url:
+            self._fetch_build_data(self._last_build_url, self._effective_role_hint())
+
+    @staticmethod
     def _clear_layout(layout):
         while layout.count():
             item = layout.takeAt(0)
@@ -1861,11 +1932,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
         for col in range(1, 19):
             header = QLabel(str(col))
             header.setAlignment(Qt.AlignCenter)
-            header.setMinimumWidth(22)
-            header.setMaximumHeight(18)
+            header.setFixedSize(24, 18)
             header.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
             self._skill_path_grid.addWidget(header, 0, col)
-            self._skill_path_grid.setColumnStretch(col, 1)
+            self._skill_path_grid.setColumnStretch(col, 0)
 
         for row_idx, skill in enumerate(row_skills, start=1):
             row_lbl = QLabel(skill)
@@ -1879,8 +1949,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for lv in range(1, 19):
                 cell = QLabel("")
                 cell.setAlignment(Qt.AlignCenter)
-                cell.setMinimumSize(22, 26)
-                cell.setMaximumHeight(36)
+                cell.setFixedSize(24, 26)
                 cell.setStyleSheet("border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: 7pt;")
 
                 if lv <= len(skill_path):
@@ -2174,6 +2243,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         self._my_champion_name = my_champion
         self._enemy_champion_name = enemy_champion
+        self._auto_role_hint = self._normalize_role_hint(role_hint)
 
         phase_text = "In Game" if in_game else "Champ Select"
         phase_color = "#fab387" if in_game else "#89b4fa"
@@ -2237,8 +2307,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._status_label.setText(hint)
 
         build_url = fallback_url or matchup_url
+        self._last_build_url = build_url
+        self._sync_role_tab_state()
         if my_champion and build_url:
-            self._fetch_build_data(build_url, role_hint)
+            self._fetch_build_data(build_url, self._effective_role_hint())
         else:
             self._apply_empty_build_state("Waiting for champion selection...")
 
@@ -4531,6 +4603,7 @@ class MainWindow(QMainWindow):
         self.current_launch_username: Optional[str] = None
         self._rank_data_by_username: dict[str, dict] = {}
         self._last_champ_select_signature: str = ""
+        self._last_champ_select_role_hint: str = ""
         self._last_champ_select_refresh_at: float = 0.0
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = True
@@ -6899,6 +6972,7 @@ QMenu#trayQuickMenu::separator {
             str(queue_id),
             queue_type,
             rank_slug,
+            role_hint,
         ])
         if (
             signature == self._last_champ_select_signature
@@ -6907,6 +6981,7 @@ QMenu#trayQuickMenu::separator {
         ):
             return
         self._last_champ_select_signature = signature
+        self._last_champ_select_role_hint = role_hint
 
         if self.game_info_panel:
             self.game_info_panel.update_payload(payload)
@@ -6918,6 +6993,7 @@ QMenu#trayQuickMenu::separator {
     def _close_champ_select_assistant(self):
         """Hide the in-client game panel and switch back to the account list."""
         self._last_champ_select_signature = ""
+        self._last_champ_select_role_hint = ""
         self._last_champ_select_refresh_at = 0.0
         if self.main_area_stack:
             if self.main_area_stack.currentIndex() == 1:
@@ -6939,6 +7015,7 @@ QMenu#trayQuickMenu::separator {
         parts = sig.split("|") if sig else []
         my_champion = parts[0] if len(parts) > 0 else ""
         enemy_champion = parts[1] if len(parts) > 1 else ""
+        role_hint = parts[5] if len(parts) > 5 else self._last_champ_select_role_hint
         if not queue_id and len(parts) > 2:
             try:
                 queue_id = int(parts[2])
@@ -6955,7 +7032,7 @@ QMenu#trayQuickMenu::separator {
             "my_champion": my_champion,
             "enemy_champion": enemy_champion,
             "queue_type": queue_type,
-            "role_hint": "",
+            "role_hint": role_hint,
             "rank_label": rank_label,
             "matchup_url": matchup_url,
             "fallback_url": fallback_url,
