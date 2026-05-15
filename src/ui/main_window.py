@@ -4093,130 +4093,92 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             return
         js = r"""
 (function() {
-    /* ── persistent style tag ───────────────────────────────────────── */
+    /* ── 1. Inject persistent style tag (runs once) ─────────────────── */
     if (!document.getElementById('_ugg_embed_hide')) {
         var s = document.createElement('style');
         s.id = '_ugg_embed_hide';
-        s.textContent = [
-            /* Hide semantic nav/aside/header elements */
-            'nav { display:none!important; visibility:hidden!important; }',
-            'aside { display:none!important; visibility:hidden!important; }',
-            'header { display:none!important; visibility:hidden!important; }',
-            '[role="navigation"] { display:none!important; visibility:hidden!important; }',
-            '[role="complementary"] { display:none!important; visibility:hidden!important; }',
-            '[role="banner"] { display:none!important; visibility:hidden!important; }',
-            /* Hide by class patterns */
-            '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
-            '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove top spacing left behind by hidden fixed nav */
-            'body, html { margin:0!important; padding:0!important; }',
-            'body { padding-top:0!important; margin-top:0!important; }',
-            /* Zero out padding-top on direct body children (nav spacer divs) */
-            'body > div { padding-top:0!important; margin-top:0!important; }',
-            'body > div > div:first-child { padding-top:0!important; margin-top:0!important; }'
-        ].join(' ');
+        s.textContent =
+            'nav,aside,header,[role="navigation"],[role="complementary"],[role="banner"],' +
+            '[class*="Sidebar"],[class*="sidebar"],[class*="NavBar"],[class*="navbar"] ' +
+            '{ display:none!important; }' +
+            'body,html { margin:0!important; padding:0!important; }';
         (document.head || document.documentElement).appendChild(s);
-        
-        /* ── immediate pass: strip top spacing ─── */
-        setTimeout(function() {
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.body.style.marginTop = '0';
-            document.body.style.paddingTop = '0';
-            document.documentElement.style.margin = '0';
-            document.documentElement.style.padding = '0';
-
-            /* Walk direct children of body and zero any padding-top / margin-top
-               that was reserved for the now-hidden fixed navbar */
-            var bodyKids = document.body.children;
-            for (var i = 0; i < bodyKids.length; i++) {
-                bodyKids[i].style.paddingTop = '0';
-                bodyKids[i].style.marginTop = '0';
-                /* One level deeper (common React root pattern) */
-                var grandKids = bodyKids[i].children;
-                if (grandKids.length > 0) {
-                    grandKids[0].style.paddingTop = '0';
-                    grandKids[0].style.marginTop = '0';
-                }
-            }
-
-            window.scrollTo(0, 0);
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-        }, 50);
-        
-        /* ── second pass: nuclear option - hide the first empty section ─── */
-        setTimeout(function() {
-            var sections = document.querySelectorAll('body > div > div, body > div > section, body > div > main');
-            sections.forEach(function(el) {
-                var text = el.innerText || el.textContent;
-                var hasContent = text && text.trim().length > 0;
-                var height = el.offsetHeight;
-                
-                /* If section is tall but has no text content, it's a spacer - hide it */
-                if (!hasContent && height > 100) {
-                    el.style.display = 'none';
-                }
-            });
-        }, 100);
-        
-        /* ── third pass: re-apply top spacing removal after React renders ─── */
-        setTimeout(function() {
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.body.style.paddingTop = '0';
-            document.body.style.marginTop = '0';
-            var bodyKids = document.body.children;
-            for (var i = 0; i < bodyKids.length; i++) {
-                bodyKids[i].style.paddingTop = '0';
-                bodyKids[i].style.marginTop = '0';
-                var grandKids = bodyKids[i].children;
-                if (grandKids.length > 0) {
-                    grandKids[0].style.paddingTop = '0';
-                    grandKids[0].style.marginTop = '0';
-                }
-            }
-            window.scrollTo(0, 0);
-        }, 300);
-        
-        /* ── set up resize listener ─── */
-        if (!window._ugg_embed_resize_listener_set) {
-            window._ugg_embed_resize_listener_set = true;
-            window.addEventListener('resize', function() {
-                window.dispatchEvent(new Event('resize', { bubbles: true }));
-            }, { passive: true });
-        }
     }
 
-    /* ── hide fixed/sticky positioned elements at top (game tabs bar) ─ */
-    var allEls = document.querySelectorAll('*');
-    for (var i = 0; i < allEls.length; i++) {
-        var el = allEls[i];
-        var style = window.getComputedStyle(el);
-        var pos = style.position;
-        var top = style.top;
-        var left = style.left;
-        var zIndex = style.zIndex;
-        
-        /* Fixed/sticky bars at the top viewport with high z-index */
-        if ((pos === 'fixed' || pos === 'sticky') &&
-            (top === '0px' || top === '0') &&
-            parseInt(zIndex) > 100) {
-            el.style.cssText = 'display:none!important; visibility:hidden!important;';
+    /* ── 2. Core cleanup function ────────────────────────────────────── */
+    function cleanup() {
+        /* Hide fixed/sticky bars and sidebars */
+        document.querySelectorAll('*').forEach(function(el) {
+            var cs = window.getComputedStyle(el);
+            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+            var top = parseFloat(cs.top);
+            var left = parseFloat(cs.left);
+            var zIdx = parseInt(cs.zIndex) || 0;
+            /* Fixed top bar */
+            if (!isNaN(top) && top <= 4 && zIdx > 50) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+            /* Fixed left sidebar (narrow) */
+            if (!isNaN(left) && left <= 4 && parseFloat(cs.width) < 120) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        /* Hide any explicit nav/aside/header in the live DOM */
+        document.querySelectorAll('nav,aside,header').forEach(function(el) {
+            el.style.setProperty('display', 'none', 'important');
+        });
+
+        /* Walk top ~6 levels of DOM and zero padding-top/margin-top > threshold.
+           This removes the spacer reserved for the now-hidden fixed navbar
+           regardless of how deeply React nests it. */
+        function zeroTopSpacing(el, depth) {
+            if (!el || depth > 6) return;
+            var cs = window.getComputedStyle(el);
+            var pt = parseFloat(cs.paddingTop) || 0;
+            var mt = parseFloat(cs.marginTop) || 0;
+            if (pt > 20) el.style.setProperty('padding-top', '0', 'important');
+            if (mt > 20) el.style.setProperty('margin-top', '0', 'important');
+            /* Recurse into first few children only */
+            for (var i = 0; i < Math.min(el.children.length, 4); i++) {
+                zeroTopSpacing(el.children[i], depth + 1);
+            }
         }
-        
-        /* Fixed/sticky sidebar on the left (narrow width, left: 0) */
-        if ((pos === 'fixed' || pos === 'sticky') &&
-            (left === '0px' || left === '0') &&
-            parseInt(style.width) < 100) {
-            el.style.cssText = 'display:none!important; visibility:hidden!important;';
-        }
+        zeroTopSpacing(document.body, 0);
+
+        document.body.style.setProperty('margin', '0', 'important');
+        document.body.style.setProperty('padding', '0', 'important');
+        document.documentElement.style.setProperty('margin', '0', 'important');
+        document.documentElement.style.setProperty('padding', '0', 'important');
+        window.scrollTo(0, 0);
     }
 
-    /* ── hide nav/aside/header now in DOM ───────────────────────────── */
-    document.querySelectorAll('nav, aside, header').forEach(function(el) {
-        el.style.cssText = 'display:none!important; visibility:hidden!important;';
-    });
+    /* ── 3. Run immediately and after React finishes rendering ───────── */
+    cleanup();
+    setTimeout(cleanup, 300);
+    setTimeout(cleanup, 800);
+    setTimeout(cleanup, 2000);
+
+    /* ── 4. MutationObserver: re-run cleanup when React mutates the DOM ─ */
+    if (!window._ugg_observer) {
+        var _debounce_timer = null;
+        window._ugg_observer = new MutationObserver(function() {
+            clearTimeout(_debounce_timer);
+            _debounce_timer = setTimeout(cleanup, 150);
+        });
+        window._ugg_observer.observe(document.documentElement, {
+            childList: true, subtree: true,
+            attributes: true, attributeFilter: ['style', 'class']
+        });
+    }
+
+    /* ── 5. Resize forwarding ────────────────────────────────────────── */
+    if (!window._ugg_resize_set) {
+        window._ugg_resize_set = true;
+        window.addEventListener('resize', function() {
+            window.dispatchEvent(new Event('resize', { bubbles: true }));
+        }, { passive: true });
+    }
 })();
 """
         self._web_view.page().runJavaScript(js)
