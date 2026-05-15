@@ -1282,7 +1282,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         # Side-by-side primary + secondary trees (matches in-client layout)
         self._rune_slots_stack = QHBoxLayout()
-        self._rune_slots_stack.setSpacing(14)
+        self._rune_slots_stack.setSpacing(8)
 
         self._primary_slots_col = QVBoxLayout()
         self._primary_slots_col.setSpacing(6)
@@ -1310,8 +1310,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._secondary_slots_col.addLayout(self._secondary_slots_body)
         self._secondary_slots_col.addStretch()
 
-        self._rune_slots_stack.addLayout(self._primary_slots_col, 3)
-        self._rune_slots_stack.addLayout(self._secondary_slots_col, 2)
+        self._rune_slots_stack.addLayout(self._primary_slots_col, 1)
+        self._rune_slots_stack.addLayout(self._secondary_slots_col, 1)
         runes_layout.addLayout(self._rune_slots_stack)
 
         self._shard_row = QHBoxLayout()
@@ -1927,8 +1927,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 if rid <= 0:
                     continue
                 lbl = QLabel()
-                lbl.setMinimumSize(self._PERK_TREE_SIZE, self._PERK_TREE_SIZE)
-                lbl.setMaximumSize(self._PERK_TREE_SIZE * 2, self._PERK_TREE_SIZE * 2)
+                lbl.setFixedSize(self._PERK_TREE_SIZE, self._PERK_TREE_SIZE)
                 lbl.setScaledContents(True)
                 lbl.setAlignment(Qt.AlignCenter)
                 if rid in active_ids:
@@ -4722,7 +4721,10 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
         layout.addLayout(top_row)
 
-        filter_row = QHBoxLayout()
+        self._filter_row_widget = QWidget()
+        filter_row = QHBoxLayout(self._filter_row_widget)
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(8)
         self._filters_label = QLabel("Filters:")
         filter_row.addWidget(self._filters_label)
 
@@ -4741,7 +4743,7 @@ class MainWindow(QMainWindow):
         self.clear_filters_btn.clicked.connect(self._clear_filters)
         filter_row.addWidget(self.clear_filters_btn)
 
-        layout.addLayout(filter_row)
+        layout.addWidget(self._filter_row_widget)
         
         # Account list
         self._saved_accounts_label = QLabel("Saved Accounts:")
@@ -4784,7 +4786,9 @@ class MainWindow(QMainWindow):
         self._apply_account_list_clipping_mask()
         
         # Button layout
-        button_layout = QHBoxLayout()
+        self._button_row_widget = QWidget()
+        button_layout = QHBoxLayout(self._button_row_widget)
+        button_layout.setContentsMargins(0, 0, 0, 0)
         
         self.launch_btn = QPushButton("Launch Selected Account")
         self.launch_btn.clicked.connect(self.launch_account)
@@ -4805,7 +4809,7 @@ class MainWindow(QMainWindow):
         self.delete_btn.setEnabled(False)
         button_layout.addWidget(self.delete_btn)
         
-        layout.addLayout(button_layout)
+        layout.addWidget(self._button_row_widget)
         
         self.lol_path_label = QLabel()
         self.lol_path_label.setStyleSheet("color: #666666;")
@@ -4916,35 +4920,29 @@ class MainWindow(QMainWindow):
             self._suppress_window_size_persistence = False
 
     def _enter_champ_select_mode(self):
-        """Resize window and disable home-page UI elements for champ select."""
+        """Resize window and hide home-page UI elements for champ select."""
         if self._in_champ_select_mode:
             return
         self._in_champ_select_mode = True
         self._pre_champ_select_size = f"{self.width()}x{self.height()}"
         self._apply_window_size(self._champ_select_window_size)
-        for widget in (
-            self.search_input, self.tag_filter_combo, self.clear_filters_btn,
-            self._filters_label, self._saved_accounts_label,
-            self.launch_btn, self.add_btn, self.edit_btn, self.delete_btn,
-        ):
-            if hasattr(self, widget.objectName() if callable(getattr(widget, "objectName", None)) else "__none__") or True:
-                widget.setEnabled(False)
+        self._filter_row_widget.hide()
+        self._saved_accounts_label.hide()
+        self._button_row_widget.hide()
+        self.lol_path_label.hide()
 
     def _exit_champ_select_mode(self):
-        """Restore window size and re-enable home-page UI elements after champ select."""
+        """Restore window size and show home-page UI elements after champ select."""
         if not self._in_champ_select_mode:
             return
         self._in_champ_select_mode = False
         restore = self._pre_champ_select_size or self._window_size
         self._pre_champ_select_size = ""
         self._apply_window_size(restore)
-        for widget in (
-            self.search_input, self.tag_filter_combo, self.clear_filters_btn,
-            self._filters_label, self._saved_accounts_label,
-            self.add_btn,
-        ):
-            widget.setEnabled(True)
-        # Restore state-dependent buttons via normal update
+        self._filter_row_widget.show()
+        self._saved_accounts_label.show()
+        self._button_row_widget.show()
+        self.lol_path_label.show()
         self.update_account_item_states()
 
     def _persist_window_size(self):
