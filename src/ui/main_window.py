@@ -4018,45 +4018,13 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         super().__init__(parent)
         self._profile_url = ""
         self._active_username = ""
+        self._loaded_profile_url = ""
         self._is_dark_mode = True
         self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 8, 12, 8)
+        outer.setContentsMargins(0, 8, 0, 0)
         outer.setSpacing(8)
-
-        self._header_card = QFrame()
-        self._header_card.setObjectName("spotlightHeaderCard")
-        header_layout = QHBoxLayout(self._header_card)
-        header_layout.setContentsMargins(14, 10, 14, 10)
-        header_layout.setSpacing(12)
-
-        left_col = QVBoxLayout()
-        left_col.setSpacing(2)
-        self._title_label = QLabel("Account Spotlight")
-        self._title_label.setStyleSheet("font-size: 11pt; font-weight: 700;")
-        self._identity_label = QLabel("Not logged in")
-        self._identity_label.setStyleSheet("font-size: 10pt; font-weight: 600;")
-        self._riot_id_label = QLabel("")
-        self._riot_id_label.setStyleSheet("font-size: 9pt;")
-        left_col.addWidget(self._title_label)
-        left_col.addWidget(self._identity_label)
-        left_col.addWidget(self._riot_id_label)
-        header_layout.addLayout(left_col, 1)
-
-        right_col = QVBoxLayout()
-        right_col.setSpacing(2)
-        self._rank_label = QLabel("Rank: —")
-        self._rank_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._rank_label.setStyleSheet("font-size: 10pt; font-weight: 700;")
-        self._record_label = QLabel("")
-        self._record_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._record_label.setStyleSheet("font-size: 9pt;")
-        right_col.addWidget(self._rank_label)
-        right_col.addWidget(self._record_label)
-        header_layout.addLayout(right_col, 0)
-
-        outer.addWidget(self._header_card)
 
         self._content_card = QFrame()
         self._content_card.setObjectName("spotlightContentCard")
@@ -4093,6 +4061,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             content_layout.addWidget(self._fallback_container)
 
         outer.addWidget(self._content_card, 1)
+        self.setMinimumHeight(420)
         self._apply_panel_styles()
 
     def _open_profile_in_browser(self):
@@ -4106,17 +4075,11 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
     def _apply_panel_styles(self):
         text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
         text_muted = "#9fb0d5" if self._is_dark_mode else "#4b5563"
-        header_bg = "rgba(16, 21, 33, 0.82)" if self._is_dark_mode else "rgba(241, 245, 249, 0.95)"
         content_bg = "rgba(10, 14, 24, 0.86)" if self._is_dark_mode else "rgba(248, 250, 252, 0.98)"
         border = "#2f3a55" if self._is_dark_mode else "#cbd5e1"
         accent = "#8ab4ff" if self._is_dark_mode else "#2563eb"
 
         self.setStyleSheet(
-            "QFrame#spotlightHeaderCard {"
-            f"background: {header_bg};"
-            f"border: 1px solid {border};"
-            "border-radius: 10px;"
-            "}"
             "QFrame#spotlightContentCard {"
             f"background: {content_bg};"
             f"border: 1px solid {border};"
@@ -4135,9 +4098,6 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             "QPushButton:hover { background: #6b95e8; }"
         )
 
-        self._riot_id_label.setObjectName("spotlightMuted")
-        self._record_label.setObjectName("spotlightMuted")
-
     def set_dark_mode(self, enabled: bool):
         super().set_dark_mode(enabled)
         self._is_dark_mode = bool(enabled)
@@ -4150,42 +4110,15 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         self._profile_url = str(profile_url or "").strip()
         if not account:
             self._active_username = ""
-            self._identity_label.setText("Not logged in")
-            self._riot_id_label.setText("")
-            self._rank_label.setText("Rank: —")
-            self._record_label.setText("")
+            self._loaded_profile_url = ""
             return
 
         self._active_username = account.username
-        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
-        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
-        self._identity_label.setText(display_name)
-        self._riot_id_label.setText(f"Riot ID: {display_name}#{tag_line}")
-
-        rank = dict(rank_data or {})
-        tier = str(rank.get("tier", "") or "").strip()
-        division = str(rank.get("rank", "") or "").strip()
-        lp = rank.get("lp")
-        wins = rank.get("wins")
-        losses = rank.get("losses")
-        wr = rank.get("win_rate")
-
-        if tier and division:
-            lp_text = f" {int(lp)} LP" if str(lp).strip() else ""
-            self._rank_label.setText(f"{tier} {division}{lp_text}")
-        elif tier:
-            self._rank_label.setText(tier)
-        else:
-            self._rank_label.setText("Rank: Unranked")
-
-        if str(wins).strip() and str(losses).strip():
-            wr_text = f" · {float(wr):.0f}% WR" if str(wr).strip() else ""
-            self._record_label.setText(f"{int(wins)}W {int(losses)}L{wr_text}")
-        else:
-            self._record_label.setText("")
 
         if self._web_view is not None and self._profile_url:
-            self._web_view.setUrl(QUrl(self._profile_url))
+            if self._profile_url != self._loaded_profile_url:
+                self._loaded_profile_url = self._profile_url
+                self._web_view.setUrl(QUrl(self._profile_url))
         elif self._profile_url:
             self._fallback_message.setText(
                 "Embedded profile view is unavailable in this build.\n"
@@ -5207,12 +5140,13 @@ class MainWindow(QMainWindow):
         self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
-        self.game_info_panel = InClientGamePanel()
         self.account_spotlight_panel = AccountSpotlightPanel()
+        self.account_spotlight_panel.hide()
+        account_list_layout.addWidget(self.account_spotlight_panel)
+        self.game_info_panel = InClientGamePanel()
         self.main_area_stack = QStackedWidget()
         self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
         self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
-        self.main_area_stack.addWidget(self.account_spotlight_panel)  # index 2: logged-in spotlight
         layout.addWidget(self.main_area_stack)
         
         # Apply clipping mask to account list viewport
@@ -5494,31 +5428,31 @@ class MainWindow(QMainWindow):
         return f"https://u.gg/lol/profile/{region_id}/{encoded_name}-{encoded_tag}/overview"
 
     def _show_logged_in_spotlight(self):
-        """Auto-open spotlight for the currently logged-in account."""
+        """Show spotlight content below the standard account list for the logged-in account."""
         if not self.main_area_stack or self._in_champ_select_mode:
             return
 
         if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
-            self.main_area_stack.setCurrentIndex(0)
+            self.account_spotlight_panel.hide()
             return
 
         account = self.account_manager.get_account(self._logged_in_username)
         if not account:
-            self.main_area_stack.setCurrentIndex(0)
+            self.account_spotlight_panel.hide()
             return
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
         self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+        self.account_spotlight_panel.show()
 
-        # Keep the logged-in account selected in the list, while spotlight stays visible below.
+        # Keep the logged-in account selected in the list if needed.
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if item.data(Qt.UserRole) == account.username:
-                self.account_list.setCurrentItem(item)
+                if self.account_list.currentItem() is not item:
+                    self.account_list.setCurrentItem(item)
                 break
-
-        self.main_area_stack.setCurrentIndex(2)
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
