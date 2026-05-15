@@ -4108,56 +4108,81 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove body/html margins and padding */
-            'body { margin:0!important; padding:0!important; }',
-            'html { margin:0!important; padding:0!important; }',
-            /* Target first main container and remove top margin only */
-            'body > div:first-child { margin-top:0!important; padding-top:0!important; }'
+            /* Remove all margins and padding from body */
+            'body, html { margin:0!important; padding:0!important; }',
+            /* Force all top-level elements to have 0 margin */
+            'body > * { margin:0!important; margin-top:0!important; padding:0!important; padding-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
-        /* ── targeted spacing cleanup ─── */
-        setTimeout(function() {
-            /* Remove margin-top from body and first container only */
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            
-            var firstDiv = document.querySelector('body > div:first-child');
-            if (firstDiv) {
-                firstDiv.style.marginTop = '0';
-                firstDiv.style.paddingTop = '0';
-            }
-            
-            /* Also target any absolutely first child regardless of wrapper */
-            var mainContent = document.querySelector('[role="main"]') || document.querySelector('main');
-            if (mainContent) {
-                mainContent.style.marginTop = '0';
-                mainContent.style.paddingTop = '0';
-            }
-        }, 50);
-        
-        /* ── aggressive pass after React finishes ─── */
+        /* ── find and collapse the spacer element ─── */
         setTimeout(function() {
             document.body.style.margin = '0';
             document.body.style.padding = '0';
             document.documentElement.style.margin = '0';
             document.documentElement.style.padding = '0';
             
-            /* Strip top spacing from all top-level containers */
-            var topDivs = document.querySelectorAll('body > div');
-            topDivs.forEach(function(el) {
-                el.style.marginTop = '0';
-                el.style.paddingTop = '0';
-            });
-            
-            /* Target any elements at the very top with excessive top margin/padding */
-            document.querySelectorAll('body > *:first-child, body > *:first-child *:first-child').forEach(function(el) {
-                var computed = window.getComputedStyle(el);
-                if (el.offsetTop < 100) {
+            /* Find any element that has large height but no visible content at top of page */
+            var allEls = document.querySelectorAll('body > *');
+            for (var i = 0; i < allEls.length; i++) {
+                var el = allEls[i];
+                var rect = el.getBoundingClientRect();
+                
+                /* If element is near top and mostly empty, collapse it */
+                if (rect.top < 100 && rect.height > 100 && el.children.length === 0) {
+                    el.style.display = 'none';
+                    continue;
+                }
+                
+                /* Force 0 margin/padding on first element */
+                if (i === 0) {
+                    el.style.margin = '0';
                     el.style.marginTop = '0';
                     el.style.paddingTop = '0';
                 }
+            }
+            
+            /* Force scroll to top */
+            if (window.scrollY > 0) {
+                window.scrollTo(0, 0);
+            }
+        }, 50);
+        
+        /* ── aggressive target: collapse specific spacer/wrapper divs ─── */
+        setTimeout(function() {
+            document.querySelectorAll('body > div').forEach(function(el, idx) {
+                var childCount = el.children.length;
+                var textLength = el.innerText.length;
+                
+                /* If first div and it's huge but has no content before the champion card, hide it */
+                if (idx === 0 && el.offsetHeight > 200 && textLength < 50) {
+                    el.style.maxHeight = '0';
+                    el.style.height = '0';
+                    el.style.overflow = 'hidden';
+                    el.style.padding = '0';
+                    el.style.margin = '0';
+                }
+                
+                /* Clear all margin/gap on any flex container */
+                el.style.gap = '0';
+                el.style.rowGap = '0';
+                el.style.margin = '0';
+                el.style.marginTop = '0';
             });
+        }, 100);
+        
+        /* ── final: if there's still content showing, force it to top ─── */
+        setTimeout(function() {
+            var allContent = document.querySelectorAll('[class*="Overview"], [class*="Stats"], [class*="Champion"]');
+            if (allContent.length > 0 && allContent[0].offsetTop > 50) {
+                var topContent = allContent[0];
+                var parent = topContent.parentElement;
+                if (parent) {
+                    parent.style.marginTop = '0';
+                    parent.style.paddingTop = '0';
+                }
+                topContent.parentElement.parentElement.style.marginTop = '0';
+            }
         }, 300);
         
         /* ── set up resize listener ─── */
