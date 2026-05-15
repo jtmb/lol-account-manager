@@ -6,15 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-# These must be set before QApplication is instantiated so Qt applies
-# per-monitor DPI scaling from startup.  AA_EnableHighDpiScaling makes Qt
-# track the physical DPI of each screen and scale logical pixels accordingly;
-# AA_UseHighDpiPixmaps ensures icons/pixmaps are rendered at native resolution.
-# QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough preserves fractional scale
-# factors (e.g. 1.25 for Windows 125%) instead of rounding to 1 or 2, which
-# fixes layout breaks when the window moves to a differently-scaled monitor.
+# Qt reads this during startup to enable high-DPI behavior on Windows.
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
-os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "PassThrough")
 
 from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 from PyQt5.QtWidgets import QApplication
@@ -22,6 +15,30 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
+
+
+def _configure_high_dpi() -> None:
+    """Enable per-monitor DPI scaling in a version-safe way.
+
+    Some PyQt5/Qt combinations can crash when unsupported DPI policies are
+    forced via environment variables. Keep this conservative and guarded.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
+
+    if hasattr(Qt, "AA_EnableHighDpiScaling"):
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    if hasattr(Qt, "AA_UseHighDpiPixmaps"):
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
+    # PassThrough keeps 125% as 1.25 instead of rounding when supported.
+    if hasattr(QApplication, "setHighDpiScaleFactorRoundingPolicy") and hasattr(Qt, "HighDpiScaleFactorRoundingPolicy"):
+        try:
+            QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+        except Exception:
+            pass
 
 
 def _detach_console() -> None:
@@ -157,10 +174,8 @@ def main():
         # Ensure accidental top-level Qt windows never use the default "python" title.
         QCoreApplication.setApplicationName("League of Legends Account Manager")
 
-        # Must be set as class-level attributes BEFORE QApplication() is created.
-        # The env vars above handle Qt's native layer; these cover the Qt/C++ side.
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+        # Must run before QApplication() is created.
+        _configure_high_dpi()
 
         app = QApplication(sys.argv)
         app.setStyle("Fusion")
