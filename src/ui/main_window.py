@@ -5134,6 +5134,11 @@ class MainWindow(QMainWindow):
 
     def _maybe_reapply_layout_for_dpi(self):
         """Re-apply active layout dimensions after crossing into another monitor scale."""
+        if not hasattr(self, "_dpi_resize_in_progress"):
+            self._dpi_resize_in_progress = False
+        if not hasattr(self, "_last_screen_scale_factor"):
+            self._last_screen_scale_factor = self._current_screen_scale_factor()
+
         if self._dpi_resize_in_progress:
             return
 
