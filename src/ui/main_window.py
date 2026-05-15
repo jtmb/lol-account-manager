@@ -4108,21 +4108,57 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Keep layout intact but adjust body spacing */
+            /* Remove body/html margins and padding */
             'body { margin:0!important; padding:0!important; }',
-            'html { margin:0!important; padding:0!important; }'
+            'html { margin:0!important; padding:0!important; }',
+            /* Target first main container and remove top margin only */
+            'body > div:first-child { margin-top:0!important; padding-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
-        /* ── conservative spacing cleanup ─── */
+        /* ── targeted spacing cleanup ─── */
         setTimeout(function() {
-            /* Only remove margin-top from first direct child to collapse top gap */
-            var firstDiv = document.querySelector('body > div');
+            /* Remove margin-top from body and first container only */
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            
+            var firstDiv = document.querySelector('body > div:first-child');
             if (firstDiv) {
                 firstDiv.style.marginTop = '0';
-                firstDiv.style.margin = '0';
+                firstDiv.style.paddingTop = '0';
             }
-        }, 30);
+            
+            /* Also target any absolutely first child regardless of wrapper */
+            var mainContent = document.querySelector('[role="main"]') || document.querySelector('main');
+            if (mainContent) {
+                mainContent.style.marginTop = '0';
+                mainContent.style.paddingTop = '0';
+            }
+        }, 50);
+        
+        /* ── aggressive pass after React finishes ─── */
+        setTimeout(function() {
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            
+            /* Strip top spacing from all top-level containers */
+            var topDivs = document.querySelectorAll('body > div');
+            topDivs.forEach(function(el) {
+                el.style.marginTop = '0';
+                el.style.paddingTop = '0';
+            });
+            
+            /* Target any elements at the very top with excessive top margin/padding */
+            document.querySelectorAll('body > *:first-child, body > *:first-child *:first-child').forEach(function(el) {
+                var computed = window.getComputedStyle(el);
+                if (el.offsetTop < 100) {
+                    el.style.marginTop = '0';
+                    el.style.paddingTop = '0';
+                }
+            });
+        }, 300);
         
         /* ── set up resize listener ─── */
         if (!window._ugg_embed_resize_listener_set) {
