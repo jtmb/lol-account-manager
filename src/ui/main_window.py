@@ -1275,8 +1275,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._rune_tree_label.setStyleSheet("color: #94a0be; font-size: 8pt;")
         runes_layout.addWidget(self._rune_tree_label)
 
-        self._rune_slots_row = QHBoxLayout()
-        self._rune_slots_row.setSpacing(12)
+        self._rune_slots_stack = QVBoxLayout()
+        self._rune_slots_stack.setSpacing(8)
 
         self._primary_slots_col = QVBoxLayout()
         self._primary_slots_col.setSpacing(4)
@@ -1296,9 +1296,9 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._secondary_slots_body.setSpacing(4)
         self._secondary_slots_col.addLayout(self._secondary_slots_body)
 
-        self._rune_slots_row.addLayout(self._primary_slots_col, 1)
-        self._rune_slots_row.addLayout(self._secondary_slots_col, 1)
-        runes_layout.addLayout(self._rune_slots_row)
+        self._rune_slots_stack.addLayout(self._primary_slots_col)
+        self._rune_slots_stack.addLayout(self._secondary_slots_col)
+        runes_layout.addLayout(self._rune_slots_stack)
 
         self._shard_row = QHBoxLayout()
         self._shard_row.setSpacing(6)
@@ -1370,7 +1370,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         build_layout.addWidget(self._core_items_meta)
 
         self._stage_option_icon_labels: dict[int, list[QLabel]] = {}
-        self._stage_option_meta_labels: dict[int, QLabel] = {}
+        self._stage_option_value_labels: dict[int, list[QLabel]] = {}
         for stage_num, stage_title in ((1, "4th Item Options"), (2, "5th Item Options"), (3, "6th Item Options")):
             title_lbl = QLabel(stage_title)
             title_lbl.setStyleSheet("color: #a6adc8; font-size: 8pt; letter-spacing: 0.5px;")
@@ -1390,11 +1390,19 @@ class InClientGamePanel(AccountListBackgroundFrame):
             build_layout.addLayout(icon_row)
             self._stage_option_icon_labels[stage_num] = icon_labels
 
-            meta_lbl = QLabel("—")
-            meta_lbl.setWordWrap(True)
-            meta_lbl.setStyleSheet("color: #8ea2d0; font-size: 8pt;")
-            build_layout.addWidget(meta_lbl)
-            self._stage_option_meta_labels[stage_num] = meta_lbl
+            value_row = QHBoxLayout()
+            value_row.setSpacing(6)
+            value_labels: list[QLabel] = []
+            for _ in range(3):
+                vl = QLabel("—")
+                vl.setAlignment(Qt.AlignCenter)
+                vl.setFixedWidth(32)
+                vl.setStyleSheet("color: #8ea2d0; font-size: 7pt;")
+                value_labels.append(vl)
+                value_row.addWidget(vl)
+            value_row.addStretch()
+            build_layout.addLayout(value_row)
+            self._stage_option_value_labels[stage_num] = value_labels
 
         build_layout.addStretch()
 
@@ -1864,7 +1872,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         else:
             self._skill_path_meta.setText("—")
 
-    def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int):
+    def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int, skip_keystone: bool = False):
         self._clear_layout(container_layout)
         style = self._rune_style_data_by_id.get(style_id)
         if not isinstance(style, dict):
@@ -1874,6 +1882,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
             return
 
         slots = style.get("slots", []) if isinstance(style.get("slots", []), list) else []
+        if skip_keystone and len(slots) > 1:
+            slots = slots[1:]
         for slot_idx, slot in enumerate(slots[:max_slots]):
             if not isinstance(slot, dict):
                 continue
@@ -1935,9 +1945,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for lbl in labels:
                 lbl.clear()
                 lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
-            meta = self._stage_option_meta_labels.get(stage_num)
-            if meta:
-                meta.setText("—")
+            for vl in self._stage_option_value_labels.get(stage_num, []):
+                vl.setText("—")
         self._render_skill_section([], [], 0.0, 0)
 
     def _apply_build_data(self, data: dict):
@@ -2006,8 +2015,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._primary_slots_title.setText(f"{style_name(primary_style)}")
         self._secondary_slots_title.setText(f"{style_name(sub_style)}")
         active_id_set = set(int(x) for x in perk_ids)
-        self._render_rune_style_slots(primary_style, self._primary_slots_body, active_id_set, 4)
-        self._render_rune_style_slots(sub_style, self._secondary_slots_body, active_id_set, 2)
+        self._render_rune_style_slots(primary_style, self._primary_slots_body, active_id_set, 4, skip_keystone=False)
+        self._render_rune_style_slots(sub_style, self._secondary_slots_body, active_id_set, 3, skip_keystone=True)
 
         shard_ids = list(data.get("shard_ids") or [])[:3]
         shard_name_map = {
@@ -2086,22 +2095,20 @@ class InClientGamePanel(AccountListBackgroundFrame):
         for stage_num, labels in self._stage_option_icon_labels.items():
             opt_key = str(stage_num)
             options = options_map.get(opt_key) if isinstance(options_map.get(opt_key), list) else []
-            meta_lbl = self._stage_option_meta_labels.get(stage_num)
+            value_labels = self._stage_option_value_labels.get(stage_num, [])
             for lbl in labels:
                 lbl.clear()
                 lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
+            for vl in value_labels:
+                vl.setText("—")
             if not options:
-                if meta_lbl:
-                    meta_lbl.setText("no data")
                 continue
-            chunks = []
             for idx, opt in enumerate(options[:3]):
                 if not isinstance(opt, dict):
                     continue
                 item_id = int(opt.get("id", 0) or 0)
                 wr = float(opt.get("win_rate", 0.0) or 0.0)
                 mm = int(opt.get("matches", 0) or 0)
-                chunks.append(f"{wr:.1f}% WR · {mm:,}")
                 if idx < len(labels):
                     cached = self._item_icon_cache.get(item_id)
                     if cached and not cached.isNull():
@@ -2114,8 +2121,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
                         t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
                         self._image_threads.append(t)
                         t.start()
-            if meta_lbl:
-                meta_lbl.setText("   |   ".join(chunks) if chunks else "no data")
+                if idx < len(value_labels):
+                    value_labels[idx].setText(f"{wr:.1f}%\n{mm:,}")
 
         # Skill sections
         skill_priority = [str(s).upper() for s in (data.get("skill_priority") or []) if str(s).strip()]
