@@ -5464,6 +5464,7 @@ class MainWindow(QMainWindow):
             self.account_list.insertItem(logged_in_row + 1, spotlight_item)
             self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
+        self._update_spotlight_size_hint()
         self.account_spotlight_panel.show()
 
         profile_url = self._build_ugg_profile_overview_url(account)
@@ -5476,6 +5477,51 @@ class MainWindow(QMainWindow):
             if item.data(Qt.UserRole) == account.username:
                 if self.account_list.currentItem() is not item:
                     self.account_list.setCurrentItem(item)
+                break
+
+    def _update_spotlight_size_hint(self):
+        """Resize the spotlight list item so it fills the viewport height below
+        the logged-in account row, expanding/shrinking as the window changes."""
+        if not self.account_spotlight_panel:
+            return
+        viewport_h = self.account_list.viewport().height()
+        if viewport_h <= 0:
+            return
+        # Find the spotlight item and the logged-in account item before it.
+        logged_in_row_h = 0
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                # Height available = viewport minus everything above the spotlight.
+                used = sum(
+                    self.account_list.item(i).sizeHint().height()
+                    for i in range(index)
+                )
+                new_h = max(380, viewport_h - used)
+                if item.sizeHint().height() != new_h:
+                    item.setSizeHint(QSize(0, new_h))
+                    self.account_spotlight_panel.setMinimumHeight(new_h)
+                break
+
+    def _update_spotlight_size_hint(self):
+        """Resize the spotlight list item so it fills the viewport height below
+        the logged-in account row, expanding/shrinking as the window changes."""
+        if not self.account_spotlight_panel:
+            return
+        viewport_h = self.account_list.viewport().height()
+        if viewport_h <= 0:
+            return
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                used = sum(
+                    self.account_list.item(i).sizeHint().height()
+                    for i in range(index)
+                )
+                new_h = max(380, viewport_h - used)
+                if item.sizeHint().height() != new_h:
+                    item.setSizeHint(QSize(0, new_h))
+                    self.account_spotlight_panel.setMinimumHeight(new_h)
                 break
 
     def _persist_window_size(self):
@@ -5493,6 +5539,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._update_spotlight_size_hint()
         if self._suppress_window_size_persistence:
             return
         if self.isMaximized() or self.isFullScreen():
