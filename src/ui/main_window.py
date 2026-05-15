@@ -4108,16 +4108,37 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove leading/trailing whitespace offsets */
+            /* Aggressively remove top spacing */
             'body { margin:0!important; padding:0!important; }',
             'html { margin:0!important; padding:0!important; }',
-            /* Remove margin from top-level divs that create vertical space */
-            'body > div { margin-top:0!important; margin-bottom:0!important; }',
-            /* Allow content to flow from top */
-            'main { margin-top:0!important; }',
-            '[role="main"] { margin-top:0!important; }'
+            'body > * { margin-top:0!important; padding-top:0!important; }',
+            'body > div:first-child { margin:0!important; padding:0!important; }',
+            'body > div { margin-top:0!important; }',
+            'main { margin-top:0!important; padding-top:0!important; }',
+            '[role="main"] { margin-top:0!important; padding-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
+        
+        /* ── immediately strip margins from all divs ─── */
+        setTimeout(function() {
+            document.querySelectorAll('body > div').forEach(function(el, idx) {
+                el.style.marginTop = '0';
+                el.style.paddingTop = '0';
+                if (idx === 0) {
+                    el.style.margin = '0';
+                    el.style.padding = '0';
+                }
+            });
+            /* Find first content div and strip top space */
+            var firstDiv = document.querySelector('body > div');
+            if (firstDiv) {
+                var children = firstDiv.children;
+                if (children.length > 0) {
+                    children[0].style.marginTop = '0';
+                    children[0].style.paddingTop = '0';
+                }
+            }
+        }, 50);
         
         /* ── set up resize listener ─── */
         if (!window._ugg_embed_resize_listener_set) {
