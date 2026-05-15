@@ -4446,6 +4446,10 @@ QMenu#trayQuickMenu::separator {
         if not isinstance(result, dict):
             return
 
+        ended_at = float(result.get("timestamp", time.time()) or time.time())
+        self._ingame_watch_status["last_game_timestamp"] = ended_at
+        self.update_account_item_states()
+
         if not bool(result.get("found", False)):
             return
 
@@ -4462,7 +4466,7 @@ QMenu#trayQuickMenu::separator {
             self._ingame_watch_status["last_game_result"] = last_result
             self._ingame_watch_status["last_game_queue"] = last_queue
             self._ingame_watch_status["last_game_id"] = game_id_raw
-            self._ingame_watch_status["last_game_timestamp"] = float(result.get("timestamp", time.time()) or time.time())
+            self._ingame_watch_status["last_game_timestamp"] = ended_at
             self.update_account_item_states()
 
         if not (self.account_manager and self._logged_in_username):
@@ -5267,6 +5271,12 @@ QMenu#trayQuickMenu::separator {
             return f"Champ Select ({queue_type})" if queue_type else "Champ Select"
         if bool(status.get("in_game", False)):
             return f"In Game ({queue_type})" if queue_type else "In Game"
+
+        # Keep a short, explicit transition after game end before settling to Logged In.
+        ended_at = float(status.get("last_game_timestamp", 0) or 0)
+        if ended_at > 0 and (time.time() - ended_at) <= 15.0:
+            return "Out of Game"
+
         return "Logged In"
 
     @staticmethod
