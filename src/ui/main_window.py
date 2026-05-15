@@ -5613,50 +5613,37 @@ class MainWindow(QMainWindow):
         if self.account_spotlight_panel._web_view is not None:
             js = r"""
 (function() {
-    /* Create aggressive stylesheet that forces full width everywhere */
+    /* Targeted CSS to remove max-width constraints on main content containers only */
     var style = document.createElement('style');
     style.textContent = [
-        '* { max-width: none !important; min-width: auto !important; }',
-        'html, body { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; }',
-        '[style*="max-width"] { max-width: none !important; }',
-        '[role="main"] { width: 100% !important; }',
-        '[role="application"] { width: 100% !important; }',
-        '.container { width: 100% !important; max-width: none !important; }',
-        '.wrapper { width: 100% !important; max-width: none !important; }',
-        '[class*="container"] { width: 100% !important; max-width: none !important; }',
-        '[class*="wrapper"] { width: 100% !important; max-width: none !important; }',
-        '[class*="content"] { width: 100% !important; max-width: none !important; }',
-        '[class*="main"] { width: 100% !important; max-width: none !important; }',
-        '[style*="width: "] { width: auto !important; }',
-        'svg { width: 100% !important; }',
-        'img { max-width: 100% !important; }',
-        '.sr-only { display: none !important; }'
+        'html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; }',
+        '[role="main"] { width: 100% !important; max-width: none !important; }',
+        '[role="application"] { width: 100% !important; max-width: none !important; }',
+        '[class*="Profile"] { width: 100% !important; max-width: none !important; }',
+        '[class*="Overview"] { width: 100% !important; max-width: none !important; }',
+        '[class*="Content"] { width: 100% !important; max-width: none !important; }',
+        '[class*="Stats"] { width: 100% !important; max-width: none !important; }',
+        '[class*="Section"] { max-width: none !important; }',
+        '[class*="Container"] { max-width: none !important; }',
+        'main { width: 100% !important; max-width: none !important; }'
     ].join(' ');
     document.head.appendChild(style);
     
-    /* Iterate all elements and strip width constraints */
-    document.querySelectorAll('*').forEach(function(el) {
+    /* Only strip max-width from specific container-like elements, not all elements */
+    document.querySelectorAll('[class*="container"], [class*="wrapper"], [role="main"], main').forEach(function(el) {
         if (el.style.maxWidth && el.style.maxWidth !== 'none') {
             el.style.maxWidth = 'none';
-            el.style.width = '100%';
-        }
-        if (el.style.width && el.style.width.includes('px')) {
-            el.style.width = 'auto';
         }
     });
     
-    /* Force browser layout recalculation multiple times */
-    var h = document.documentElement.offsetHeight;
+    /* Force browser layout recalculation */
+    void document.documentElement.offsetHeight;
     
-    /* Dispatch multiple resize events to wake up React */
-    for (var i = 0; i < 3; i++) {
-        (function(index) {
-            setTimeout(function() {
-                window.dispatchEvent(new Event('resize', { bubbles: true }));
-                window.dispatchEvent(new Event('orientationchange', { bubbles: true }));
-            }, i * 50);
-        })(i);
-    }
+    /* Dispatch resize events to trigger React re-layout */
+    window.dispatchEvent(new Event('resize', { bubbles: true }));
+    setTimeout(function() {
+        window.dispatchEvent(new Event('resize', { bubbles: true }));
+    }, 100);
 })();
 """
             self.account_spotlight_panel._web_view.page().runJavaScript(js)
