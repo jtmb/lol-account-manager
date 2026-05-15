@@ -3290,6 +3290,31 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
+        theme_before = (
+            self._text_zoom_percent,
+            self._app_bg_color,
+            self._app_surface_color,
+            self._app_border_color,
+            self._app_text_color,
+            self._app_accent_color,
+            self._app_hover_color,
+            self._hover_highlight_color_setting,
+            self._logged_in_gradient_color,
+            self._logged_in_gradient_intensity,
+            self._logged_in_border_width
+        )
+
+        if self._logged_in and active:
+            self.setStyleSheet(
+                "#accountListItem {"
+                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                f"stop:0 {left_active},"
+                f"stop:0.18 {mid_active},"
+                "stop:1 rgba(37, 41, 61, 170));"
+                "border: 1px solid transparent;"
+                "border-radius: 10px;"
+                "}"
+            )
             if self.graphicsEffect() is not None:
                 self.setGraphicsEffect(None)
         active = self._selected or self._hovered
