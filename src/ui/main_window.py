@@ -1055,6 +1055,29 @@ class _UggBuildFetchThread(QThread):
         rec_shards = picked_payload.get("stat_shards") if isinstance(picked_payload.get("stat_shards"), dict) else {}
         rec_start = picked_payload.get("rec_starting_items") if isinstance(picked_payload.get("rec_starting_items"), dict) else {}
         rec_core = picked_payload.get("rec_core_items") if isinstance(picked_payload.get("rec_core_items"), dict) else {}
+        rec_skills = picked_payload.get("rec_skills") if isinstance(picked_payload.get("rec_skills"), dict) else {}
+        rec_skill_path = picked_payload.get("rec_skill_path") if isinstance(picked_payload.get("rec_skill_path"), dict) else {}
+
+        item_stage_options: dict[str, list[dict]] = {}
+        for i in range(1, 7):
+            raw_opts = picked_payload.get(f"item_options_{i}")
+            parsed: list[dict] = []
+            if isinstance(raw_opts, list):
+                for opt in raw_opts:
+                    if not isinstance(opt, dict):
+                        continue
+                    try:
+                        item_id = int(opt.get("id", 0) or 0)
+                    except (TypeError, ValueError):
+                        item_id = 0
+                    if item_id <= 0:
+                        continue
+                    parsed.append({
+                        "id": item_id,
+                        "win_rate": float(opt.get("win_rate", 0.0) or 0.0),
+                        "matches": int(opt.get("matches", 0) or 0),
+                    })
+            item_stage_options[str(i)] = parsed
 
         out = {
             "ok": True,
@@ -1068,6 +1091,9 @@ class _UggBuildFetchThread(QThread):
             "shard_ids": [int(x) for x in (rec_shards.get("active_shards") or []) if str(x).isdigit()],
             "starting_item_ids": [int(x) for x in (rec_start.get("ids") or []) if str(x).isdigit()],
             "core_item_ids": [int(x) for x in (rec_core.get("ids") or []) if str(x).isdigit()],
+            "skill_priority": [str(x) for x in (rec_skills.get("slots") or [])],
+            "skill_path": [str(x) for x in (rec_skill_path.get("slots") or [])],
+            "item_stage_options": item_stage_options,
         }
         self.build_ready.emit(out)
 
@@ -1100,6 +1126,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._item_icon_cache: dict[int, QPixmap] = {}
         self._perk_icon_cache: dict[int, QPixmap] = {}
         self._rune_icon_path_by_id: dict[int, str] = {}
+        self._rune_style_data_by_id: dict[int, dict] = {}
+        self._pending_perk_targets: dict[int, list[QLabel]] = {}
 
         self._build_fetch_thread: Optional[_UggBuildFetchThread] = None
         self._build_cache: dict[str, dict] = {}
@@ -1235,6 +1263,49 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._active_perk_row.addWidget(lbl)
         self._active_perk_row.addStretch()
         runes_layout.addLayout(self._active_perk_row)
+
+        self._rune_tree_label = QLabel()
+        self._rune_tree_label.setWordWrap(True)
+        self._rune_tree_label.setStyleSheet("color: #94a0be; font-size: 8pt;")
+        runes_layout.addWidget(self._rune_tree_label)
+
+        self._rune_slots_row = QHBoxLayout()
+        self._rune_slots_row.setSpacing(12)
+
+        self._primary_slots_col = QVBoxLayout()
+        self._primary_slots_col.setSpacing(4)
+        self._primary_slots_title = QLabel("Primary Tree")
+        self._primary_slots_title.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
+        self._primary_slots_col.addWidget(self._primary_slots_title)
+        self._primary_slots_body = QVBoxLayout()
+        self._primary_slots_body.setSpacing(4)
+        self._primary_slots_col.addLayout(self._primary_slots_body)
+
+        self._secondary_slots_col = QVBoxLayout()
+        self._secondary_slots_col.setSpacing(4)
+        self._secondary_slots_title = QLabel("Secondary Tree")
+        self._secondary_slots_title.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
+        self._secondary_slots_col.addWidget(self._secondary_slots_title)
+        self._secondary_slots_body = QVBoxLayout()
+        self._secondary_slots_body.setSpacing(4)
+        self._secondary_slots_col.addLayout(self._secondary_slots_body)
+
+        self._rune_slots_row.addLayout(self._primary_slots_col, 1)
+        self._rune_slots_row.addLayout(self._secondary_slots_col, 1)
+        runes_layout.addLayout(self._rune_slots_row)
+
+        self._shard_row = QHBoxLayout()
+        self._shard_row.setSpacing(6)
+        self._shard_labels: list[QLabel] = []
+        for _ in range(3):
+            lbl = QLabel("—")
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setFixedSize(24, 24)
+            lbl.setStyleSheet("color: #a6adc8; border-radius: 4px; background: #1e1e2e;")
+            self._shard_labels.append(lbl)
+            self._shard_row.addWidget(lbl)
+        self._shard_row.addStretch()
+        runes_layout.addLayout(self._shard_row)
         runes_layout.addStretch()
 
         # Build page
@@ -1278,6 +1349,43 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._core_items_row.addWidget(lbl)
         self._core_items_row.addStretch()
         build_layout.addLayout(self._core_items_row)
+
+        self._stage_option_icon_labels: dict[int, list[QLabel]] = {}
+        self._stage_option_meta_labels: dict[int, QLabel] = {}
+        for stage_num, stage_title in ((1, "4th Item Options"), (2, "5th Item Options"), (3, "6th Item Options")):
+            title_lbl = QLabel(stage_title)
+            title_lbl.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+            build_layout.addWidget(title_lbl)
+
+            icon_row = QHBoxLayout()
+            icon_row.setSpacing(6)
+            icon_labels: list[QLabel] = []
+            for _ in range(3):
+                il = QLabel()
+                il.setFixedSize(28, 28)
+                il.setAlignment(Qt.AlignCenter)
+                il.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+                icon_labels.append(il)
+                icon_row.addWidget(il)
+            icon_row.addStretch()
+            build_layout.addLayout(icon_row)
+            self._stage_option_icon_labels[stage_num] = icon_labels
+
+            meta_lbl = QLabel("—")
+            meta_lbl.setWordWrap(True)
+            meta_lbl.setStyleSheet("color: #94a0be; font-size: 8pt;")
+            build_layout.addWidget(meta_lbl)
+            self._stage_option_meta_labels[stage_num] = meta_lbl
+
+        self._skill_priority_label = QLabel("Skill Priority: —")
+        self._skill_priority_label.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
+        build_layout.addWidget(self._skill_priority_label)
+
+        self._skill_path_label = QLabel("Skill Path: —")
+        self._skill_path_label.setWordWrap(True)
+        self._skill_path_label.setStyleSheet("color: #94a0be; font-size: 8pt;")
+        build_layout.addWidget(self._skill_path_label)
+
         build_layout.addStretch()
 
         self._left_stack.addWidget(runes_page)
@@ -1391,9 +1499,16 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 raw = resp.read().decode("utf-8", errors="ignore")
             data = json.loads(raw)
             icon_map: dict[int, str] = {}
+            style_map: dict[int, dict] = {}
             for style in data:
                 if not isinstance(style, dict):
                     continue
+                try:
+                    sid = int(style.get("id", 0) or 0)
+                except (TypeError, ValueError):
+                    sid = 0
+                if sid > 0:
+                    style_map[sid] = style
                 for slot in style.get("slots", []) or []:
                     if not isinstance(slot, dict):
                         continue
@@ -1408,8 +1523,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
                         if rid > 0 and icon:
                             icon_map[rid] = icon
             self._rune_icon_path_by_id = icon_map
+            self._rune_style_data_by_id = style_map
         except Exception:
             self._rune_icon_path_by_id = {}
+            self._rune_style_data_by_id = {}
 
     def _load_rune_path_icons(self):
         """Start background threads to fetch rune path icons from DDragon."""
@@ -1460,6 +1577,16 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 self._perk_icon_cache[perk_id] = sized
                 if 0 <= slot_idx < len(self._active_perk_labels):
                     self._active_perk_labels[slot_idx].setPixmap(sized)
+        elif tag.startswith("rune_perk_generic_"):
+            try:
+                perk_id = int(tag[len("rune_perk_generic_"):])
+            except ValueError:
+                return
+            sized = pix.scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._perk_icon_cache[perk_id] = sized
+            targets = self._pending_perk_targets.pop(perk_id, [])
+            for lbl in targets:
+                lbl.setPixmap(sized)
         elif tag.startswith("item_icon_"):
             parts = tag.split("_")
             if len(parts) >= 5:
@@ -1472,6 +1599,20 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 sized = pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self._item_icon_cache[item_id] = sized
                 labels = self._starting_item_labels if row == "start" else self._core_item_labels
+                if 0 <= slot_idx < len(labels):
+                    labels[slot_idx].setPixmap(sized)
+        elif tag.startswith("item_stage_"):
+            parts = tag.split("_")
+            if len(parts) >= 5:
+                try:
+                    item_id = int(parts[2])
+                    stage_num = int(parts[3])
+                    slot_idx = int(parts[4])
+                except ValueError:
+                    return
+                sized = pix.scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self._item_icon_cache[item_id] = sized
+                labels = self._stage_option_icon_labels.get(stage_num, [])
                 if 0 <= slot_idx < len(labels):
                     labels[slot_idx].setPixmap(sized)
         elif tag.startswith("portrait_"):
@@ -1554,6 +1695,74 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._show_runes_btn.setChecked(idx == 0)
         self._show_build_btn.setChecked(idx == 1)
 
+    @staticmethod
+    def _clear_layout(layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            child_layout = item.layout()
+            if widget is not None:
+                widget.deleteLater()
+            elif child_layout is not None:
+                InClientGamePanel._clear_layout(child_layout)
+
+    def _set_perk_icon(self, label: QLabel, perk_id: int):
+        cached = self._perk_icon_cache.get(perk_id)
+        if cached and not cached.isNull():
+            label.setPixmap(cached)
+            return
+        pending = self._pending_perk_targets.setdefault(perk_id, [])
+        pending.append(label)
+        if len(pending) > 1:
+            return
+        icon_path = self._rune_icon_path_by_id.get(perk_id, "")
+        if not icon_path:
+            return
+        icon_url = f"https://ddragon.leagueoflegends.com/cdn/img/{icon_path}"
+        tag = f"rune_perk_generic_{perk_id}"
+        t = _ImageFetchThread(tag, icon_url, self)
+        t.image_ready.connect(self._on_image_ready)
+        t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+        self._image_threads.append(t)
+        t.start()
+
+    def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int):
+        self._clear_layout(container_layout)
+        style = self._rune_style_data_by_id.get(style_id)
+        if not isinstance(style, dict):
+            empty = QLabel("No rune tree data")
+            empty.setStyleSheet("color: #7f8aa3; font-size: 8pt;")
+            container_layout.addWidget(empty)
+            return
+
+        slots = style.get("slots", []) if isinstance(style.get("slots", []), list) else []
+        for slot_idx, slot in enumerate(slots[:max_slots]):
+            if not isinstance(slot, dict):
+                continue
+            row = QHBoxLayout()
+            row.setSpacing(4)
+            runes = slot.get("runes", []) if isinstance(slot.get("runes", []), list) else []
+            for rune in runes:
+                if not isinstance(rune, dict):
+                    continue
+                try:
+                    rid = int(rune.get("id", 0) or 0)
+                except (TypeError, ValueError):
+                    rid = 0
+                if rid <= 0:
+                    continue
+                lbl = QLabel()
+                lbl.setFixedSize(22, 22)
+                lbl.setAlignment(Qt.AlignCenter)
+                if rid in active_ids:
+                    lbl.setStyleSheet("border-radius: 11px; background: #1e1e2e; border: 1px solid #58a6ff;")
+                else:
+                    lbl.setStyleSheet("border-radius: 11px; background: #1e1e2e; border: 1px solid #30374b;")
+                row.addWidget(lbl)
+                self._set_perk_icon(lbl, rid)
+            row.addStretch()
+            container_layout.addLayout(row)
+
     def _on_build_data_ready(self, expected_key: str, data: dict):
         if expected_key != self._pending_build_key:
             return
@@ -1569,11 +1778,28 @@ class InClientGamePanel(AccountListBackgroundFrame):
         for lbl in self._active_perk_labels:
             lbl.clear()
             lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        self._rune_tree_label.setText("Primary/Secondary rune rows will appear after data loads.")
+        self._primary_slots_title.setText("Primary Tree")
+        self._secondary_slots_title.setText("Secondary Tree")
+        self._clear_layout(self._primary_slots_body)
+        self._clear_layout(self._secondary_slots_body)
+        for lbl in self._shard_labels:
+            lbl.setText("—")
+            lbl.setStyleSheet("color: #a6adc8; border-radius: 4px; background: #1e1e2e;")
         for lbl in self._starting_item_labels + self._core_item_labels:
             lbl.clear()
             lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
         for style_id, lbl in self._rune_path_labels.items():
             lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+        for stage_num, labels in self._stage_option_icon_labels.items():
+            for lbl in labels:
+                lbl.clear()
+                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            meta = self._stage_option_meta_labels.get(stage_num)
+            if meta:
+                meta.setText("—")
+        self._skill_priority_label.setText("Skill Priority: —")
+        self._skill_path_label.setText("Skill Path: —")
 
     def _apply_build_data(self, data: dict):
         role_name = str(data.get("role", "") or "").upper()
@@ -1616,6 +1842,54 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._image_threads.append(t)
             t.start()
 
+        # Detailed rune row summary (primary 4 + secondary 2)
+        primary_ids = perk_ids[:4]
+        secondary_ids = perk_ids[4:6]
+        def _rune_name(rid: int) -> str:
+            for style in self._rune_style_data_by_id.values():
+                for slot in style.get("slots", []) or []:
+                    for rune in slot.get("runes", []) or []:
+                        try:
+                            rrid = int(rune.get("id", 0) or 0)
+                        except (TypeError, ValueError):
+                            rrid = 0
+                        if rrid == rid:
+                            return str(rune.get("name", "") or str(rid))
+            return str(rid)
+
+        primary_text = " / ".join(_rune_name(int(x)) for x in primary_ids) if primary_ids else "—"
+        secondary_text = " / ".join(_rune_name(int(x)) for x in secondary_ids) if secondary_ids else "—"
+        self._rune_tree_label.setText(
+            f"Primary: {primary_text}\nSecondary: {secondary_text}"
+        )
+
+        style_name = lambda sid: self._RUNE_STYLES.get(sid, (str(sid), ""))[0]
+        self._primary_slots_title.setText(f"{style_name(primary_style)}")
+        self._secondary_slots_title.setText(f"{style_name(sub_style)}")
+        active_id_set = set(int(x) for x in perk_ids)
+        self._render_rune_style_slots(primary_style, self._primary_slots_body, active_id_set, 4)
+        self._render_rune_style_slots(sub_style, self._secondary_slots_body, active_id_set, 2)
+
+        shard_ids = list(data.get("shard_ids") or [])[:3]
+        shard_name_map = {
+            5008: "AF",
+            5005: "AS",
+            5007: "AH",
+            5001: "HP",
+            5002: "AR",
+            5003: "MR",
+            5010: "MS",
+            5011: "TEN",
+        }
+        for idx, lbl in enumerate(self._shard_labels):
+            if idx < len(shard_ids):
+                sid = int(shard_ids[idx])
+                lbl.setText(shard_name_map.get(sid, str(sid)))
+                lbl.setStyleSheet("color: #f5f7ff; border-radius: 4px; background: #2f5fd0;")
+            else:
+                lbl.setText("—")
+                lbl.setStyleSheet("color: #a6adc8; border-radius: 4px; background: #1e1e2e;")
+
         start_ids = list(data.get("starting_item_ids") or [])[:len(self._starting_item_labels)]
         for idx, lbl in enumerate(self._starting_item_labels):
             lbl.clear()
@@ -1653,6 +1927,56 @@ class InClientGamePanel(AccountListBackgroundFrame):
             t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
             self._image_threads.append(t)
             t.start()
+
+        # Stage options (4th/5th/6th item)
+        options_map = data.get("item_stage_options") if isinstance(data.get("item_stage_options"), dict) else {}
+        for stage_num, labels in self._stage_option_icon_labels.items():
+            opt_key = str(stage_num)
+            options = options_map.get(opt_key) if isinstance(options_map.get(opt_key), list) else []
+            meta_lbl = self._stage_option_meta_labels.get(stage_num)
+            for lbl in labels:
+                lbl.clear()
+                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            if not options:
+                if meta_lbl:
+                    meta_lbl.setText("no data")
+                continue
+            chunks = []
+            for idx, opt in enumerate(options[:3]):
+                if not isinstance(opt, dict):
+                    continue
+                item_id = int(opt.get("id", 0) or 0)
+                wr = float(opt.get("win_rate", 0.0) or 0.0)
+                mm = int(opt.get("matches", 0) or 0)
+                chunks.append(f"{item_id} ({wr:.1f}%/{mm})")
+                if idx < len(labels):
+                    cached = self._item_icon_cache.get(item_id)
+                    if cached and not cached.isNull():
+                        labels[idx].setPixmap(cached)
+                    else:
+                        icon_url = f"https://ddragon.leagueoflegends.com/cdn/{self._DDRAGON_VERSION}/img/item/{item_id}.png"
+                        tag = f"item_stage_{item_id}_{stage_num}_{idx}"
+                        t = _ImageFetchThread(tag, icon_url, self)
+                        t.image_ready.connect(self._on_image_ready)
+                        t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+                        self._image_threads.append(t)
+                        t.start()
+            if meta_lbl:
+                meta_lbl.setText(" | ".join(chunks) if chunks else "no data")
+
+        # Skill sections
+        skill_priority = [str(s).upper() for s in (data.get("skill_priority") or []) if str(s).strip()]
+        if skill_priority:
+            self._skill_priority_label.setText("Skill Priority: " + " -> ".join(skill_priority[:3]))
+        else:
+            self._skill_priority_label.setText("Skill Priority: —")
+
+        skill_path = [str(s).upper() for s in (data.get("skill_path") or []) if str(s).strip()]
+        if skill_path:
+            parts = [f"{i + 1}:{slot}" for i, slot in enumerate(skill_path[:18])]
+            self._skill_path_label.setText("Skill Path: " + "  ".join(parts))
+        else:
+            self._skill_path_label.setText("Skill Path: —")
 
     def update_payload(self, payload: dict):
         in_game = bool(payload.get("in_game", False))
