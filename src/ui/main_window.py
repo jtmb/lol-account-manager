@@ -5606,47 +5606,12 @@ class MainWindow(QMainWindow):
                 break
 
     def _reapply_ugg_embed_css(self):
-        """Re-apply the u.gg embed CSS (called when window state changes like maximize)."""
+        """Re-apply the hide script when window resizes to ensure layout stays correct."""
         if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
             return
-        # Trigger the CSS reset on the web page to adapt to new window size
-        if self.account_spotlight_panel._web_view is not None:
-            js = r"""
-(function() {
-    /* Targeted CSS to remove max-width constraints on main content containers only */
-    var style = document.createElement('style');
-    style.textContent = [
-        'html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; }',
-        '[role="main"] { width: 100% !important; max-width: none !important; }',
-        '[role="application"] { width: 100% !important; max-width: none !important; }',
-        '[class*="Profile"] { width: 100% !important; max-width: none !important; }',
-        '[class*="Overview"] { width: 100% !important; max-width: none !important; }',
-        '[class*="Content"] { width: 100% !important; max-width: none !important; }',
-        '[class*="Stats"] { width: 100% !important; max-width: none !important; }',
-        '[class*="Section"] { max-width: none !important; }',
-        '[class*="Container"] { max-width: none !important; }',
-        'main { width: 100% !important; max-width: none !important; }'
-    ].join(' ');
-    document.head.appendChild(style);
-    
-    /* Only strip max-width from specific container-like elements, not all elements */
-    document.querySelectorAll('[class*="container"], [class*="wrapper"], [role="main"], main').forEach(function(el) {
-        if (el.style.maxWidth && el.style.maxWidth !== 'none') {
-            el.style.maxWidth = 'none';
-        }
-    });
-    
-    /* Force browser layout recalculation */
-    void document.documentElement.offsetHeight;
-    
-    /* Dispatch resize events to trigger React re-layout */
-    window.dispatchEvent(new Event('resize', { bubbles: true }));
-    setTimeout(function() {
-        window.dispatchEvent(new Event('resize', { bubbles: true }));
-    }, 100);
-})();
-"""
-            self.account_spotlight_panel._web_view.page().runJavaScript(js)
+        # Re-run the same proven hide script to reapply all CSS constraints
+        # This includes the max-width removal and resize listener
+        self.account_spotlight_panel._run_hide_script()
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
