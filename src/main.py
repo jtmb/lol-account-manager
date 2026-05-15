@@ -13,6 +13,16 @@ from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
 
 
+def _startup_trace(step: str) -> None:
+    """Write startup breadcrumbs for diagnosing native crashes."""
+    try:
+        trace_file = Path.home() / "lol_account_manager_startup.log"
+        with trace_file.open("a", encoding="utf-8") as fh:
+            fh.write(f"{step}\n")
+    except Exception:
+        pass
+
+
 def _detach_console() -> None:
     """Permanently detach this process from its Windows console window.
 
@@ -139,35 +149,47 @@ def _apply_dark_palette(app: QApplication, settings: Optional[dict] = None) -> N
 def main():
     """Run the application"""
     try:
+        _startup_trace("main:begin")
         # Detach the Windows console before anything else so it can never flash.
         _detach_console()
+        _startup_trace("main:after_detach_console")
         _install_no_console_subprocess_guard()
+        _startup_trace("main:after_subprocess_guard")
 
         # Ensure accidental top-level Qt windows never use the default "python" title.
         QCoreApplication.setApplicationName("League of Legends Account Manager")
+        _startup_trace("main:after_app_name")
 
         app = QApplication(sys.argv)
+        _startup_trace("main:after_qapplication")
         app.setStyle("Fusion")
+        _startup_trace("main:after_style")
 
         settings = load_settings()
+        _startup_trace("main:after_load_settings")
 
         # Must be called before any window is created so that every widget's
         # initial OS-level background paint uses dark colors, preventing the
         # white flash on Windows.
         _apply_dark_palette(app, settings)
+        _startup_trace("main:after_apply_palette")
 
         icon_path = _resource_path("assets/icon.ico")
         if icon_path.exists():
             app.setWindowIcon(QIcon(str(icon_path)))
 
         window = MainWindow()
+        _startup_trace("main:after_main_window_ctor")
         if bool(settings.get("start_minimized_to_tray", False)):
             window.hide()
+            _startup_trace("main:window_hidden_to_tray")
         else:
             window.show()
             window.raise_()
             window.activateWindow()
+            _startup_trace("main:window_shown")
 
+        _startup_trace("main:before_exec")
         sys.exit(app.exec_())
     except Exception:
         raise

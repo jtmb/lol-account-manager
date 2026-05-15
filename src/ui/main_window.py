@@ -428,6 +428,10 @@ def _hide_windows_console_window():
     """Hide the attached Windows console window if one exists."""
     if not sys.platform.startswith("win"):
         return
+    # Disabled by default because low-level Win32 calls here have caused
+    # native startup aborts on some Windows/PyQt combinations.
+    if os.environ.get("LOLAM_ENABLE_WIN_WINDOW_HACKS", "0") != "1":
+        return
     try:
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
@@ -444,6 +448,11 @@ def _hide_any_python_titled_window():
     multiple code paths and can be external to Qt's own window lifecycle.
     """
     if not sys.platform.startswith("win"):
+        return
+
+    # Disabled by default because EnumWindows callback interop can trigger
+    # native crashes on some systems. Opt in only when needed.
+    if os.environ.get("LOLAM_ENABLE_WIN_WINDOW_HACKS", "0") != "1":
         return
 
     try:
