@@ -895,37 +895,72 @@ class InGameDiagnosticsDialog(QDialog):
         super().closeEvent(event)
 
 
+class _ImageFetchThread(QThread):
+    """Background thread that downloads a single image URL and emits the raw bytes."""
+    image_ready = pyqtSignal(str, bytes)  # (tag, raw_bytes)
+
+    def __init__(self, tag: str, url: str, parent=None):
+        super().__init__(parent)
+        self._tag = tag
+        self._url = url
+
+    def run(self):
+        try:
+            req = Request(self._url, headers={"User-Agent": "lol-account-manager/1.0"})
+            with urlopen(req, timeout=6) as resp:
+                raw = resp.read()
+            self.image_ready.emit(self._tag, raw)
+        except Exception:
+            self.image_ready.emit(self._tag, b"")
+
+
 class InClientGamePanel(AccountListBackgroundFrame):
     """Inline panel shown in place of the account list during champ select / in-game."""
 
+    _PORTRAIT_SIZE = 80
+    _ICON_SIZE = 28
+    _DDRAGON_VERSION = "16.10.1"
+
+    # Rune style ID → (name, icon-filename-base)
+    _RUNE_STYLES = {
+        8000: ("Precision",   "Precision"),
+        8100: ("Domination",  "Domination"),
+        8200: ("Sorcery",     "Sorcery"),
+        8300: ("Inspiration", "Whimsy"),
+        8400: ("Resolve",     "Resolve"),
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._matchup_url = ""
-        self._fallback_url = ""
         self.setObjectName("accountListContainer")
 
+        self._my_champion_name = ""
+        self._enemy_champion_name = ""
+        self._image_threads: list[_ImageFetchThread] = []
+        self._portrait_cache: dict[str, QPixmap] = {}
+
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(28, 20, 28, 20)
-        outer.setSpacing(12)
+        outer.setContentsMargins(20, 16, 20, 16)
+        outer.setSpacing(10)
 
         # ── Phase / Queue header ──────────────────────────────────────────
         header_row = QHBoxLayout()
         header_row.setSpacing(8)
         self._phase_label = QLabel("Champ Select")
         hdr_font = QFont()
-        hdr_font.setPointSize(12)
+        hdr_font.setPointSize(11)
         hdr_font.setBold(True)
         self._phase_label.setFont(hdr_font)
         self._phase_label.setStyleSheet("color: #89b4fa;")
         header_row.addWidget(self._phase_label)
 
         self._queue_label = QLabel()
-        self._queue_label.setStyleSheet("color: #a6adc8; font-size: 10pt;")
+        self._queue_label.setStyleSheet("color: #a6adc8; font-size: 9pt;")
         header_row.addWidget(self._queue_label)
         header_row.addStretch()
 
         self._elo_label = QLabel()
-        self._elo_label.setStyleSheet("color: #a6e3a1; font-size: 10pt;")
+        self._elo_label.setStyleSheet("color: #a6e3a1; font-size: 9pt;")
         header_row.addWidget(self._elo_label)
         outer.addLayout(header_row)
 
@@ -934,20 +969,27 @@ class InClientGamePanel(AccountListBackgroundFrame):
         sep.setStyleSheet("background: #313244; max-height: 1px; border: none;")
         outer.addWidget(sep)
 
-        # ── Champion matchup row ──────────────────────────────────────────
+        # ── Champion portraits + names row ────────────────────────────────
         matchup_row = QHBoxLayout()
         matchup_row.setSpacing(0)
 
-        champ_font = QFont()
-        champ_font.setPointSize(15)
-        champ_font.setBold(True)
-
         you_col = QVBoxLayout()
-        you_col.setSpacing(2)
-        you_role = QLabel("YOU")
-        you_role.setAlignment(Qt.AlignCenter)
-        you_role.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
-        you_col.addWidget(you_role)
+        you_col.setSpacing(4)
+        you_col.setAlignment(Qt.AlignHCenter)
+        you_role_lbl = QLabel("YOU")
+        you_role_lbl.setAlignment(Qt.AlignCenter)
+        you_role_lbl.setStyleSheet("color: #6c7086; font-size: 7pt; letter-spacing: 1px;")
+        you_col.addWidget(you_role_lbl)
+        self._my_portrait = QLabel()
+        self._my_portrait.setFixedSize(self._PORTRAIT_SIZE, self._PORTRAIT_SIZE)
+        self._my_portrait.setAlignment(Qt.AlignCenter)
+        self._my_portrait.setStyleSheet(
+            "border-radius: 40px; background: #313244; border: 2px solid #89b4fa;"
+        )
+        you_col.addWidget(self._my_portrait, 0, Qt.AlignHCenter)
+        champ_font = QFont()
+        champ_font.setPointSize(10)
+        champ_font.setBold(True)
         self._my_champ_label = QLabel("—")
         self._my_champ_label.setFont(champ_font)
         self._my_champ_label.setAlignment(Qt.AlignCenter)
@@ -958,16 +1000,24 @@ class InClientGamePanel(AccountListBackgroundFrame):
         vs_label = QLabel("VS")
         vs_label.setAlignment(Qt.AlignCenter)
         vs_label.setStyleSheet(
-            "color: #f38ba8; font-size: 12pt; font-weight: bold; padding: 0 20px;"
+            "color: #f38ba8; font-size: 11pt; font-weight: bold; padding: 0 12px;"
         )
         matchup_row.addWidget(vs_label)
 
         enemy_col = QVBoxLayout()
-        enemy_col.setSpacing(2)
-        enemy_role = QLabel("ENEMY")
-        enemy_role.setAlignment(Qt.AlignCenter)
-        enemy_role.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
-        enemy_col.addWidget(enemy_role)
+        enemy_col.setSpacing(4)
+        enemy_col.setAlignment(Qt.AlignHCenter)
+        enemy_role_lbl = QLabel("ENEMY")
+        enemy_role_lbl.setAlignment(Qt.AlignCenter)
+        enemy_role_lbl.setStyleSheet("color: #6c7086; font-size: 7pt; letter-spacing: 1px;")
+        enemy_col.addWidget(enemy_role_lbl)
+        self._enemy_portrait = QLabel()
+        self._enemy_portrait.setFixedSize(self._PORTRAIT_SIZE, self._PORTRAIT_SIZE)
+        self._enemy_portrait.setAlignment(Qt.AlignCenter)
+        self._enemy_portrait.setStyleSheet(
+            "border-radius: 40px; background: #313244; border: 2px solid #f38ba8;"
+        )
+        enemy_col.addWidget(self._enemy_portrait, 0, Qt.AlignHCenter)
         self._enemy_champ_label = QLabel("—")
         self._enemy_champ_label.setFont(champ_font)
         self._enemy_champ_label.setAlignment(Qt.AlignCenter)
@@ -977,10 +1027,11 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         outer.addLayout(matchup_row)
 
+        # ── Status hint ───────────────────────────────────────────────────
         self._status_label = QLabel("Waiting for champion selection…")
         self._status_label.setWordWrap(True)
         self._status_label.setAlignment(Qt.AlignCenter)
-        self._status_label.setStyleSheet("color: #a6adc8; font-size: 10pt; padding: 4px 0;")
+        self._status_label.setStyleSheet("color: #a6adc8; font-size: 9pt; padding: 2px 0;")
         outer.addWidget(self._status_label)
 
         sep2 = QFrame()
@@ -988,24 +1039,134 @@ class InClientGamePanel(AccountListBackgroundFrame):
         sep2.setStyleSheet("background: #313244; max-height: 1px; border: none;")
         outer.addWidget(sep2)
 
-        guide_label = QLabel("Build Guide  ·  u.gg")
-        guide_label.setStyleSheet("color: #6c7086; font-size: 9pt;")
-        outer.addWidget(guide_label)
+        # ── Rune paths section ────────────────────────────────────────────
+        rune_header = QHBoxLayout()
+        rune_title = QLabel("Suggested Rune Paths")
+        rune_title.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
+        rune_header.addWidget(rune_title)
+        rune_header.addStretch()
+        outer.addLayout(rune_header)
 
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
-        self._matchup_btn = QPushButton("⚔  Matchup Build")
-        self._matchup_btn.setEnabled(False)
-        self._matchup_btn.clicked.connect(self._open_matchup)
-        btn_row.addWidget(self._matchup_btn)
-
-        self._fallback_btn = QPushButton("📋  Champion Build")
-        self._fallback_btn.setEnabled(False)
-        self._fallback_btn.clicked.connect(self._open_fallback)
-        btn_row.addWidget(self._fallback_btn)
-        outer.addLayout(btn_row)
+        # Row of rune path icons (one per style)
+        self._rune_paths_row = QHBoxLayout()
+        self._rune_paths_row.setSpacing(8)
+        self._rune_path_labels: dict[int, QLabel] = {}
+        for style_id, (name, _) in self._RUNE_STYLES.items():
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            col.setAlignment(Qt.AlignHCenter)
+            icon_lbl = QLabel()
+            icon_lbl.setFixedSize(self._ICON_SIZE, self._ICON_SIZE)
+            icon_lbl.setAlignment(Qt.AlignCenter)
+            icon_lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
+            icon_lbl.setToolTip(name)
+            col.addWidget(icon_lbl, 0, Qt.AlignHCenter)
+            name_lbl = QLabel(name[:4])
+            name_lbl.setAlignment(Qt.AlignCenter)
+            name_lbl.setStyleSheet("color: #45475a; font-size: 7pt;")
+            col.addWidget(name_lbl, 0, Qt.AlignHCenter)
+            self._rune_path_labels[style_id] = icon_lbl
+            self._rune_paths_row.addLayout(col)
+        self._rune_paths_row.addStretch()
+        outer.addLayout(self._rune_paths_row)
 
         outer.addStretch()
+
+        # Preload rune path icons
+        self._rune_icon_cache: dict[int, QPixmap] = {}
+        self._load_rune_path_icons()
+
+    def _load_rune_path_icons(self):
+        """Start background threads to fetch rune path icons from DDragon."""
+        for style_id, (name, icon_base) in self._RUNE_STYLES.items():
+            if style_id in self._rune_icon_cache:
+                continue
+            url = (
+                f"https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data"
+                f"/global/default/v1/perk-images/styles/"
+                f"{style_id}_{name.lower()}.png"
+            )
+            t = _ImageFetchThread(f"rune_style_{style_id}", url, self)
+            t.image_ready.connect(self._on_image_ready)
+            t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+            self._image_threads.append(t)
+            t.start()
+
+    def _cleanup_thread(self, thread: "_ImageFetchThread"):
+        try:
+            self._image_threads.remove(thread)
+        except ValueError:
+            pass
+
+    def _on_image_ready(self, tag: str, raw: bytes):
+        if not raw:
+            return
+        pix = QPixmap()
+        if not pix.loadFromData(raw):
+            return
+
+        if tag.startswith("rune_style_"):
+            style_id = int(tag[len("rune_style_"):])
+            sized = pix.scaled(self._ICON_SIZE, self._ICON_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._rune_icon_cache[style_id] = sized
+            lbl = self._rune_path_labels.get(style_id)
+            if lbl:
+                lbl.setPixmap(sized)
+                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+        elif tag.startswith("portrait_"):
+            champ_key = tag[len("portrait_"):]
+            circular = self._make_circular(pix, self._PORTRAIT_SIZE)
+            self._portrait_cache[champ_key] = circular
+            if champ_key == self._my_champion_name.lower():
+                self._my_portrait.setPixmap(circular)
+            if champ_key == self._enemy_champion_name.lower():
+                self._enemy_portrait.setPixmap(circular)
+
+    @staticmethod
+    def _make_circular(pix: "QPixmap", size: int) -> "QPixmap":
+        """Crop and mask a pixmap into a circle of the given size."""
+        scaled = pix.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        # Center-crop to exact size
+        if scaled.width() > size or scaled.height() > size:
+            x = (scaled.width() - size) // 2
+            y = (scaled.height() - size) // 2
+            scaled = scaled.copy(x, y, size, size)
+
+        result = QPixmap(size, size)
+        result.fill(Qt.transparent)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        path = QPainterPath()
+        path.addEllipse(0, 0, size, size)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, scaled)
+        painter.end()
+        return result
+
+    def _load_portrait(self, champion_name: str):
+        """Kick off a background fetch for a champion's square portrait."""
+        if not champion_name:
+            return
+        key = champion_name.lower()
+        if key in self._portrait_cache:
+            pix = self._portrait_cache[key]
+            if key == self._my_champion_name.lower() and pix and not pix.isNull():
+                self._my_portrait.setPixmap(pix)
+            if key == self._enemy_champion_name.lower() and pix and not pix.isNull():
+                self._enemy_portrait.setPixmap(pix)
+            return
+        # Capitalize first letter only (DDragon uses canonical champion name)
+        name_canonical = champion_name.strip()
+        url = (
+            f"https://ddragon.leagueoflegends.com/cdn/{self._DDRAGON_VERSION}"
+            f"/img/champion/{name_canonical}.png"
+        )
+        tag = f"portrait_{key}"
+        t = _ImageFetchThread(tag, url, self)
+        t.image_ready.connect(self._on_image_ready)
+        t.finished.connect(lambda thread=t: self._cleanup_thread(thread))
+        self._image_threads.append(t)
+        t.start()
 
     def update_payload(self, payload: dict):
         in_game = bool(payload.get("in_game", False))
@@ -1013,20 +1174,53 @@ class InClientGamePanel(AccountListBackgroundFrame):
         enemy_champion = str(payload.get("enemy_champion", "") or "").strip()
         queue_type = str(payload.get("queue_type", "") or "").strip()
         rank_label = str(payload.get("rank_label", "") or "").strip() or "Overall"
-        self._matchup_url = str(payload.get("matchup_url", "") or "").strip()
-        self._fallback_url = str(payload.get("fallback_url", "") or "").strip()
+
+        self._my_champion_name = my_champion
+        self._enemy_champion_name = enemy_champion
 
         phase_text = "In Game" if in_game else "Champ Select"
         phase_color = "#fab387" if in_game else "#89b4fa"
         self._phase_label.setText(phase_text)
         self._phase_label.setStyleSheet(
-            f"color: {phase_color}; font-size: 12pt; font-weight: bold;"
+            f"color: {phase_color}; font-size: 11pt; font-weight: bold;"
         )
         self._queue_label.setText(f"— {queue_type}" if queue_type else "")
         self._elo_label.setText(f"Elo: {rank_label}" if (rank_label and not in_game) else "")
 
         self._my_champ_label.setText(my_champion if my_champion else "—")
         self._enemy_champ_label.setText(enemy_champion if enemy_champion else "—")
+
+        # Reset portraits to placeholder
+        placeholder_style_my = (
+            "border-radius: 40px; background: #313244; border: 2px solid #89b4fa;"
+        )
+        placeholder_style_enemy = (
+            "border-radius: 40px; background: #313244; border: 2px solid #f38ba8;"
+        )
+        if not my_champion:
+            self._my_portrait.clear()
+            self._my_portrait.setStyleSheet(placeholder_style_my)
+        if not enemy_champion:
+            self._enemy_portrait.clear()
+            self._enemy_portrait.setStyleSheet(placeholder_style_enemy)
+
+        # Load portraits if we have champion names
+        if my_champion:
+            cached = self._portrait_cache.get(my_champion.lower())
+            if cached and not cached.isNull():
+                self._my_portrait.setPixmap(cached)
+            else:
+                self._my_portrait.clear()
+                self._my_portrait.setStyleSheet(placeholder_style_my)
+                self._load_portrait(my_champion)
+        if enemy_champion:
+            cached = self._portrait_cache.get(enemy_champion.lower())
+            if cached and not cached.isNull():
+                self._enemy_portrait.setPixmap(cached)
+            else:
+                self._enemy_portrait.clear()
+                self._enemy_portrait.setStyleSheet(placeholder_style_enemy)
+                self._load_portrait(enemy_champion)
 
         if in_game:
             if my_champion and enemy_champion:
@@ -1044,24 +1238,6 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 hint = "Waiting for champion selection…"
 
         self._status_label.setText(hint)
-        self._matchup_btn.setEnabled(bool(self._matchup_url))
-        self._fallback_btn.setEnabled(bool(self._fallback_url))
-
-    def _open_matchup(self):
-        if not self._matchup_url:
-            return
-        try:
-            webbrowser.open_new_tab(self._matchup_url)
-        except Exception:
-            webbrowser.open(self._matchup_url)
-
-    def _open_fallback(self):
-        if not self._fallback_url:
-            return
-        try:
-            webbrowser.open_new_tab(self._fallback_url)
-        except Exception:
-            webbrowser.open(self._fallback_url)
 
 
 class MasterPasswordDialog(QDialog):
