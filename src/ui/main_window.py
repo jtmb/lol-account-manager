@@ -5428,12 +5428,8 @@ class MainWindow(QMainWindow):
         return f"https://u.gg/lol/profile/{region_id}/{encoded_name}-{encoded_tag}/overview"
 
     def _show_logged_in_spotlight(self):
-        """Update spotlight content for the logged-in account.
-
-        Placement is handled by refresh_account_list which inserts the panel
-        as a QListWidgetItem directly after the logged-in account row.
-        This method only refreshes the displayed content (rank data / URL).
-        """
+        """Ensure the spotlight panel is in the list directly after the logged-in
+        account row and has up-to-date content.  Safe to call at any time."""
         if self._in_champ_select_mode:
             return
         if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
@@ -5442,6 +5438,33 @@ class MainWindow(QMainWindow):
         account = self.account_manager.get_account(self._logged_in_username)
         if not account:
             return
+
+        # Find the logged-in account row and check if spotlight is already
+        # sitting right after it.
+        logged_in_row = -1
+        spotlight_already_placed = False
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                spotlight_already_placed = True
+                break
+            if item.data(Qt.UserRole) == account.username:
+                logged_in_row = index
+
+        if not spotlight_already_placed:
+            if logged_in_row < 0:
+                # Logged-in account is not currently visible in the list.
+                return
+            # Re-parent away from any previous owner so Qt won't delete it
+            # when insertItem triggers internal housekeeping.
+            self.account_spotlight_panel.setParent(self.account_list_background)
+            spotlight_item = QListWidgetItem()
+            spotlight_item.setFlags(Qt.NoItemFlags)
+            spotlight_item.setSizeHint(QSize(0, 480))
+            self.account_list.insertItem(logged_in_row + 1, spotlight_item)
+            self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
+
+        self.account_spotlight_panel.show()
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
@@ -7199,21 +7222,6 @@ QMenu#trayQuickMenu::separator {
                     )
                     widget.setFixedHeight(row_height)
                     self.account_list.setItemWidget(item, widget)
-
-                    # After adding the logged-in account row, inject the spotlight
-                    # panel as the very next item so it appears directly below it.
-                    if (
-                        not self._in_champ_select_mode
-                        and self._logged_in_username
-                        and account.username == self._logged_in_username
-                        and self.account_spotlight_panel
-                    ):
-                        spotlight_item = QListWidgetItem()
-                        spotlight_item.setFlags(Qt.NoItemFlags)
-                        spotlight_item.setSizeHint(QSize(0, 480))
-                        self.account_list.addItem(spotlight_item)
-                        self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
-                        self.account_spotlight_panel.show()
 
                 self.update_account_item_states()
                 if fetch_ranks and self._show_ranks:
