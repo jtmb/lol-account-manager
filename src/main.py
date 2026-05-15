@@ -1,4 +1,5 @@
 """Main application entry point"""
+import os
 import sys
 import ctypes
 import subprocess
@@ -9,7 +10,6 @@ from PyQt5.QtCore import QCoreApplication, QTimer
 from PyQt5.QtWidgets import QApplication
 
 from PyQt5.QtGui import QIcon, QPalette, QColor
-from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
 
 
@@ -35,6 +35,8 @@ def _detach_console() -> None:
     """
     if not sys.platform.startswith("win"):
         return
+    if os.environ.get("LOLAM_ENABLE_CONSOLE_DETACH", "0") != "1":
+        return
     try:
         ctypes.windll.kernel32.FreeConsole()
     except Exception:
@@ -50,6 +52,8 @@ def _install_no_console_subprocess_guard() -> None:
     types unless the caller already provided explicit creation flags.
     """
     if not sys.platform.startswith("win"):
+        return
+    if os.environ.get("LOLAM_ENABLE_SUBPROCESS_GUARD", "0") != "1":
         return
 
     original_popen = subprocess.Popen
@@ -155,6 +159,10 @@ def main():
         _startup_trace("main:after_detach_console")
         _install_no_console_subprocess_guard()
         _startup_trace("main:after_subprocess_guard")
+
+        _startup_trace("main:before_import_main_window")
+        from src.ui.main_window import MainWindow
+        _startup_trace("main:after_import_main_window")
 
         # Ensure accidental top-level Qt windows never use the default "python" title.
         QCoreApplication.setApplicationName("League of Legends Account Manager")
