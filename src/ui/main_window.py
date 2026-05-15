@@ -5141,8 +5141,8 @@ class MainWindow(QMainWindow):
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
         self.account_spotlight_panel = AccountSpotlightPanel()
+        self.account_spotlight_panel.setParent(self.account_list_background)
         self.account_spotlight_panel.hide()
-        account_list_layout.addWidget(self.account_spotlight_panel)
         self.game_info_panel = InClientGamePanel()
         self.main_area_stack = QStackedWidget()
         self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
@@ -5428,25 +5428,26 @@ class MainWindow(QMainWindow):
         return f"https://u.gg/lol/profile/{region_id}/{encoded_name}-{encoded_tag}/overview"
 
     def _show_logged_in_spotlight(self):
-        """Show spotlight content below the standard account list for the logged-in account."""
-        if not self.main_area_stack or self._in_champ_select_mode:
-            return
+        """Update spotlight content for the logged-in account.
 
+        Placement is handled by refresh_account_list which inserts the panel
+        as a QListWidgetItem directly after the logged-in account row.
+        This method only refreshes the displayed content (rank data / URL).
+        """
+        if self._in_champ_select_mode:
+            return
         if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
-            self.account_spotlight_panel.hide()
             return
 
         account = self.account_manager.get_account(self._logged_in_username)
         if not account:
-            self.account_spotlight_panel.hide()
             return
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
         self.account_spotlight_panel.set_account(account, rank_data, profile_url)
-        self.account_spotlight_panel.show()
 
-        # Keep the logged-in account selected in the list if needed.
+        # Keep the logged-in account row selected.
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if item.data(Qt.UserRole) == account.username:
@@ -7135,6 +7136,11 @@ QMenu#trayQuickMenu::separator {
         """Refresh the account list display"""
         self.account_list.setUpdatesEnabled(False)
         try:
+            # Re-parent spotlight panel before clear() so Qt doesn't delete it
+            # (QAbstractItemView::clear() calls deleteLater on all item widgets).
+            if self.account_spotlight_panel:
+                self.account_spotlight_panel.setParent(self.account_list_background)
+                self.account_spotlight_panel.hide()
             self.account_list.clear()
 
             if not self.account_manager:
@@ -7193,6 +7199,21 @@ QMenu#trayQuickMenu::separator {
                     )
                     widget.setFixedHeight(row_height)
                     self.account_list.setItemWidget(item, widget)
+
+                    # After adding the logged-in account row, inject the spotlight
+                    # panel as the very next item so it appears directly below it.
+                    if (
+                        not self._in_champ_select_mode
+                        and self._logged_in_username
+                        and account.username == self._logged_in_username
+                        and self.account_spotlight_panel
+                    ):
+                        spotlight_item = QListWidgetItem()
+                        spotlight_item.setFlags(Qt.NoItemFlags)
+                        spotlight_item.setSizeHint(QSize(0, 480))
+                        self.account_list.addItem(spotlight_item)
+                        self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
+                        self.account_spotlight_panel.show()
 
                 self.update_account_item_states()
                 if fetch_ranks and self._show_ranks:
