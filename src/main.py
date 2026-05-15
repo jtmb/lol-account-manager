@@ -19,8 +19,6 @@ os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "PassThrough")
 from PyQt5.QtCore import Qt, QCoreApplication, QTimer
 from PyQt5.QtWidgets import QApplication
 
-QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
@@ -158,6 +156,11 @@ def main():
 
         # Ensure accidental top-level Qt windows never use the default "python" title.
         QCoreApplication.setApplicationName("League of Legends Account Manager")
+
+        # Must be set as class-level attributes BEFORE QApplication() is created.
+        # The env vars above handle Qt's native layer; these cover the Qt/C++ side.
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
         app = QApplication(sys.argv)
         app.setStyle("Fusion")
