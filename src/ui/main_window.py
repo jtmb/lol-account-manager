@@ -5607,11 +5607,42 @@ class MainWindow(QMainWindow):
         if self.account_spotlight_panel._web_view is not None:
             js = r"""
 (function() {
-    /* Force elements to recalculate with new viewport width */
-    document.querySelectorAll('[class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
-        el.style.maxWidth = 'none';
-        el.style.width = '100%';
-    });
+    var applyStyles = function() {
+        /* Force all layout containers to full width */
+        document.querySelectorAll('body, html, [class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
+            el.style.maxWidth = 'none !important';
+            el.style.width = '100% !important';
+            el.style.boxSizing = 'border-box';
+        });
+        /* Force specific u.gg containers */
+        document.querySelectorAll('[class*="ProfileContainer"], [class*="profile-container"], [class*="PageContainer"], [class*="page-container"]').forEach(function(el) {
+            el.style.maxWidth = 'none !important';
+            el.style.width = '100% !important';
+        });
+    };
+    
+    /* Apply immediately */
+    applyStyles();
+    
+    /* Re-apply on DOM mutations (React re-renders) */
+    if (!window._ugg_observer) {
+        var observer = new MutationObserver(function() {
+            applyStyles();
+        });
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+        window._ugg_observer = observer;
+    }
+    
+    /* Also watch for window resize and re-apply */
+    if (!window._ugg_resize_applied) {
+        window._ugg_resize_applied = true;
+        window.addEventListener('resize', applyStyles, { passive: true });
+    }
 })();
 """
             self.account_spotlight_panel._web_view.page().runJavaScript(js)
@@ -5650,7 +5681,7 @@ class MainWindow(QMainWindow):
         
         # Re-run the u.gg embed CSS when window is maximized/restored
         if event.type() == QEvent.WindowStateChange:
-            QTimer.singleShot(100, self._reapply_ugg_embed_css)
+            QTimer.singleShot(300, self._reapply_ugg_embed_css)
         
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
         if (
