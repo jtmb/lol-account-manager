@@ -5613,33 +5613,50 @@ class MainWindow(QMainWindow):
         if self.account_spotlight_panel._web_view is not None:
             js = r"""
 (function() {
-    /* Remove all max-width constraints that might prevent full width */
+    /* Create aggressive stylesheet that forces full width everywhere */
     var style = document.createElement('style');
     style.textContent = [
-        '* { max-width: none !important; }',
-        'body, html { width: 100% !important; margin: 0 !important; padding: 0 !important; }',
+        '* { max-width: none !important; min-width: auto !important; }',
+        'html, body { width: 100% !important; height: 100% !important; margin: 0 !important; padding: 0 !important; }',
         '[style*="max-width"] { max-width: none !important; }',
-        '[style*="width: "] { width: 100% !important; }'
+        '[role="main"] { width: 100% !important; }',
+        '[role="application"] { width: 100% !important; }',
+        '.container { width: 100% !important; max-width: none !important; }',
+        '.wrapper { width: 100% !important; max-width: none !important; }',
+        '[class*="container"] { width: 100% !important; max-width: none !important; }',
+        '[class*="wrapper"] { width: 100% !important; max-width: none !important; }',
+        '[class*="content"] { width: 100% !important; max-width: none !important; }',
+        '[class*="main"] { width: 100% !important; max-width: none !important; }',
+        '[style*="width: "] { width: auto !important; }',
+        'svg { width: 100% !important; }',
+        'img { max-width: 100% !important; }',
+        '.sr-only { display: none !important; }'
     ].join(' ');
     document.head.appendChild(style);
     
-    /* Force all elements to recalculate with full viewport */
+    /* Iterate all elements and strip width constraints */
     document.querySelectorAll('*').forEach(function(el) {
         if (el.style.maxWidth && el.style.maxWidth !== 'none') {
             el.style.maxWidth = 'none';
+            el.style.width = '100%';
         }
-        var computedStyle = window.getComputedStyle(el);
-        if (computedStyle.maxWidth && computedStyle.maxWidth !== 'none') {
-            el.style.maxWidth = 'none !important';
+        if (el.style.width && el.style.width.includes('px')) {
+            el.style.width = 'auto';
         }
     });
     
-    /* Dispatch synthetic resize event to trigger React re-layout */
-    window.dispatchEvent(new Event('resize', { bubbles: true }));
-    window.dispatchEvent(new Event('orientationchange', { bubbles: true }));
+    /* Force browser layout recalculation multiple times */
+    var h = document.documentElement.offsetHeight;
     
-    /* Force browser layout recalculation */
-    void document.documentElement.offsetHeight;
+    /* Dispatch multiple resize events to wake up React */
+    for (var i = 0; i < 3; i++) {
+        (function(index) {
+            setTimeout(function() {
+                window.dispatchEvent(new Event('resize', { bubbles: true }));
+                window.dispatchEvent(new Event('orientationchange', { bubbles: true }));
+            }, i * 50);
+        })(i);
+    }
 })();
 """
             self.account_spotlight_panel._web_view.page().runJavaScript(js)
@@ -5659,7 +5676,10 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._update_spotlight_size_hint()
+        # Update spotlight size and reapply CSS for every resize
+        # (both manual drag and maximize button result in resizeEvent)
+        QTimer.singleShot(10, self._update_spotlight_size_hint)
+        QTimer.singleShot(100, self._reapply_ugg_embed_css)
         if self._suppress_window_size_persistence:
             return
         if self.isMaximized() or self.isFullScreen():
@@ -5680,6 +5700,8 @@ class MainWindow(QMainWindow):
         if event.type() == QEvent.WindowStateChange:
             QTimer.singleShot(100, self._update_spotlight_size_hint)
             QTimer.singleShot(300, self._reapply_ugg_embed_css)
+            # Set flag to trigger additional CSS reapply on next resize
+            self._should_reapply_css_on_resize = True
         
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
         if (
@@ -5690,6 +5712,14 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(80, self._apply_champ_select_window_size)
         else:
             self._maybe_reapply_layout_for_dpi()
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        
+        # After maximize, Qt continues to resize the window. Catch this to reapply CSS.
+        if getattr(self, '_should_reapply_css_on_resize', False):
+            QTimer.singleShot(50, self._reapply_ugg_embed_css)
+            self._should_reapply_css_on_resize = False
     
     def toggle_theme(self):
         """Force dark mode."""
