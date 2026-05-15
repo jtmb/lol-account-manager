@@ -5191,6 +5191,16 @@ class MainWindow(QMainWindow):
         top_row.addWidget(title)
 
         top_row.addStretch()
+        self._home_button = QPushButton("")
+        self._home_button.setObjectName("homeIconButton")
+        self._home_button.setFixedSize(26, 26)
+        self._home_button.setAutoDefault(False)
+        self._home_button.setDefault(False)
+        self._home_button.setToolTip("Back to Home")
+        self._home_button.setEnabled(False)
+        self._home_button.clicked.connect(self._on_home_button_clicked)
+        top_row.addWidget(self._home_button, 0, Qt.AlignVCenter)
+
         self._refresh_button = ClickableIconLabel()
         self._refresh_button.setObjectName("refreshIconButton")
         self._refresh_button.setFixedSize(26, 26)
@@ -5632,12 +5642,24 @@ class MainWindow(QMainWindow):
                     self._reapply_ugg_embed_css()
                 break
 
+    def _on_home_button_clicked(self):
+        """Exit spotlight mode and return to the normal home view."""
+        if not self.account_spotlight_panel:
+            return
+        # Re-parent and hide spotlight, then refresh the list
+        self.account_spotlight_panel.setParent(self.account_list_background)
+        self.account_spotlight_panel.hide()
+        self._exit_spotlight_ui_mode()
+        self.refresh_account_list(fetch_ranks=False)
+
     def _enter_spotlight_ui_mode(self):
         """Hide filters, bottom buttons and main scrollbar while spotlight is visible."""
         self._filter_row_widget.hide()
         self._button_row_widget.hide()
         self.lol_path_label.hide()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._home_button.setEnabled(True)
+        self._set_icon_state(self._home_button, "normal")
 
     def _exit_spotlight_ui_mode(self):
         """Restore filters, bottom buttons and scrollbar when spotlight is hidden."""
@@ -5645,6 +5667,8 @@ class MainWindow(QMainWindow):
         self._button_row_widget.show()
         self.lol_path_label.show()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._home_button.setEnabled(False)
+        self._set_icon_state(self._home_button, "normal")
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
@@ -5940,6 +5964,7 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
+            self._home_button: "home",
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
@@ -5975,6 +6000,9 @@ class MainWindow(QMainWindow):
                 self._set_icon_state(button, "hover" if button.underMouse() else "normal")
         # Clean stylesheet for icon buttons
         self._refresh_button.setStyleSheet("background-color: transparent; border: none; padding: 0px; margin: 0px;")
+        self._home_button.setStyleSheet(
+            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+        )
         self._settings_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
         )
@@ -6028,6 +6056,8 @@ class MainWindow(QMainWindow):
         elif icon_type == "settings":
             # Draw gear (settings icon)
             self._draw_settings_icon(painter, size, color)
+        elif icon_type == "home":
+            self._draw_home_icon(painter, size, color)
         
         painter.end()
         return QIcon(pixmap)
@@ -6072,7 +6102,40 @@ class MainWindow(QMainWindow):
         painter.setBrush(color)
         painter.setPen(Qt.NoPen)
         painter.drawPath(arrow_path)
-    
+
+    def _draw_home_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic house/home icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        m = size / 24.0  # scale factor (designed on 24px grid)
+
+        # Roof triangle
+        roof = QPainterPath()
+        roof.moveTo(12 * m, 2 * m)   # apex
+        roof.lineTo(22 * m, 11 * m)  # right eave
+        roof.lineTo(2  * m, 11 * m)  # left eave
+        roof.closeSubpath()
+        painter.drawPath(roof)
+
+        # House body (rectangle below roof)
+        body_x = 5 * m
+        body_y = 11 * m
+        body_w = 14 * m
+        body_h = 10 * m
+        painter.drawRect(QRectF(body_x, body_y, body_w, body_h))
+
+        # Door cutout (punch out with background colour so it looks like a door)
+        door_w = 5 * m
+        door_h = 6 * m
+        door_x = (size - door_w) / 2
+        door_y = 21 * m - door_h
+        bg = painter.background().color()
+        # Use transparent to cut out the door opening
+        painter.setBrush(Qt.transparent)
+        painter.setCompositionMode(QPainter.CompositionMode_Clear)
+        painter.drawRect(QRectF(door_x, door_y, door_w, door_h))
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+
     def _draw_settings_icon(self, painter: QPainter, size: int, color: QColor):
         """Draw a minimalistic settings/gear icon."""
         painter.setBrush(color)
