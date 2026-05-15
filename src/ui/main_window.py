@@ -5630,8 +5630,10 @@ class MainWindow(QMainWindow):
                 break
 
     def _update_spotlight_size_hint(self):
-        """Resize the spotlight list item so it fills the viewport height below
-        the account row, expanding/shrinking as the window changes."""
+        """Resize the spotlight list item so it fills the viewport height.
+        Setting height = full viewport height ensures that, once the account
+        row above is scrolled to the top, all rows below the spotlight are
+        pushed off-screen regardless of any spacing/DPI differences."""
         if not self.account_spotlight_panel:
             return
         viewport_h = self.account_list.viewport().height()
@@ -5640,19 +5642,14 @@ class MainWindow(QMainWindow):
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                # Height available = viewport minus everything above the spotlight.
-                used = sum(
-                    self.account_list.item(i).sizeHint().height()
-                    for i in range(index)
-                )
-                new_h = max(380, viewport_h - used)
+                new_h = max(380, viewport_h)
                 if item.sizeHint().height() != new_h:
                     item.setSizeHint(QSize(0, new_h))
                     self.account_spotlight_panel.setMinimumHeight(new_h)
                     self.account_list.doItemsLayout()
                     self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
-                # Always restore scroll position after doItemsLayout resets it
+                # Always restore scroll after doItemsLayout resets it
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
                     if row_above:
