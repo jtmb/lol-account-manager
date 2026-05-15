@@ -4108,43 +4108,82 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Aggressively remove top spacing */
+            /* Aggressively collapse all spacing */
             'body { margin:0!important; padding:0!important; }',
             'html { margin:0!important; padding:0!important; }',
-            'body > * { margin-top:0!important; padding-top:0!important; }',
-            'body > div:first-child { margin:0!important; padding:0!important; }',
-            'body > div { margin-top:0!important; }',
-            'main { margin-top:0!important; padding-top:0!important; }',
-            '[role="main"] { margin-top:0!important; padding-top:0!important; }'
+            'body > * { margin:0!important; padding:0!important; }',
+            'main { margin:0!important; padding:0!important; }',
+            '[role="main"] { margin:0!important; padding:0!important; }',
+            /* Collapse empty containers */
+            'div:empty { display:none!important; }',
+            /* Force fit-content sizing to eliminate gaps */
+            'body { height:auto!important; }',
+            'body > div { height:auto!important; }',
+            'body > div > * { margin:0!important; }',
+            'body > div > * > * { margin-top:0!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
-        /* ── immediately strip margins from all divs ─── */
+        /* ── immediately and aggressively strip spacing ─── */
         setTimeout(function() {
-            document.querySelectorAll('body > div').forEach(function(el, idx) {
+            /* Remove all margin and padding from body and direct children */
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.body.style.height = 'auto';
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            
+            /* Strip all divs under body */
+            var bodyDivs = document.querySelectorAll('body > div');
+            bodyDivs.forEach(function(el, idx) {
+                el.style.margin = '0';
+                el.style.padding = '0';
                 el.style.marginTop = '0';
                 el.style.paddingTop = '0';
-                if (idx === 0) {
-                    el.style.margin = '0';
-                    el.style.padding = '0';
+                el.style.height = 'auto';
+                el.style.minHeight = 'auto';
+                
+                /* Strip spacing from all children */
+                var allChildren = el.querySelectorAll('*');
+                allChildren.forEach(function(child) {
+                    if (child.offsetHeight === 0 && child.offsetWidth === 0) {
+                        child.style.display = 'none';
+                    }
+                    child.style.marginTop = '0';
+                    child.style.paddingTop = '0';
+                });
+            });
+            
+            /* Pull first content up */
+            var firstDiv = document.querySelector('body > div');
+            if (firstDiv && firstDiv.firstChild) {
+                firstDiv.firstChild.style.marginTop = '-9999px';
+                firstDiv.firstChild.style.marginTop = '0';
+            }
+        }, 30);
+        
+        /* ── run it again after React renders ─── */
+        setTimeout(function() {
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.querySelectorAll('body > div').forEach(function(el) {
+                el.style.margin = '0';
+                el.style.padding = '0';
+                el.style.marginTop = '0';
+                el.style.paddingTop = '0';
+                el.style.height = 'auto';
+            });
+            document.querySelectorAll('body *').forEach(function(el) {
+                if (el.offsetHeight === 0 && el.offsetWidth === 0) {
+                    el.style.display = 'none';
                 }
             });
-            /* Find first content div and strip top space */
-            var firstDiv = document.querySelector('body > div');
-            if (firstDiv) {
-                var children = firstDiv.children;
-                if (children.length > 0) {
-                    children[0].style.marginTop = '0';
-                    children[0].style.paddingTop = '0';
-                }
-            }
-        }, 50);
+        }, 500);
         
         /* ── set up resize listener ─── */
         if (!window._ugg_embed_resize_listener_set) {
             window._ugg_embed_resize_listener_set = true;
             window.addEventListener('resize', function() {
-                /* Just dispatch another resize to trigger re-layout */
                 window.dispatchEvent(new Event('resize', { bubbles: true }));
             }, { passive: true });
         }
