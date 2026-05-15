@@ -1093,6 +1093,8 @@ class _UggBuildFetchThread(QThread):
             "core_item_ids": [int(x) for x in (rec_core.get("ids") or []) if str(x).isdigit()],
             "skill_priority": [str(x) for x in (rec_skills.get("slots") or [])],
             "skill_path": [str(x) for x in (rec_skill_path.get("slots") or [])],
+            "skill_matches": int(rec_skill_path.get("matches", 0) or 0),
+            "skill_win_rate": float(rec_skill_path.get("win_rate", 0.0) or 0.0),
             "item_stage_options": item_stage_options,
         }
         self.build_ready.emit(out)
@@ -1377,15 +1379,6 @@ class InClientGamePanel(AccountListBackgroundFrame):
             build_layout.addWidget(meta_lbl)
             self._stage_option_meta_labels[stage_num] = meta_lbl
 
-        self._skill_priority_label = QLabel("Skill Priority: —")
-        self._skill_priority_label.setStyleSheet("color: #cdd6f4; font-size: 8pt;")
-        build_layout.addWidget(self._skill_priority_label)
-
-        self._skill_path_label = QLabel("Skill Path: —")
-        self._skill_path_label.setWordWrap(True)
-        self._skill_path_label.setStyleSheet("color: #94a0be; font-size: 8pt;")
-        build_layout.addWidget(self._skill_path_label)
-
         build_layout.addStretch()
 
         self._left_stack.addWidget(runes_page)
@@ -1472,6 +1465,62 @@ class InClientGamePanel(AccountListBackgroundFrame):
         content_row.addWidget(right_card, 2)
         outer.addLayout(content_row)
 
+        # Bottom card: dedicated skill section
+        skill_card = QFrame()
+        skill_card.setObjectName("gameSkillCard")
+        skill_card.setStyleSheet(
+            "QFrame#gameSkillCard {"
+            "background: rgba(20, 24, 36, 0.78);"
+            "border: 1px solid #2f3548;"
+            "border-radius: 10px;"
+            "}"
+        )
+        skill_layout = QHBoxLayout(skill_card)
+        skill_layout.setContentsMargins(12, 10, 12, 10)
+        skill_layout.setSpacing(14)
+
+        # Left: priority
+        priority_col = QVBoxLayout()
+        priority_col.setSpacing(6)
+        priority_title = QLabel("Skill Priority")
+        priority_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        priority_col.addWidget(priority_title)
+
+        self._skill_priority_row = QHBoxLayout()
+        self._skill_priority_row.setSpacing(6)
+        priority_col.addLayout(self._skill_priority_row)
+
+        self._skill_priority_meta = QLabel("—")
+        self._skill_priority_meta.setStyleSheet("color: #94a0be; font-size: 8pt;")
+        priority_col.addWidget(self._skill_priority_meta)
+        priority_col.addStretch()
+
+        # Right: path grid
+        path_col = QVBoxLayout()
+        path_col.setSpacing(6)
+        path_header = QHBoxLayout()
+        path_title = QLabel("Skill Path")
+        path_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        path_subtitle = QLabel("Most popular ability leveling order")
+        path_subtitle.setStyleSheet("color: #7f8aa3; font-size: 8pt;")
+        path_header.addWidget(path_title)
+        path_header.addWidget(path_subtitle)
+        path_header.addStretch()
+        path_col.addLayout(path_header)
+
+        self._skill_path_grid = QGridLayout()
+        self._skill_path_grid.setHorizontalSpacing(4)
+        self._skill_path_grid.setVerticalSpacing(4)
+        path_col.addLayout(self._skill_path_grid)
+
+        self._skill_path_meta = QLabel("—")
+        self._skill_path_meta.setStyleSheet("color: #94a0be; font-size: 8pt;")
+        path_col.addWidget(self._skill_path_meta)
+
+        skill_layout.addLayout(priority_col, 1)
+        skill_layout.addLayout(path_col, 4)
+        outer.addWidget(skill_card)
+
         # ── Status hint ───────────────────────────────────────────────────
         self._status_label = QLabel("Waiting for champion selection…")
         self._status_label.setWordWrap(True)
@@ -1480,8 +1529,6 @@ class InClientGamePanel(AccountListBackgroundFrame):
         outer.addWidget(self._status_label)
 
         self._set_left_view(0)
-
-        outer.addStretch()
 
         self._load_runes_reforged_map()
         self._load_rune_path_icons()
@@ -1726,6 +1773,80 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._image_threads.append(t)
         t.start()
 
+    def _render_skill_section(self, skill_priority: list[str], skill_path: list[str], skill_wr: float = 0.0, skill_matches: int = 0):
+        self._clear_layout(self._skill_priority_row)
+        self._clear_layout(self._skill_path_grid)
+
+        color_by_skill = {
+            "Q": "#4fb4ff",
+            "W": "#ff9f43",
+            "E": "#f5cd5a",
+            "R": "#d16cff",
+        }
+
+        if skill_priority:
+            for idx, skill in enumerate(skill_priority[:3]):
+                s = str(skill).upper().strip()
+                bubble = QLabel(s or "—")
+                bubble.setAlignment(Qt.AlignCenter)
+                bubble.setFixedSize(28, 28)
+                color = color_by_skill.get(s, "#5b6078")
+                bubble.setStyleSheet(
+                    f"border-radius: 14px; background: #1e1e2e; border: 1px solid {color}; color: {color}; font-weight: bold;"
+                )
+                self._skill_priority_row.addWidget(bubble)
+                if idx < min(2, len(skill_priority) - 1):
+                    arrow = QLabel("→")
+                    arrow.setStyleSheet("color: #a6adc8; font-size: 11pt;")
+                    self._skill_priority_row.addWidget(arrow)
+            self._skill_priority_meta.setText(f"{skill_wr:.2f}% WR · {skill_matches:,} matches")
+        else:
+            empty = QLabel("—")
+            empty.setStyleSheet("color: #7f8aa3; font-size: 9pt;")
+            self._skill_priority_row.addWidget(empty)
+            self._skill_priority_meta.setText("—")
+        self._skill_priority_row.addStretch()
+
+        # Grid headers
+        row_skills = ["Q", "W", "E", "R"]
+        for col in range(1, 19):
+            header = QLabel(str(col))
+            header.setAlignment(Qt.AlignCenter)
+            header.setFixedSize(22, 16)
+            header.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
+            self._skill_path_grid.addWidget(header, 0, col)
+
+        for row_idx, skill in enumerate(row_skills, start=1):
+            row_lbl = QLabel(skill)
+            row_lbl.setAlignment(Qt.AlignCenter)
+            row_lbl.setFixedSize(22, 22)
+            row_lbl.setStyleSheet(
+                f"border-radius: 4px; background: #1e1e2e; color: {color_by_skill.get(skill, '#cdd6f4')}; font-weight: bold;"
+            )
+            self._skill_path_grid.addWidget(row_lbl, row_idx, 0)
+
+            for lv in range(1, 19):
+                cell = QLabel("")
+                cell.setAlignment(Qt.AlignCenter)
+                cell.setFixedSize(22, 22)
+                cell.setStyleSheet("border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: 7pt;")
+
+                if lv <= len(skill_path):
+                    picked = str(skill_path[lv - 1]).upper().strip()
+                    if picked == skill:
+                        color = color_by_skill.get(skill, "#4fb4ff")
+                        cell.setText(str(lv))
+                        cell.setStyleSheet(
+                            f"border-radius: 4px; background: {color}; color: #0b1020; font-size: 7pt; font-weight: bold;"
+                        )
+                self._skill_path_grid.addWidget(cell, row_idx, lv)
+
+        if skill_path:
+            compact = "  ".join(f"{i + 1}:{str(s).upper()}" for i, s in enumerate(skill_path[:18]))
+            self._skill_path_meta.setText(compact)
+        else:
+            self._skill_path_meta.setText("—")
+
     def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int):
         self._clear_layout(container_layout)
         style = self._rune_style_data_by_id.get(style_id)
@@ -1798,8 +1919,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             meta = self._stage_option_meta_labels.get(stage_num)
             if meta:
                 meta.setText("—")
-        self._skill_priority_label.setText("Skill Priority: —")
-        self._skill_path_label.setText("Skill Path: —")
+        self._render_skill_section([], [], 0.0, 0)
 
     def _apply_build_data(self, data: dict):
         role_name = str(data.get("role", "") or "").upper()
@@ -1966,17 +2086,13 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
         # Skill sections
         skill_priority = [str(s).upper() for s in (data.get("skill_priority") or []) if str(s).strip()]
-        if skill_priority:
-            self._skill_priority_label.setText("Skill Priority: " + " -> ".join(skill_priority[:3]))
-        else:
-            self._skill_priority_label.setText("Skill Priority: —")
-
         skill_path = [str(s).upper() for s in (data.get("skill_path") or []) if str(s).strip()]
-        if skill_path:
-            parts = [f"{i + 1}:{slot}" for i, slot in enumerate(skill_path[:18])]
-            self._skill_path_label.setText("Skill Path: " + "  ".join(parts))
-        else:
-            self._skill_path_label.setText("Skill Path: —")
+        self._render_skill_section(
+            skill_priority,
+            skill_path,
+            float(data.get("skill_win_rate", 0.0) or 0.0),
+            int(data.get("skill_matches", 0) or 0),
+        )
 
     def update_payload(self, payload: dict):
         in_game = bool(payload.get("in_game", False))
