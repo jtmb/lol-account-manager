@@ -402,6 +402,68 @@ def _hide_windows_console_window():
         pass
 
 
+def _hide_stray_python_console_windows():
+    """Hide stray top-level python console windows that may flash on Windows.
+
+    Some environments can briefly surface a console window titled "python"
+    during heavy UI repaints or extension hooks. We suppress only console-class
+    windows with python-like titles to avoid touching normal app windows.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    try:
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+    except Exception:
+        return
+
+    # Always hide this process console if one is attached.
+    try:
+        hwnd = kernel32.GetConsoleWindow()
+        if hwnd:
+            user32.ShowWindow(hwnd, 0)
+    except Exception:
+        pass
+
+    try:
+        get_class = user32.GetClassNameW
+        get_text = user32.GetWindowTextW
+        get_text_len = user32.GetWindowTextLengthW
+        is_visible = user32.IsWindowVisible
+        show_window = user32.ShowWindow
+
+        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+        def _enum_cb(hwnd, _lparam):
+            try:
+                if not is_visible(hwnd):
+                    return True
+
+                class_buf = ctypes.create_unicode_buffer(256)
+                get_class(hwnd, class_buf, 255)
+                if class_buf.value != "ConsoleWindowClass":
+                    return True
+
+                text_len = get_text_len(hwnd)
+                if text_len <= 0:
+                    return True
+
+                text_buf = ctypes.create_unicode_buffer(text_len + 1)
+                get_text(hwnd, text_buf, text_len + 1)
+                title = (text_buf.value or "").strip().lower()
+
+                if title == "python" or title.startswith("python "):
+                    show_window(hwnd, 0)
+            except Exception:
+                pass
+            return True
+
+        user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+    except Exception:
+        pass
+
+
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -3345,6 +3407,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         _hide_windows_console_window()
+        _hide_stray_python_console_windows()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
@@ -3465,6 +3528,11 @@ class MainWindow(QMainWindow):
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
+        if sys.platform.startswith("win"):
+            self._console_guard_timer = QTimer(self)
+            self._console_guard_timer.setInterval(50)
+            self._console_guard_timer.timeout.connect(_hide_stray_python_console_windows)
+            self._console_guard_timer.start()
         QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
             QTimer.singleShot(4000, self._check_for_updates)
@@ -3910,10 +3978,12 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         # Refresh button should not force a full stylesheet reapply.
+        _hide_stray_python_console_windows()
         self._apply_account_list_background()
         self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
+        _hide_stray_python_console_windows()
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4195,6 +4265,7 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
+        _hide_stray_python_console_windows()
         theme_before = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -4326,6 +4397,7 @@ class MainWindow(QMainWindow):
             self.update_account_item_states()
 
         self.refresh_account_list(fetch_ranks=False)
+        _hide_stray_python_console_windows()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
