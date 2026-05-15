@@ -4108,81 +4108,90 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             /* Hide by class patterns */
             '[class*="Sidebar"] { display:none!important; visibility:hidden!important; }',
             '[class*="sidebar"] { display:none!important; visibility:hidden!important; }',
-            /* Remove all margins and padding from body */
-            'body, html { margin:0!important; padding:0!important; }',
-            /* Force all top-level elements to have 0 margin */
-            'body > * { margin:0!important; margin-top:0!important; padding:0!important; padding-top:0!important; }'
+            /* Aggressive body collapse */
+            'body, html { margin:0!important; padding:0!important; min-height:auto!important; height:auto!important; }',
+            'body > * { margin:0!important; margin-top:0!important; padding:0!important; padding-top:0!important; }',
+            /* Force content to align top with no gaps */
+            'body { display:flex!important; flex-direction:column!important; align-items:stretch!important; }',
+            'body > div:first-child { margin-top:-9999px!important; }'
         ].join(' ');
         (document.head || document.documentElement).appendChild(s);
         
-        /* ── find and collapse the spacer element ─── */
+        /* ── immediate aggressive pass ─── */
         setTimeout(function() {
+            /* Zero out everything */
             document.body.style.margin = '0';
             document.body.style.padding = '0';
+            document.body.style.marginTop = '0';
+            document.body.style.paddingTop = '0';
             document.documentElement.style.margin = '0';
             document.documentElement.style.padding = '0';
             
-            /* Find any element that has large height but no visible content at top of page */
-            var allEls = document.querySelectorAll('body > *');
-            for (var i = 0; i < allEls.length; i++) {
-                var el = allEls[i];
-                var rect = el.getBoundingClientRect();
-                
-                /* If element is near top and mostly empty, collapse it */
-                if (rect.top < 100 && rect.height > 100 && el.children.length === 0) {
-                    el.style.display = 'none';
-                    continue;
-                }
-                
-                /* Force 0 margin/padding on first element */
-                if (i === 0) {
-                    el.style.margin = '0';
-                    el.style.marginTop = '0';
-                    el.style.paddingTop = '0';
-                }
-            }
+            /* Scroll everything to absolute top */
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
             
-            /* Force scroll to top */
-            if (window.scrollY > 0) {
-                window.scrollTo(0, 0);
+            /* Find actual content container and pull it up */
+            var mainWrapper = document.querySelector('body > div:first-child');
+            if (mainWrapper) {
+                mainWrapper.style.marginTop = '0';
+                mainWrapper.style.margin = '0';
+                mainWrapper.style.padding = '0';
+                mainWrapper.style.paddingTop = '0';
+                
+                /* Measure how far down the real content starts */
+                var allKids = mainWrapper.children;
+                var minTop = 9999;
+                for (var i = 0; i < allKids.length; i++) {
+                    var rect = allKids[i].getBoundingClientRect();
+                    if (rect.height > 0 && rect.top < minTop) {
+                        minTop = rect.top;
+                    }
+                }
+                
+                /* If there's a gap, use negative margin to pull content up */
+                if (minTop > 50) {
+                    mainWrapper.style.marginTop = '-' + minTop + 'px';
+                }
             }
         }, 50);
         
-        /* ── aggressive target: collapse specific spacer/wrapper divs ─── */
+        /* ── second pass: nuclear option - hide the first empty section ─── */
         setTimeout(function() {
-            document.querySelectorAll('body > div').forEach(function(el, idx) {
-                var childCount = el.children.length;
-                var textLength = el.innerText.length;
+            var sections = document.querySelectorAll('body > div > div, body > div > section, body > div > main');
+            sections.forEach(function(el) {
+                var text = el.innerText || el.textContent;
+                var hasContent = text && text.trim().length > 0;
+                var height = el.offsetHeight;
                 
-                /* If first div and it's huge but has no content before the champion card, hide it */
-                if (idx === 0 && el.offsetHeight > 200 && textLength < 50) {
-                    el.style.maxHeight = '0';
-                    el.style.height = '0';
-                    el.style.overflow = 'hidden';
-                    el.style.padding = '0';
-                    el.style.margin = '0';
+                /* If section is tall but has no text content, it's a spacer - hide it */
+                if (!hasContent && height > 100) {
+                    el.style.display = 'none';
                 }
-                
-                /* Clear all margin/gap on any flex container */
-                el.style.gap = '0';
-                el.style.rowGap = '0';
-                el.style.margin = '0';
-                el.style.marginTop = '0';
             });
         }, 100);
         
-        /* ── final: if there's still content showing, force it to top ─── */
+        /* ── third pass: verify everything is at top ─── */
         setTimeout(function() {
-            var allContent = document.querySelectorAll('[class*="Overview"], [class*="Stats"], [class*="Champion"]');
-            if (allContent.length > 0 && allContent[0].offsetTop > 50) {
-                var topContent = allContent[0];
-                var parent = topContent.parentElement;
-                if (parent) {
-                    parent.style.marginTop = '0';
-                    parent.style.paddingTop = '0';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            window.scrollTo(0, 0);
+            
+            /* Force any flex gaps to be 0 */
+            var allDivs = document.querySelectorAll('*');
+            allDivs.forEach(function(el) {
+                var computed = window.getComputedStyle(el);
+                if (computed.gap && computed.gap !== '0px') {
+                    el.style.gap = '0';
                 }
-                topContent.parentElement.parentElement.style.marginTop = '0';
-            }
+                if (computed.rowGap && computed.rowGap !== '0px') {
+                    el.style.rowGap = '0';
+                }
+                if (el.offsetTop < 200) {
+                    el.style.marginTop = '0';
+                }
+            });
         }, 300);
         
         /* ── set up resize listener ─── */
