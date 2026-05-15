@@ -1360,6 +1360,7 @@ class SettingsDialog(QDialog):
         self._theme_color_previous_values: dict[str, str] = {}
         self._apply_callback = apply_callback
         self._preview_callback = preview_callback
+        self._save_requested = False
         self.init_ui()
 
     def _default_settings_values(self) -> dict:
@@ -2518,15 +2519,8 @@ class SettingsDialog(QDialog):
 
     def _save_and_close(self):
         """Apply settings and close the dialog."""
-        values = self.get_values()
+        self._save_requested = True
         self.accept()
-        # Apply after the dialog closes to avoid repainting the main window
-        # under an active modal, which can create transient top-level flashes.
-        if self._apply_callback:
-            QTimer.singleShot(0, lambda: self._apply_callback(values))
-        QTimer.singleShot(25, _hide_any_python_titled_window)
-        QTimer.singleShot(75, _hide_any_python_titled_window)
-        QTimer.singleShot(150, _hide_any_python_titled_window)
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -4113,7 +4107,8 @@ class MainWindow(QMainWindow):
                 if preview_was_applied[0]:
                     self._apply_settings_values(original_settings, persist=False)
                 return
-            # Save/Apply handlers inside the dialog already applied settings.
+            if getattr(dialog, "_save_requested", False):
+                self._apply_settings_values(dialog.get_values())
         finally:
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
