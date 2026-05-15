@@ -4167,6 +4167,23 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
 """
         self._web_view.page().runJavaScript(js)
 
+    def _reapply_ugg_embed_css(self):
+        """Re-apply the u.gg embed CSS (called when window state changes like maximize)."""
+        if not self.account_spotlight_panel or not self.account_spotlight_panel.isVisible():
+            return
+        # Trigger the CSS reset on the web page to adapt to new window size
+        if self.account_spotlight_panel._web_view is not None:
+            js = r"""
+(function() {
+    /* Force elements to recalculate with new viewport width */
+    document.querySelectorAll('[class*="Layout"], [class*="layout"], [class*="Container"], [class*="container"], [class*="Content"], [class*="content"], [class*="Wrapper"], [class*="wrapper"], main, [role="main"]').forEach(function(el) {
+        el.style.maxWidth = 'none';
+        el.style.width = '100%';
+    });
+})();
+"""
+            self.account_spotlight_panel._web_view.page().runJavaScript(js)
+
     def _apply_panel_styles(self):
         text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
         text_muted = "#9fb0d5" if self._is_dark_mode else "#4b5563"
@@ -5596,27 +5613,7 @@ class MainWindow(QMainWindow):
                 if item.sizeHint().height() != new_h:
                     item.setSizeHint(QSize(0, new_h))
                     self.account_spotlight_panel.setMinimumHeight(new_h)
-                break
-
-    def _update_spotlight_size_hint(self):
-        """Resize the spotlight list item so it fills the viewport height below
-        the logged-in account row, expanding/shrinking as the window changes."""
-        if not self.account_spotlight_panel:
-            return
-        viewport_h = self.account_list.viewport().height()
-        if viewport_h <= 0:
-            return
-        for index in range(self.account_list.count()):
-            item = self.account_list.item(index)
-            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                used = sum(
-                    self.account_list.item(i).sizeHint().height()
-                    for i in range(index)
-                )
-                new_h = max(380, viewport_h - used)
-                if item.sizeHint().height() != new_h:
-                    item.setSizeHint(QSize(0, new_h))
-                    self.account_spotlight_panel.setMinimumHeight(new_h)
+                    self._reapply_ugg_embed_css()
                 break
 
     def _persist_window_size(self):
@@ -5650,6 +5647,11 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, event):
         super().changeEvent(event)
+        
+        # Re-run the u.gg embed CSS when window is maximized/restored
+        if event.type() == QEvent.WindowStateChange:
+            QTimer.singleShot(100, self._reapply_ugg_embed_css)
+        
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
         if (
             screen_change_type is not None
