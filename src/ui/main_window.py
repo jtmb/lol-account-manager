@@ -5392,6 +5392,14 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(50, apply_clipping_mask)
         self.account_list_background.resizeEvent = resize_with_mask
 
+        # When the account list widget itself grows (e.g. filter/button rows hidden
+        # during spotlight mode) recompute the spotlight item height immediately.
+        _orig_list_resize = self.account_list.resizeEvent
+        def _list_resize_with_spotlight(event, _orig=_orig_list_resize):
+            _orig(event)
+            QTimer.singleShot(0, self._update_spotlight_size_hint)
+        self.account_list.resizeEvent = _list_resize_with_spotlight
+
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
             return
@@ -5604,7 +5612,9 @@ class MainWindow(QMainWindow):
 
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
-        QTimer.singleShot(0, self._update_spotlight_size_hint)
+        # Safety fallback: list resize event fires instantly if the viewport grew,
+        # but add a 200 ms shot in case the layout settles later.
+        QTimer.singleShot(200, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
@@ -7998,9 +8008,9 @@ QMenu#trayQuickMenu::separator {
 
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
-        # Compute size AFTER entering spotlight mode so the full viewport
-        # height (filter/button rows now hidden) is used.
-        QTimer.singleShot(0, self._update_spotlight_size_hint)
+        # Safety fallback at 200 ms; the list's own resizeEvent will also fire
+        # immediately if the viewport height changed when filter rows were hidden.
+        QTimer.singleShot(200, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
