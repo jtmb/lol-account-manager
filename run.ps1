@@ -149,7 +149,12 @@ Write-Host ""
 Write-Host "[*] Starting League of Legends Account Manager..."
 Write-Host ""
 
-& python src/main.py
+$pythonW = Join-Path $PSScriptRoot "venv\Scripts\pythonw.exe"
+if (Test-Path $pythonW) {
+    & $pythonW -m src.main
+} else {
+    & pythonw -m src.main
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

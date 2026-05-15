@@ -111,6 +111,9 @@ if not exist "%VENV_PYTHON%" (
     exit /b 1
 )
 
+set "VENV_PYTHONW=%CD%\venv\Scripts\pythonw.exe"
+if not exist "%VENV_PYTHONW%" set "VENV_PYTHONW=%VENV_PYTHON%"
+
 REM Install dependencies
 echo.
 echo [*] Installing dependencies (this may take 1-2 minutes)...
@@ -131,7 +134,7 @@ REM Run the application
 echo.
 echo [*] Starting League of Legends Account Manager...
 echo.
-"%VENV_PYTHON%" -m src.main
+"%VENV_PYTHONW%" -m src.main
 
 if !errorlevel! neq 0 (
     echo.
