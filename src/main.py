@@ -24,10 +24,6 @@ def _detach_console() -> None:
     if not sys.platform.startswith("win"):
         return
     try:
-        # Hide first so there's no visual glitch during detach
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
         ctypes.windll.kernel32.FreeConsole()
     except Exception:
         pass
