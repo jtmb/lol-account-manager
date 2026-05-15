@@ -58,7 +58,9 @@ LOG_FILE = LOGS_DIR / "app.log"
 GITHUB_RELEASES_API = "https://api.github.com/repos/jtmb/lol-account-manager/releases/latest"
 DDRAGON_VERSION = "14.24.1"
 DEFAULT_LOGGED_IN_HIGHLIGHT_DARK = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
+DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT = str(SETTINGS_PANEL_DEFAULTS.get("logged_in_gradient_color", "#6b7280"))
 DEFAULT_ROW_HOVER_HIGHLIGHT_DARK = "#45475a"
+DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT = "#c8c9d1"
 HOVER_HIGHLIGHT_THEME_AUTO = "__theme__"
 SPLASH_THEME_AUTO = "__none__"
 LOCKED_CHAMPION_SPLASH_EDGE_FADE = 80
@@ -71,21 +73,21 @@ DEFAULT_APP_ACCENT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_accent_color", "
 DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#45475a"))
 
 
-def _default_logged_in_highlight() -> str:
-    """Return the default logged-in highlight color."""
-    return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK
+def _default_logged_in_highlight(dark_mode: bool) -> str:
+    """Return theme-appropriate default logged-in highlight color."""
+    return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK if dark_mode else DEFAULT_LOGGED_IN_HIGHLIGHT_LIGHT
 
 
-def _default_row_hover_highlight() -> str:
-    """Return the default hover/selection row highlight color."""
-    return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK
+def _default_row_hover_highlight(dark_mode: bool) -> str:
+    """Return theme-appropriate default hover/selection row highlight color."""
+    return DEFAULT_ROW_HOVER_HIGHLIGHT_DARK if dark_mode else DEFAULT_ROW_HOVER_HIGHLIGHT_LIGHT
 
 
-def _resolve_row_hover_highlight(setting_value: str) -> str:
+def _resolve_row_hover_highlight(setting_value: str, dark_mode: bool) -> str:
     """Resolve effective hover color from saved setting or theme auto mode."""
     value = str(setting_value or HOVER_HIGHLIGHT_THEME_AUTO).strip()
     if value == HOVER_HIGHLIGHT_THEME_AUTO:
-        return _default_row_hover_highlight()
+        return _default_row_hover_highlight(dark_mode)
     return value
 
 
@@ -155,6 +157,7 @@ class AccountListBackgroundFrame(QFrame):
         self._opacity = 25
         self._edge_fade = 55
         self._inner_fade = 20
+        self._dark_mode = True
         self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
 
     def set_base_color(self, color: str):
@@ -171,6 +174,10 @@ class AccountListBackgroundFrame(QFrame):
         self._inner_fade = max(0, min(100, int(inner_fade)))
         self.update()
 
+    def set_dark_mode(self, enabled: bool):
+        self._dark_mode = bool(enabled)
+        self.update()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
@@ -183,22 +190,41 @@ class AccountListBackgroundFrame(QFrame):
         path.addRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
         painter.setClipPath(path)
 
-        painter.fillRect(rect, self._base_color)
+        base_color = self._base_color if self._dark_mode else QColor("#ededf0")
+        painter.fillRect(rect, base_color)
 
         if self._enabled and self._pixmap and not self._pixmap.isNull():
             target = rect.adjusted(1, 1, -1, -1)
             scaled = self._pixmap.scaled(target.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            x = max(0, (scaled.width() - target.width()) // 2)
+            if self._dark_mode:
+                x = max(0, (scaled.width() - target.width()) // 2)
+            else:
+                # In light mode, keep visual focus to the right so account text remains cleaner on the left.
+                x = max(0, int((scaled.width() - target.width()) * 0.68))
             y = max(0, (scaled.height() - target.height()) // 2)
             crop = scaled.copy(x, y, target.width(), target.height())
-            painter.setOpacity(self._opacity / 100.0)
+            effective_opacity = self._opacity
+            if not self._dark_mode:
+                # Light mode needs a stronger base image to avoid washed-out splash art.
+                effective_opacity = min(100, int(self._opacity * 1.25) + 6)
+            painter.setOpacity(effective_opacity / 100.0)
             painter.drawPixmap(target.topLeft(), crop)
             painter.setOpacity(1.0)
 
-            edge_alpha = int(230 * (self._edge_fade / 100.0))
+            if not self._dark_mode:
+                # Add a subtle veil across the left content area for text readability.
+                readability = QLinearGradient(rect.left(), 0, rect.left() + int(rect.width() * 0.68), 0)
+                readability.setColorAt(0.0, QColor(236, 240, 246, 125))
+                readability.setColorAt(0.55, QColor(236, 240, 246, 70))
+                readability.setColorAt(1.0, QColor(236, 240, 246, 10))
+                painter.fillRect(rect, readability)
+
+            edge_alpha_base = 230 if self._dark_mode else 135
+            edge_alpha = int(edge_alpha_base * (self._edge_fade / 100.0))
             if edge_alpha > 0:
-                edge_color = self._base_color
-                fade_width = max(24, int(min(rect.width(), rect.height()) * 0.20))
+                edge_color = base_color if self._dark_mode else QColor("#c8ccd6")
+                fade_ratio = 0.20 if self._dark_mode else 0.22
+                fade_width = max(24, int(min(rect.width(), rect.height()) * fade_ratio))
                 left_grad = QLinearGradient(rect.left(), 0, rect.left() + fade_width, 0)
                 left_grad.setColorAt(0.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), edge_alpha))
                 left_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
@@ -219,7 +245,8 @@ class AccountListBackgroundFrame(QFrame):
                 bottom_grad.setColorAt(1.0, QColor(edge_color.red(), edge_color.green(), edge_color.blue(), 0))
                 painter.fillRect(rect.left(), rect.bottom() - fade_width, rect.width(), fade_width, bottom_grad)
 
-            inner_alpha = int(120 * (self._inner_fade / 100.0))
+            inner_alpha_base = 120 if self._dark_mode else 110
+            inner_alpha = int(inner_alpha_base * (self._inner_fade / 100.0))
             if inner_alpha > 0:
                 radial = QRadialGradient(rect.center(), max(rect.width(), rect.height()) * 0.45)
                 radial.setColorAt(0.0, QColor(0, 0, 0, inner_alpha))
@@ -538,6 +565,161 @@ QTabBar::tab:hover:!selected {
 }
 """
 
+LIGHT_STYLESHEET = """
+QMainWindow, QDialog, QWidget {
+    background-color: #e7e8ec;
+    color: #2e2d2a;
+}
+QListWidget {
+    background-color: #ededf0;
+    border: 1px solid #c4c6cf;
+    border-radius: 6px;
+    padding: 0px;
+}
+QListWidget::item {
+    background: transparent;
+    border: none;
+    margin: 0px;
+    padding: 0px;
+}
+QListWidget::item:selected {
+    background: transparent;
+    border: none;
+}
+QListWidget::item:hover {
+    background: transparent;
+    border: none;
+}
+QScrollBar:vertical {
+    background: #dfdcd6;
+    width: 12px;
+    margin: 2px;
+    border: 1px solid #c4beb4;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #9b9489;
+    min-height: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #847c72;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: transparent;
+    height: 0px;
+}
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+QScrollBar:horizontal {
+    background: #dfdcd6;
+    height: 12px;
+    margin: 2px;
+    border: 1px solid #c4beb4;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #9b9489;
+    min-width: 26px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #847c72;
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: transparent;
+    width: 0px;
+}
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+}
+QPushButton {
+    background-color: #d2d3db;
+    color: #2e2d2a;
+    border: 1px solid #c4c6cf;
+    border-radius: 5px;
+    padding: 5px 10px;
+}
+QPushButton:hover {
+    background-color: #c8c9d1;
+}
+QPushButton:pressed {
+    background-color: #bebfc8;
+}
+QPushButton:disabled {
+    background-color: #ececf0;
+    color: #9a9a9a;
+    border: 1px solid #d8d9e1;
+}
+QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
+    background-color: #fafafa;
+    color: #2e2d2a;
+    border: 1px solid #d0d0d6;
+    border-radius: 4px;
+    padding: 4px;
+}
+QComboBox {
+    padding-right: 24px;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #c4c6cf;
+    background-color: #d2d3db;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #d2d3db;
+    border-left: 1px solid #c4c6cf;
+    width: 16px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #c8c9d1;
+}
+QComboBox QAbstractItemView {
+    background-color: #fafafa;
+    color: #2e2d2a;
+    selection-background-color: #e7e8ee;
+}
+QLabel {
+    color: #2e2d2a;
+}
+QLineEdit::placeholder {
+    color: #7c756b;
+}
+QTabWidget::pane {
+    border: 1px solid #c7c1b6;
+    border-radius: 8px;
+    top: -1px;
+    background-color: #e7e8ec;
+}
+QTabBar::tab {
+    background-color: #e7e8ee;
+    color: #4a4742;
+    border: 1px solid #d0d0d6;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 6px 12px;
+    margin-right: 4px;
+}
+QTabBar::tab:selected {
+    background-color: #e7e8ec;
+    color: #2e2d2a;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #d2d3db;
+}
+"""
+
 REGION_OPTIONS = [
     ("NA", "North America"),
     ("EUW", "Europe West"),
@@ -663,16 +845,29 @@ class InGameDiagnosticsDialog(QDialog):
         self.setModal(False)
         self.setMinimumSize(520, 330)
 
-        self.setStyleSheet(
-            "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
-            "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #e2e8f0; }"
-            "QLabel#diagValue { color: #dbe4ff; }"
-            "QPushButton {"
-            "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
-            "border-radius: 6px; padding: 6px 12px;"
-            "}"
-            "QPushButton:hover { background-color: #45475a; }"
-        )
+        dark_mode = bool(getattr(parent, "_dark_mode", True))
+        if dark_mode:
+            self.setStyleSheet(
+                "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
+                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #e2e8f0; }"
+                "QLabel#diagValue { color: #dbe4ff; }"
+                "QPushButton {"
+                "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
+                "border-radius: 6px; padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #45475a; }"
+            )
+        else:
+            self.setStyleSheet(
+                "QDialog { background-color: #fafafa; color: #2e2d2a; }"
+                "QLabel#diagHeader { font-size: 12pt; font-weight: 600; color: #2e2d2a; }"
+                "QLabel#diagValue { color: #2e2d2a; }"
+                "QPushButton {"
+                "background-color: #d2d3db; color: #2e2d2a; border: 1px solid #c4c6cf;"
+                "border-radius: 6px; padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #c8c9d1; }"
+            )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -832,41 +1027,81 @@ class LaunchProgressDialog(QDialog):
         self.setMaximumWidth(560)
         self.setAttribute(Qt.WA_StyledBackground, True)
 
-        self.setStyleSheet(
-            "QDialog {"
-            "background-color: #1e1e2e;"
-            "color: #cdd6f4;"
-            "}"
-            "QLabel#launchTitle {"
-            "font-size: 12pt;"
-            "font-weight: 600;"
-            "color: #e2e8f0;"
-            "}"
-            "QLabel#launchMessage {"
-            "font-size: 10.5pt;"
-            "color: #cdd6f4;"
-            "}"
-            "QProgressBar {"
-            "border: 1px solid #45475a;"
-            "border-radius: 7px;"
-            "background-color: #181825;"
-            "text-align: center;"
-            "min-height: 18px;"
-            "}"
-            "QProgressBar::chunk {"
-            "border-radius: 6px;"
-            "background-color: #7aa2f7;"
-            "}"
-            "QPushButton {"
-            "background-color: #313244;"
-            "color: #cdd6f4;"
-            "border: 1px solid #45475a;"
-            "border-radius: 5px;"
-            "padding: 6px 12px;"
-            "}"
-            "QPushButton:hover { background-color: #45475a; }"
-            "QPushButton:pressed { background-color: #585b70; }"
-        )
+        dark_mode = bool(getattr(parent, "_dark_mode", True))
+        if dark_mode:
+            self.setStyleSheet(
+                "QDialog {"
+                "background-color: #1e1e2e;"
+                "color: #cdd6f4;"
+                "}"
+                "QLabel#launchTitle {"
+                "font-size: 12pt;"
+                "font-weight: 600;"
+                "color: #e2e8f0;"
+                "}"
+                "QLabel#launchMessage {"
+                "font-size: 10.5pt;"
+                "color: #cdd6f4;"
+                "}"
+                "QProgressBar {"
+                "border: 1px solid #45475a;"
+                "border-radius: 7px;"
+                "background-color: #181825;"
+                "text-align: center;"
+                "min-height: 18px;"
+                "}"
+                "QProgressBar::chunk {"
+                "border-radius: 6px;"
+                "background-color: #7aa2f7;"
+                "}"
+                "QPushButton {"
+                "background-color: #313244;"
+                "color: #cdd6f4;"
+                "border: 1px solid #45475a;"
+                "border-radius: 5px;"
+                "padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #45475a; }"
+                "QPushButton:pressed { background-color: #585b70; }"
+            )
+        else:
+            self.setStyleSheet(
+                "QDialog {"
+                "background-color: #f4f4f4;"
+                "color: #2e2d2a;"
+                "}"
+                "QLabel#launchTitle {"
+                "font-size: 12pt;"
+                "font-weight: 600;"
+                "background-color: transparent;"
+                "color: #2e2d2a;"
+                "}"
+                "QLabel#launchMessage {"
+                "font-size: 10.5pt;"
+                "background-color: transparent;"
+                "color: #49453f;"
+                "}"
+                "QProgressBar {"
+                "border: 1px solid #d0d0d6;"
+                "border-radius: 7px;"
+                "background-color: #f0f1f5;"
+                "text-align: center;"
+                "min-height: 18px;"
+                "}"
+                "QProgressBar::chunk {"
+                "border-radius: 6px;"
+                "background-color: #b6b8c3;"
+                "}"
+                "QPushButton {"
+                "background-color: #d2d3db;"
+                "color: #2e2d2a;"
+                "border: 1px solid #c4c6cf;"
+                "border-radius: 5px;"
+                "padding: 6px 12px;"
+                "}"
+                "QPushButton:hover { background-color: #c8c9d1; }"
+                "QPushButton:pressed { background-color: #bebfc8; }"
+            )
 
         self._title_label = QLabel("Starting launch")
         self._title_label.setObjectName("launchTitle")
@@ -1523,7 +1758,7 @@ class SettingsDialog(QDialog):
         self._set_combo_to_data(self.tag_style_combo, str(values.get("tag_chip_style", "vibrant")))
         self._set_combo_to_data(
             self.logged_in_gradient_color_combo,
-            str(values.get("logged_in_gradient_color", _default_logged_in_highlight())),
+            str(values.get("logged_in_gradient_color", _default_logged_in_highlight(bool(getattr(self.parent(), "_dark_mode", True))))),
         )
         self._set_combo_to_data(
             self.hover_highlight_color_combo,
@@ -1872,7 +2107,8 @@ class SettingsDialog(QDialog):
         self.logged_in_gradient_color_combo.setToolTip(
             "Choose the color used for the logged-in row highlight."
         )
-        default_gradient_color = _default_logged_in_highlight()
+        parent_dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
+        default_gradient_color = _default_logged_in_highlight(parent_dark_mode)
         current_gradient_color = str(
             self._settings.get("logged_in_gradient_color", default_gradient_color) or default_gradient_color
         )
@@ -1888,7 +2124,7 @@ class SettingsDialog(QDialog):
         for label, value in self.HOVER_HIGHLIGHT_COLOR_OPTIONS:
             self.hover_highlight_color_combo.addItem(label, value)
         self.hover_highlight_color_combo.setToolTip(
-            "Follows the global theme automatically. Pick a color here to override it."
+            "Global Theme follows light/dark mode automatically. Pick a color here to override it."
         )
         default_hover_color = HOVER_HIGHLIGHT_THEME_AUTO
         current_hover_color = str(
@@ -1934,15 +2170,26 @@ class SettingsDialog(QDialog):
             self._champion_splash_line_edit.setClearButtonEnabled(True)
             self._champion_splash_line_edit.installEventFilter(self)
 
-        edit_bg = "#171a2a"
-        edit_fg = "#dbe4ff"
-        edit_border = "#3f4b71"
-        placeholder = "#8ea1cf"
-        popup_bg = "#151b2d"
-        popup_fg = "#e9efff"
-        popup_border = "#3f4b71"
-        popup_sel_bg = "#2d3d62"
-        popup_sel_fg = "#ffffff"
+        if parent_dark_mode:
+            edit_bg = "#171a2a"
+            edit_fg = "#dbe4ff"
+            edit_border = "#3f4b71"
+            placeholder = "#8ea1cf"
+            popup_bg = "#151b2d"
+            popup_fg = "#e9efff"
+            popup_border = "#3f4b71"
+            popup_sel_bg = "#2d3d62"
+            popup_sel_fg = "#ffffff"
+        else:
+            edit_bg = "#fafafa"
+            edit_fg = "#2e2d2a"
+            edit_border = "#d0d0d6"
+            placeholder = "#8a90a3"
+            popup_bg = "#ffffff"
+            popup_fg = "#273247"
+            popup_border = "#cfd6e6"
+            popup_sel_bg = "#e2e8f5"
+            popup_sel_fg = "#13233f"
 
         self.champion_splash_combo.setStyleSheet(
             "QComboBox { padding-right: 24px; }"
@@ -2256,7 +2503,7 @@ class SettingsDialog(QDialog):
         save_btn.setFixedWidth(100)
         save_btn.setAutoDefault(False)
         save_btn.setDefault(False)
-        save_btn.clicked.connect(self._save_and_close)
+        save_btn.clicked.connect(self.accept)
         button_row.addWidget(save_btn)
         layout.addLayout(button_row)
 
@@ -2318,11 +2565,19 @@ class SettingsDialog(QDialog):
             skin_line_edit.setPlaceholderText("Type skin name")
             skin_line_edit.setClearButtonEnabled(True)
 
-        popup_bg = "#151b2d"
-        popup_fg = "#e9efff"
-        popup_border = "#3f4b71"
-        popup_sel_bg = "#2d3d62"
-        popup_sel_fg = "#ffffff"
+        dark_mode = bool(getattr(self.parent(), "_dark_mode", True))
+        if dark_mode:
+            popup_bg = "#151b2d"
+            popup_fg = "#e9efff"
+            popup_border = "#3f4b71"
+            popup_sel_bg = "#2d3d62"
+            popup_sel_fg = "#ffffff"
+        else:
+            popup_bg = "#ffffff"
+            popup_fg = "#273247"
+            popup_border = "#cfd6e6"
+            popup_sel_bg = "#e2e8f5"
+            popup_sel_fg = "#13233f"
 
         skin_completer = QCompleter(self.champion_splash_skin_combo.model(), self)
         skin_completer.setCaseSensitivity(Qt.CaseInsensitive)
@@ -2413,15 +2668,6 @@ class SettingsDialog(QDialog):
                 for label, preset in self._custom_theme_presets
             ],
         }
-
-    def _save_and_close(self):
-        """Apply settings while dialog still covers the main window, then close.
-        By applying before accept(), the main window already has the new theme
-        when it is revealed — no double-paint flash.
-        """
-        if self._apply_callback:
-            self._apply_callback(self.get_values())
-        self.accept()
 
     def apply_settings(self):
         """Apply settings without closing the dialog."""
@@ -2639,6 +2885,7 @@ class AccountListItem(QFrame):
         self._selected = False
         self._hovered = False
         self._logged_in = False
+        self._dark_mode = True
         self._tag_chip_labels: list[QLabel] = []
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setOffset(0, 3)
@@ -2791,11 +3038,18 @@ class AccountListItem(QFrame):
 
     def _refresh_text_styles(self):
         """Keep row text readable across theme + logged-in highlight states."""
-        username_color = "#d2dbf5" if self._logged_in else "#b5bfdc"
-        region_color = "#c0cbea" if self._logged_in else "#9aa8cd"
-        tag_color = "#c7d3f0"
-        pin_color = "#f6c453"
-        self.name_label.setStyleSheet("background: transparent; border: none; color: #e8edff;")
+        if self._dark_mode:
+            username_color = "#d2dbf5" if self._logged_in else "#b5bfdc"
+            region_color = "#c0cbea" if self._logged_in else "#9aa8cd"
+            tag_color = "#c7d3f0"
+            pin_color = "#f6c453"
+            self.name_label.setStyleSheet("background: transparent; border: none; color: #e8edff;")
+        else:
+            username_color = "#6b7280"
+            region_color = "#6b7280"
+            tag_color = "#9aa1b2"
+            pin_color = "#9a6f2a"
+            self.name_label.setStyleSheet("background: transparent; border: none; color: #111827;")
 
         self.pin_label.setStyleSheet(
             f"background: transparent; border: none; color: {pin_color}; font-size: 11px;"
@@ -2839,7 +3093,7 @@ class AccountListItem(QFrame):
     def _tag_chip_stylesheet(self, tag_text: str) -> str:
         """Return themed chip style using text-based random color assignment."""
         style = self._tag_chip_style if self._tag_chip_style in self._TAG_STYLE_PALETTES else "vibrant"
-        palette = self._TAG_STYLE_PALETTES[style]["dark"]
+        palette = self._TAG_STYLE_PALETTES[style]["dark" if self._dark_mode else "light"]
         size = self._tag_size_preset()
         idx = self._tag_color_slot_for_text(tag_text, len(palette))
         bg, border, fg, accent = palette[idx]
@@ -2858,7 +3112,7 @@ class AccountListItem(QFrame):
         """Return style for the overflow chip (+N)."""
         size = self._tag_size_preset()
         style = self._tag_chip_style if self._tag_chip_style in self._TAG_MORE_STYLE else "vibrant"
-        bg, border, fg, accent = self._TAG_MORE_STYLE[style]["dark"]
+        bg, border, fg, accent = self._TAG_MORE_STYLE[style]["dark" if self._dark_mode else "light"]
         return (
             f"background-color: {bg};"
             f"border: 1px solid {border};"
@@ -2884,15 +3138,27 @@ class AccountListItem(QFrame):
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         badge_bg_alpha = int(30 + (90 * t))
         badge_border_alpha = int(70 + (130 * t))
-        self.logged_in_label.setStyleSheet(
-            f"background-color: {self._rgba(self._logged_in_gradient_color, badge_bg_alpha)};"
-            f"border: 1px solid {self._rgba(self._logged_in_gradient_color, badge_border_alpha)};"
-            "border-radius: 10px;"
-            "color: #eef5ff;"
-            "font-size: 9.5px;"
-            "font-weight: 700;"
-            "padding: 0px 9px;"
-        )
+        badge_fg = "#eef5ff" if self._dark_mode else "#1e3a8a"
+        if self._dark_mode:
+            self.logged_in_label.setStyleSheet(
+                f"background-color: {self._rgba(self._logged_in_gradient_color, badge_bg_alpha)};"
+                f"border: 1px solid {self._rgba(self._logged_in_gradient_color, badge_border_alpha)};"
+                "border-radius: 10px;"
+                f"color: {badge_fg};"
+                "font-size: 9.5px;"
+                "font-weight: 700;"
+                "padding: 0px 9px;"
+            )
+        else:
+            self.logged_in_label.setStyleSheet(
+                f"background-color: {self._rgba(self._logged_in_gradient_color, max(20, badge_bg_alpha - 20))};"
+                f"border: 1px solid {self._rgba(self._logged_in_gradient_color, max(45, badge_border_alpha - 25))};"
+                "border-radius: 10px;"
+                f"color: {badge_fg};"
+                "font-size: 9.5px;"
+                "font-weight: 700;"
+                "padding: 0px 9px;"
+            )
 
     def _hex_to_rgb(self, color: str) -> tuple[int, int, int]:
         raw = (color or "#4f7cff").strip().lstrip('#')
@@ -2935,7 +3201,7 @@ class AccountListItem(QFrame):
             lp = _escape_html(f"{rank_data.get('lp', '')} LP")
             wins = _escape_html(f"{rank_data.get('wins', '')}W / {rank_data.get('losses', '')}L")
             win_rate = _escape_html(f"{rank_data.get('win_rate', '')}% WR")
-            neutral_base = "#8b93a8"
+            neutral_base = "#8b93a8" if self._dark_mode else "#4b5563"
             neutral_color = self._adjust_hex_brightness(neutral_base, self._rank_text_brightness)
             self.rank_label.setStyleSheet("background: transparent; border: none; font-size: 11px;")
             pixmap = _build_rank_pixmap(rank_data.get("medal_bytes", b""))
@@ -2970,6 +3236,13 @@ class AccountListItem(QFrame):
         if not show_ranks or not show_rank_images:
             self.rank_icon_label.setVisible(False)
 
+    def set_dark_mode(self, enabled: bool):
+        self._dark_mode = enabled
+        self._refresh_tag_chip_styles()
+        self._refresh_text_styles()
+        self._refresh_logged_in_badge_style()
+        self._update_visual_state()
+
     def set_hover_highlight_color(self, color: str):
         self._hover_highlight_color = str(color or self._hover_highlight_color)
         self._update_visual_state()
@@ -2996,6 +3269,68 @@ class AccountListItem(QFrame):
 
     def _update_visual_state(self):
         active = self._selected or self._hovered
+        if self._dark_mode:
+            t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
+            left_active = self._rgba(self._logged_in_gradient_color, int(26 + 74 * t))
+            mid_active = self._rgba(self._logged_in_gradient_color, int(14 + 50 * t))
+            left_idle = self._rgba(self._logged_in_gradient_color, int(18 + 56 * t))
+            mid_idle = self._rgba(self._logged_in_gradient_color, int(10 + 40 * t))
+            border_scale = self._logged_in_border_opacity / 100.0
+            border_active = self._rgba(self._logged_in_gradient_color, int((90 + 90 * t) * border_scale))
+            border_idle = self._rgba(self._logged_in_gradient_color, int((70 + 70 * t) * border_scale))
+            border_width = max(1, self._logged_in_border_width - 2)
+            left_border_width = self._logged_in_border_width
+
+            if self._logged_in and active:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                    f"stop:0 {left_active},"
+                    f"stop:0.18 {mid_active},"
+                    "stop:1 rgba(37, 41, 61, 170));"
+                    "border: 1px solid transparent;"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
+            elif self._logged_in:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+                    f"stop:0 {left_idle},"
+                    f"stop:0.16 {mid_idle},"
+                    "stop:1 rgba(25, 30, 47, 95));"
+                    "border: 1px solid transparent;"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
+            elif active:
+                hover_bg = self._rgba(self._hover_highlight_color, 170)
+                hover_border = self._rgba(self._hover_highlight_color, 118)
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    f"background-color: {hover_bg};"
+                    f"border: 1px solid {hover_border};"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(22)
+                self._shadow.setColor(QColor(0, 0, 0, 120))
+            else:
+                self.setStyleSheet(
+                    "#accountListItem {"
+                    "background-color: transparent;"
+                    "border: 1px solid transparent;"
+                    "border-radius: 10px;"
+                    "}"
+                )
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
+            return
+
         t = max(0.03, min(1.0, self._logged_in_gradient_intensity / 100.0))
         left_active = self._rgba(self._logged_in_gradient_color, int(36 + 72 * t))
         mid_active = self._rgba(self._logged_in_gradient_color, int(24 + 56 * t))
@@ -3090,22 +3425,23 @@ class MainWindow(QMainWindow):
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
-        self._settings_dialog_open: bool = False
-        self._pending_settings_refresh: bool = False
         self._app_bg_color: str = str(self._settings.get('app_bg_color', DEFAULT_APP_BG_COLOR) or DEFAULT_APP_BG_COLOR)
         self._app_surface_color: str = str(self._settings.get('app_surface_color', DEFAULT_APP_SURFACE_COLOR) or DEFAULT_APP_SURFACE_COLOR)
         self._app_border_color: str = str(self._settings.get('app_border_color', DEFAULT_APP_BORDER_COLOR) or DEFAULT_APP_BORDER_COLOR)
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
         self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
-        default_gradient_color = _default_logged_in_highlight()
+        default_gradient_color = _default_logged_in_highlight(self._dark_mode)
         self._logged_in_gradient_color: str = str(
             self._settings.get('logged_in_gradient_color', default_gradient_color) or default_gradient_color
         )
         self._hover_highlight_color_setting: str = str(
             self._settings.get('hover_highlight_color', HOVER_HIGHLIGHT_THEME_AUTO) or HOVER_HIGHLIGHT_THEME_AUTO
         )
-        self._hover_highlight_color: str = _resolve_row_hover_highlight(self._hover_highlight_color_setting)
+        self._hover_highlight_color: str = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
+        )
         self._champion_splash_enabled: bool = bool(self._settings.get('champion_splash_enabled', False))
         self._champion_splash_champion: str = str(
             self._settings.get('champion_splash_champion', SPLASH_THEME_AUTO) or SPLASH_THEME_AUTO
@@ -3391,6 +3727,7 @@ class MainWindow(QMainWindow):
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
             return
+        self.account_list_background.set_dark_mode(self._dark_mode)
         self.account_list_background.set_base_color(self._app_surface_color)
         pixmap = None
         if self._champion_splash_enabled:
@@ -3620,24 +3957,13 @@ class MainWindow(QMainWindow):
         # Delay icon refresh to ensure stylesheet is fully applied
         QTimer.singleShot(10, self._refresh_icon_buttons)
 
-    def _flush_pending_settings_refresh(self):
-        """Run any queued settings refresh after a modal dialog closes."""
-        if self._settings_dialog_open or not self._pending_settings_refresh:
-            return
-        self._pending_settings_refresh = False
-        self._apply_theme()
-        self.refresh_account_list(fetch_ranks=False)
-
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
-        if self._settings_dialog_open or QApplication.activeModalWidget():
-            self._pending_settings_refresh = True
-            return
         QTimer.singleShot(0, self._perform_refresh_ui)
 
     def _perform_refresh_ui(self):
         self._apply_theme()
-        self.refresh_account_list(fetch_ranks=False)
+        self.refresh_account_list()
         self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
@@ -3906,23 +4232,17 @@ class MainWindow(QMainWindow):
             apply_callback=self._apply_settings_values,
             preview_callback=_preview_callback,
         )
-        # Give the dialog an explicit stylesheet so parent cascade doesn't flash it on open
-        dialog.setStyleSheet(self.styleSheet())
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
-        self._settings_dialog_open = True
         try:
             if dialog.exec_() != QDialog.Accepted:
                 if preview_was_applied[0]:
-                    self._pending_settings_refresh = False
                     self._apply_settings_values(original_settings, persist=False)
                 return
-            # Settings were already applied by _save_and_close while the dialog was
-            # covering the main window. Flush any queued refresh now that the modal is gone.
-            if self._pending_settings_refresh:
-                QTimer.singleShot(0, self._flush_pending_settings_refresh)
+
+            values = dialog.get_values()
+            self._apply_settings_values(values, persist=True)
         finally:
-            self._settings_dialog_open = False
             self._settings_icon_latched = False
             self._sync_icon_button_state(self._settings_button)
 
@@ -3957,7 +4277,10 @@ class MainWindow(QMainWindow):
         self._hover_highlight_color_setting = str(
             values.get('hover_highlight_color', self._hover_highlight_color_setting)
         )
-        self._hover_highlight_color = _resolve_row_hover_highlight(self._hover_highlight_color_setting)
+        self._hover_highlight_color = _resolve_row_hover_highlight(
+            self._hover_highlight_color_setting,
+            self._dark_mode,
+        )
         self._champion_splash_enabled = bool(values.get('champion_splash_enabled', self._champion_splash_enabled))
         self._champion_splash_champion = str(values.get('champion_splash_champion', self._champion_splash_champion))
         self._champion_splash_skin = int(values.get('champion_splash_skin', self._champion_splash_skin))
@@ -3997,13 +4320,8 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        if self._settings_dialog_open or QApplication.activeModalWidget():
-            self._pending_settings_refresh = True
-            return
-
-        self._pending_settings_refresh = False
         self._apply_theme()
-        self.refresh_account_list(fetch_ranks=False)
+        self.refresh_account_list()
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
@@ -4572,11 +4890,19 @@ QMenu#trayQuickMenu::separator {
             notes = str(payload.get("body") or "").strip()
             note_preview = self._build_release_notes_preview(notes)
 
-            dialog_bg = "#0f1424"
-            text_primary = "#eef3ff"
-            text_secondary = "#aeb6cc"
-            text_accent = "#8bb0ff"
-            divider_color = "#2b3652"
+            dark_mode = bool(getattr(self, "_dark_mode", True))
+            if dark_mode:
+                dialog_bg = "#0f1424"
+                text_primary = "#eef3ff"
+                text_secondary = "#aeb6cc"
+                text_accent = "#8bb0ff"
+                divider_color = "#2b3652"
+            else:
+                dialog_bg = "#f3f5fb"
+                text_primary = "#1f2937"
+                text_secondary = "#5b657a"
+                text_accent = "#2d5ca8"
+                divider_color = "#d5dcec"
 
             prompt = (
                 "<div style='margin-bottom: 8px;'>"
@@ -4799,14 +5125,14 @@ QMenu#trayQuickMenu::separator {
     def initialize_account_manager(self, password: str):
         """Initialize account manager with master password"""
         self.account_manager = AccountManager(password)
-        self.refresh_account_list(fetch_ranks=True)
+        self.refresh_account_list()
         self._reset_auto_lock_timer()
         self._update_tray_actions_state()
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
         self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
-        self.refresh_account_list(fetch_ranks=False)
+        self.refresh_account_list()
 
     def _clear_filters(self):
         self.search_input.clear()
@@ -4897,12 +5223,8 @@ QMenu#trayQuickMenu::separator {
         indexed.sort(key=lambda pair: (not bool(getattr(pair[1], "is_pinned", False)), pair[0]))
         return [acc for _, acc in indexed]
     
-    def refresh_account_list(self, fetch_ranks: bool = True):
+    def refresh_account_list(self):
         """Refresh the account list display"""
-        if self._settings_dialog_open or QApplication.activeModalWidget():
-            self._pending_settings_refresh = True
-            return
-
         self.account_list.setUpdatesEnabled(False)
         try:
             self.account_list.clear()
@@ -4961,7 +5283,7 @@ QMenu#trayQuickMenu::separator {
                     self.account_list.setItemWidget(item, widget)
 
                 self.update_account_item_states()
-                if fetch_ranks and self._show_ranks:
+                if self._show_ranks:
                     self._start_rank_fetches()
         finally:
             self.account_list.setUpdatesEnabled(True)
@@ -4969,12 +5291,6 @@ QMenu#trayQuickMenu::separator {
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
         if not self._show_ranks:
-            return
-
-        # Starting native threads while a modal dialog is active causes the terminal
-        # window (parent process) to briefly flash to the foreground on Linux.
-        # Bail out silently; the caller is responsible for re-scheduling after close.
-        if QApplication.activeModalWidget():
             return
 
         # Stop leftover threads from a previous refresh
@@ -5027,6 +5343,7 @@ QMenu#trayQuickMenu::separator {
             widget = self.account_list.itemWidget(item)
             if isinstance(widget, AccountListItem):
                 is_logged_in = bool(self._logged_in_username) and item.data(Qt.UserRole) == self._logged_in_username
+                widget.set_dark_mode(self._dark_mode)
                 widget.set_hover_highlight_color(self._hover_highlight_color)
                 widget.set_selected(item.isSelected())
                 widget.set_logged_in(is_logged_in)
@@ -5143,7 +5460,7 @@ QMenu#trayQuickMenu::separator {
         if chosen_action == toggle_pin_action:
             try:
                 self.account_manager.set_account_pinned(account.username, not bool(getattr(account, "is_pinned", False)))
-                self.refresh_account_list(fetch_ranks=False)
+                self.refresh_account_list()
             except Exception as exc:
                 self._show_error("Pin", f"Could not update pin state: {exc}")
         elif chosen_action == open_opgg_profile_action:
@@ -5256,7 +5573,7 @@ QMenu::separator {
                 )
                 if old_logged_in and old_logged_in == username:
                     self._logged_in_username = data['username']
-                self.refresh_account_list(fetch_ranks=False)
+                self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account updated successfully!")
             except ValueError as e:
                 self._show_error("Error", str(e))
@@ -5284,7 +5601,7 @@ QMenu::separator {
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
-                self.refresh_account_list(fetch_ranks=False)
+                self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account added successfully!")
             except ValueError as e:
                 self._show_error("Error", str(e))
@@ -5321,7 +5638,7 @@ QMenu::separator {
                 self.account_manager.delete_account(username)
                 if self._logged_in_username == username:
                     self._logged_in_username = None
-                self.refresh_account_list(fetch_ranks=False)
+                self.refresh_account_list()
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
                 self._show_error("Error", f"Failed to delete account: {str(e)}")
@@ -5402,7 +5719,7 @@ QMenu::separator {
                     logging.debug("Could not update last launch timestamp", exc_info=True)
                 self._logged_in_username = account.username
                 self._session_miss_count = 0
-                self.refresh_account_list(fetch_ranks=False)
+                self.refresh_account_list()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
         else:
@@ -5685,7 +6002,7 @@ QMenu::separator {
 
         try:
             count = self.account_manager.import_from_file(file_path, source_password, merge=merge)
-            self.refresh_account_list(fetch_ranks=False)
+            self.refresh_account_list()
             QMessageBox.information(
                 self,
                 "Import Successful",
