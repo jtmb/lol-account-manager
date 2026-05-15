@@ -5056,13 +5056,54 @@ class MainWindow(QMainWindow):
         finally:
             self._suppress_window_size_persistence = False
 
+    def _current_screen_scale_factor(self) -> float:
+        """Return current monitor scale factor (1.0 == 100% Windows scaling)."""
+        screen = None
+        handle = self.windowHandle()
+        if handle is not None:
+            try:
+                screen = handle.screen()
+            except Exception:
+                screen = None
+        if screen is None:
+            try:
+                screen = QApplication.screenAt(self.frameGeometry().center())
+            except Exception:
+                screen = None
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        if screen is None:
+            return 1.0
+
+        try:
+            dpi = float(screen.logicalDotsPerInch())
+        except Exception:
+            dpi = 96.0
+        if dpi <= 0:
+            dpi = 96.0
+
+        return max(1.0, min(2.0, dpi / 96.0))
+
+    def _apply_champ_select_window_size(self):
+        """Apply champ-select size scaled for the monitor's DPI setting."""
+        base_w, base_h = _parse_resolution(self._champ_select_window_size, fallback=(941, 1053))
+        scale = self._current_screen_scale_factor()
+        width = max(660, int(round(base_w * scale)))
+        height = max(480, int(round(base_h * scale)))
+
+        self._suppress_window_size_persistence = True
+        try:
+            self.resize(width, height)
+        finally:
+            self._suppress_window_size_persistence = False
+
     def _enter_champ_select_mode(self):
         """Resize window and hide home-page UI elements for champ select."""
         if self._in_champ_select_mode:
             return
         self._in_champ_select_mode = True
         self._pre_champ_select_size = f"{self.width()}x{self.height()}"
-        self._apply_window_size(self._champ_select_window_size)
+        self._apply_champ_select_window_size()
         self._filter_row_widget.hide()
         self._saved_accounts_label.hide()
         self._button_row_widget.hide()
@@ -5105,6 +5146,11 @@ class MainWindow(QMainWindow):
             return
         self._window_size_mode = 'custom'
         self._window_resize_save_timer.start()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.ScreenChangeInternal and self._in_champ_select_mode:
+            QTimer.singleShot(80, self._apply_champ_select_window_size)
     
     def toggle_theme(self):
         """Force dark mode."""
