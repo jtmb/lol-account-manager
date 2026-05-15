@@ -153,6 +153,24 @@ CHAMPION_SPLASH_OPTIONS = [
 CHAMPION_NAME_BY_ID = {champ_id: name for name, champ_id in CHAMPION_SPLASH_OPTIONS}
 
 
+class _ResizeCallbackFilter(QObject):
+    """Event filter that invokes a callback whenever the watched widget is resized.
+
+    Used instead of monkey-patching ``resizeEvent`` on existing QWidget instances,
+    which does not work in PyQt5 because Qt dispatches virtual methods via the C++
+    vtable and ignores Python instance attributes.
+    """
+
+    def __init__(self, callback, parent=None):
+        super().__init__(parent)
+        self._callback = callback
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            self._callback()
+        return False  # always pass the event through
+
+
 class AccountListBackgroundFrame(QFrame):
     """Paintable background container for the account list splash art."""
 
@@ -5377,20 +5395,23 @@ class MainWindow(QMainWindow):
         # Defer mask application until layout is finalized
         QTimer.singleShot(100, apply_clipping_mask)
         
-        # Re-apply mask on container resize
-        original_resize = self.account_list_background.resizeEvent
-        def resize_with_mask(event):
-            original_resize(event)
-            QTimer.singleShot(50, apply_clipping_mask)
-        self.account_list_background.resizeEvent = resize_with_mask
+        # Re-apply mask on container resize.
+        # Use installEventFilter instead of monkey-patching resizeEvent: PyQt5
+        # dispatches virtual methods via the C++ vtable which ignores Python
+        # instance attributes, so a plain assignment never fires.
+        if not hasattr(self, '_bg_resize_filter'):
+            self._bg_resize_filter = _ResizeCallbackFilter(
+                lambda: QTimer.singleShot(50, apply_clipping_mask), self
+            )
+            self.account_list_background.installEventFilter(self._bg_resize_filter)
 
-        # When the account list widget itself grows (e.g. filter/button rows hidden
-        # during spotlight mode) recompute the spotlight item height immediately.
-        _orig_list_resize = self.account_list.resizeEvent
-        def _list_resize_with_spotlight(event, _orig=_orig_list_resize):
-            _orig(event)
-            QTimer.singleShot(0, self._update_spotlight_size_hint)
-        self.account_list.resizeEvent = _list_resize_with_spotlight
+        # Update spotlight item height whenever account_list itself resizes
+        # (e.g. when filter/button rows are hidden and the list grows taller).
+        if not hasattr(self, '_list_resize_filter'):
+            self._list_resize_filter = _ResizeCallbackFilter(
+                lambda: QTimer.singleShot(0, self._update_spotlight_size_hint), self
+            )
+            self.account_list.installEventFilter(self._list_resize_filter)
 
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
@@ -5764,8 +5785,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         
         # Re-run the u.gg embed CSS when window is maximized/restored
         if event.type() == QEvent.WindowStateChange:
-            QTimer.singleShot(100, self._update_spotlight_size_hint)
-            QTimer.singleShot(500, self._update_spotlight_size_hint)  # safety net
+            # Skip spotlight size shots when the window is being *minimized*:
+            # account_list.height() is unreliable while the window is iconified
+            # on some compositors, and no visible update is needed anyway.
+            # The shots below will still fire when the window is restored.
+            is_minimizing = bool(self.windowState() & Qt.WindowMinimized)
+            if not is_minimizing:
+                QTimer.singleShot(100, self._update_spotlight_size_hint)
+                QTimer.singleShot(500, self._update_spotlight_size_hint)  # safety net
             QTimer.singleShot(200, self._update_webview_zoom)
             QTimer.singleShot(300, self._reapply_ugg_embed_css)
             # Set flag to trigger additional CSS reapply on next resize
@@ -7972,6 +7999,10 @@ QMenu#trayQuickMenu::separator {
                 self.account_spotlight_panel.set_account(account, rank_data, profile_url)
                 QTimer.singleShot(200, self._update_webview_zoom)
                 self._enter_spotlight_ui_mode()
+                # Ensure size is correct in case account_list grew (e.g. after
+                # a refresh_account_list that temporarily showed filter rows).
+                QTimer.singleShot(50, self._update_spotlight_size_hint)
+                QTimer.singleShot(300, self._update_spotlight_size_hint)
                 # Scroll to the account row above the spotlight
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
