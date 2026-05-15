@@ -30,6 +30,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+!lol_account_manager.spec
 
 # Virtual environments
 venv/

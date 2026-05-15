@@ -49,6 +49,10 @@ if exist "assets\icon.ico" set "DATA_ARG=--add-data assets\icon.ico;assets"
   --clean ^
   --name "LoLAccountManager" ^
   --windowed ^
+    --collect-all PyQt5.QtWebEngineWidgets ^
+    --collect-all PyQt5.QtWebEngineCore ^
+    --collect-data PyQt5 ^
+    --collect-binaries PyQt5 ^
     %ICON_ARG% ^
     %DATA_ARG% ^
   --collect-all pywinauto ^

@@ -5,26 +5,23 @@ from pathlib import Path
 
 # Get the project root directory
 root_dir = Path(__file__).parent
-spec_file = root_dir / 'build' / 'lol_account_manager.spec'
+spec_file = root_dir / 'lol_account_manager.spec'
+os.chdir(root_dir)
 
 icon_file = root_dir / 'assets' / 'icon.ico'
 
-# Create build command
+# Build from spec so Qt WebEngine runtime assets are always bundled.
 args = [
-    'src/main.py',
-    '--name', 'LoL Account Manager',
-    '--windowed',  # Hide console window
-    '--onefile',  # Create single executable
-    '--add-data', f'src:src',
-    '--add-data', 'app_config.json:.',
-    '--distpath', 'dist',
-    '--buildpath', 'build/.build',
-    '--specpath', 'build',
+    str(spec_file),
+    '--noconfirm',
+    '--clean',
 ]
 
-if icon_file.exists():
-    args.extend(['--icon', str(icon_file)])
-    args.extend(['--add-data', f'{icon_file}:assets'])
+if not spec_file.exists():
+    raise FileNotFoundError(
+        f"Missing PyInstaller spec file: {spec_file}. "
+        "The spec is required to bundle Qt WebEngine runtime files."
+    )
 
 PyInstaller.__main__.run(args)
 
