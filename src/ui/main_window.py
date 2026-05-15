@@ -4019,7 +4019,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         self._profile_url = ""
         self._active_username = ""
         self._is_dark_mode = True
-        self._base_color = DEFAULT_APP_SURFACE_COLOR
+        self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 8, 12, 8)
@@ -4139,11 +4139,12 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
         self._record_label.setObjectName("spotlightMuted")
 
     def set_dark_mode(self, enabled: bool):
+        super().set_dark_mode(enabled)
         self._is_dark_mode = bool(enabled)
         self._apply_panel_styles()
 
     def set_base_color(self, color: str):
-        self._base_color = str(color or DEFAULT_APP_SURFACE_COLOR)
+        super().set_base_color(color)
 
     def set_account(self, account: Optional[Account], rank_data: Optional[dict], profile_url: str):
         self._profile_url = str(profile_url or "").strip()
