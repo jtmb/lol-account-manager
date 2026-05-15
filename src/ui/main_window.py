@@ -5590,6 +5590,7 @@ class MainWindow(QMainWindow):
 
         self._update_spotlight_size_hint()
         self.account_spotlight_panel.show()
+        self._enter_spotlight_ui_mode()
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
@@ -5630,6 +5631,16 @@ class MainWindow(QMainWindow):
                     self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
                 break
+
+    def _enter_spotlight_ui_mode(self):
+        """Hide filters and main scrollbar while the spotlight panel is visible."""
+        self._filter_row_widget.hide()
+        self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+    def _exit_spotlight_ui_mode(self):
+        """Restore filters and scrollbar when spotlight is hidden."""
+        self._filter_row_widget.show()
+        self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
@@ -7366,6 +7377,7 @@ QMenu#trayQuickMenu::separator {
             if self.account_spotlight_panel:
                 self.account_spotlight_panel.setParent(self.account_list_background)
                 self.account_spotlight_panel.hide()
+                self._exit_spotlight_ui_mode()
             self.account_list.clear()
 
             if not self.account_manager:
