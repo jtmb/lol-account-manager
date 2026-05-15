@@ -77,22 +77,23 @@ def _resource_path(relative_path: str) -> Path:
     return Path(__file__).resolve().parents[1] / relative_path
 
 
-def _apply_dark_palette(app: QApplication) -> None:
+def _apply_dark_palette(app: QApplication, settings: Optional[dict] = None) -> None:
     """Set a dark QPalette on the application so every widget starts dark.
 
     On Windows, Qt paints the OS-level window background using the QPalette
-    *before* any stylesheet is applied.  Without this, newly created or
+    *before* any stylesheet is applied. Without this, newly created or
     repainted widgets momentarily appear white (the system default), producing
-    the visible white flash when buttons are pressed.
+    the visible white flash during startup and dialog creation.
     """
+    settings = settings or {}
     palette = QPalette()
-    dark_bg      = QColor("#1e1e2e")
-    surface      = QColor("#181825")
-    border       = QColor("#313244")
-    text         = QColor("#cdd6f4")
-    disabled     = QColor("#585b70")
-    highlight    = QColor("#45475a")
-    hilite_text  = QColor("#cdd6f4")
+    dark_bg = QColor(str(settings.get("app_bg_color", "#1e1e2e")))
+    surface = QColor(str(settings.get("app_surface_color", "#181825")))
+    border = QColor(str(settings.get("app_border_color", "#313244")))
+    text = QColor(str(settings.get("app_text_color", "#cdd6f4")))
+    accent = QColor(str(settings.get("app_accent_color", "#89b4fa")))
+    highlight = QColor(str(settings.get("app_hover_color", "#45475a")))
+    disabled = QColor("#585b70")
 
     palette.setColor(QPalette.Window,          dark_bg)
     palette.setColor(QPalette.WindowText,      text)
@@ -101,16 +102,37 @@ def _apply_dark_palette(app: QApplication) -> None:
     palette.setColor(QPalette.ToolTipBase,     dark_bg)
     palette.setColor(QPalette.ToolTipText,     text)
     palette.setColor(QPalette.Text,            text)
-    palette.setColor(QPalette.Button,          border)
+    palette.setColor(QPalette.Button,          surface)
     palette.setColor(QPalette.ButtonText,      text)
     palette.setColor(QPalette.BrightText,      text)
     palette.setColor(QPalette.Highlight,       highlight)
-    palette.setColor(QPalette.HighlightedText, hilite_text)
-    palette.setColor(QPalette.Link,            QColor("#89b4fa"))
+    palette.setColor(QPalette.HighlightedText, text)
+    palette.setColor(QPalette.Link,            accent)
     palette.setColor(QPalette.Disabled, QPalette.Text,       disabled)
     palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled)
     palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled)
     app.setPalette(palette)
+
+    app.setStyleSheet(
+        "QWidget {"
+        f" background-color: {dark_bg.name()};"
+        f" color: {text.name()};"
+        " }"
+        "QDialog {"
+        f" background-color: {dark_bg.name()};"
+        f" color: {text.name()};"
+        " }"
+        "QLineEdit, QComboBox, QTextEdit, QPlainTextEdit {"
+        f" background-color: {surface.name()};"
+        f" color: {text.name()};"
+        f" border: 1px solid {border.name()};"
+        " }"
+        "QPushButton {"
+        f" background-color: {surface.name()};"
+        f" color: {text.name()};"
+        f" border: 1px solid {border.name()};"
+        " }"
+    )
 
 
 def main():
@@ -126,17 +148,19 @@ def main():
         app = QApplication(sys.argv)
         app.setStyle("Fusion")
 
+        settings = load_settings()
+
         # Must be called before any window is created so that every widget's
         # initial OS-level background paint uses dark colors, preventing the
         # white flash on Windows.
-        _apply_dark_palette(app)
+        _apply_dark_palette(app, settings)
 
         icon_path = _resource_path("assets/icon.ico")
         if icon_path.exists():
             app.setWindowIcon(QIcon(str(icon_path)))
 
         window = MainWindow()
-        if bool(load_settings().get("start_minimized_to_tray", False)):
+        if bool(settings.get("start_minimized_to_tray", False)):
             window.hide()
         else:
             window.show()
