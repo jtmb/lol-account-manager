@@ -1,10 +1,33 @@
 """Main application entry point"""
 import sys
+import ctypes
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QIcon, QPalette, QColor
 from src.ui.main_window import MainWindow
 from src.config.paths import load_settings
+
+
+def _detach_console() -> None:
+    """Permanently detach this process from its Windows console window.
+
+    When launched via `python.exe` (not `pythonw.exe`), the process has an
+    attached console whose window can flash to the foreground at any time —
+    whenever Windows briefly activates it due to DWM repaints, ctypes calls,
+    or Qt event processing.  Calling FreeConsole() severs that link entirely,
+    making it impossible for the console window to ever appear.  This mirrors
+    what PyInstaller's --noconsole and pythonw.exe do internally.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        # Hide first so there's no visual glitch during detach
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)
+        ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        pass
 
 
 def _resource_path(relative_path: str) -> Path:
@@ -52,6 +75,9 @@ def _apply_dark_palette(app: QApplication) -> None:
 
 def main():
     """Run the application"""
+    # Detach the Windows console before anything else so it can never flash.
+    _detach_console()
+
     app = QApplication(sys.argv)
 
     # Must be called before any window is created so that every widget's
