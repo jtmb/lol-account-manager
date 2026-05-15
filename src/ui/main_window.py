@@ -1383,12 +1383,19 @@ class SettingsDialog(QDialog):
             f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
         )
 
+        # Ensure a native HWND exists early and avoid partial paints while
+        # the dialog is being constructed and styled.
+        self.setAttribute(Qt.WA_NativeWindow, True)
+        self.setUpdatesEnabled(False)
+
         # Force HWND creation so we can apply dark-mode chrome to the title bar
         # *before* the dialog is shown — prevents the white title bar flash.
         self.create()
         _apply_windows11_chrome(self, True)
 
         self.init_ui()
+        self.setUpdatesEnabled(True)
+        self.repaint()
 
     def showEvent(self, event):
         super().showEvent(event)
