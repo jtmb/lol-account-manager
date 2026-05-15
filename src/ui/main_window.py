@@ -4,7 +4,8 @@ from PyQt5.QtWidgets import (
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
-    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog
+    QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
+    QStackedWidget
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
@@ -894,101 +895,157 @@ class InGameDiagnosticsDialog(QDialog):
         super().closeEvent(event)
 
 
-class ChampSelectAssistantDialog(QDialog):
-    """Show champ-select matchup/build guidance with quick open actions."""
+class InClientGamePanel(AccountListBackgroundFrame):
+    """Inline panel shown in place of the account list during champ select / in-game."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._matchup_url = ""
         self._fallback_url = ""
-        self.setWindowTitle("Champ Select Assistant")
-        self.setModal(False)
-        self.setMinimumSize(560, 320)
+        self.setObjectName("accountListContainer")
 
-        self.setStyleSheet(
-            "QDialog { background-color: #1e1e2e; color: #cdd6f4; }"
-            "QLabel#title { font-size: 13pt; font-weight: 700; color: #e2e8f0; }"
-            "QLabel#meta { color: #dbe4ff; font-size: 10pt; }"
-            "QTextEdit {"
-            "background-color: #181825; color: #dbe4ff;"
-            "border: 1px solid #313244; border-radius: 8px;"
-            "padding: 8px;"
-            "}"
-            "QPushButton {"
-            "background-color: #313244; color: #cdd6f4; border: 1px solid #45475a;"
-            "border-radius: 6px; padding: 6px 12px;"
-            "}"
-            "QPushButton:hover { background-color: #45475a; }"
-            "QPushButton:disabled { color: #8087a2; }"
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(28, 20, 28, 20)
+        outer.setSpacing(12)
+
+        # ── Phase / Queue header ──────────────────────────────────────────
+        header_row = QHBoxLayout()
+        header_row.setSpacing(8)
+        self._phase_label = QLabel("Champ Select")
+        hdr_font = QFont()
+        hdr_font.setPointSize(12)
+        hdr_font.setBold(True)
+        self._phase_label.setFont(hdr_font)
+        self._phase_label.setStyleSheet("color: #89b4fa;")
+        header_row.addWidget(self._phase_label)
+
+        self._queue_label = QLabel()
+        self._queue_label.setStyleSheet("color: #a6adc8; font-size: 10pt;")
+        header_row.addWidget(self._queue_label)
+        header_row.addStretch()
+
+        self._elo_label = QLabel()
+        self._elo_label.setStyleSheet("color: #a6e3a1; font-size: 10pt;")
+        header_row.addWidget(self._elo_label)
+        outer.addLayout(header_row)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("background: #313244; max-height: 1px; border: none;")
+        outer.addWidget(sep)
+
+        # ── Champion matchup row ──────────────────────────────────────────
+        matchup_row = QHBoxLayout()
+        matchup_row.setSpacing(0)
+
+        champ_font = QFont()
+        champ_font.setPointSize(15)
+        champ_font.setBold(True)
+
+        you_col = QVBoxLayout()
+        you_col.setSpacing(2)
+        you_role = QLabel("YOU")
+        you_role.setAlignment(Qt.AlignCenter)
+        you_role.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
+        you_col.addWidget(you_role)
+        self._my_champ_label = QLabel("—")
+        self._my_champ_label.setFont(champ_font)
+        self._my_champ_label.setAlignment(Qt.AlignCenter)
+        self._my_champ_label.setStyleSheet("color: #cdd6f4;")
+        you_col.addWidget(self._my_champ_label)
+        matchup_row.addLayout(you_col, 1)
+
+        vs_label = QLabel("VS")
+        vs_label.setAlignment(Qt.AlignCenter)
+        vs_label.setStyleSheet(
+            "color: #f38ba8; font-size: 12pt; font-weight: bold; padding: 0 20px;"
         )
+        matchup_row.addWidget(vs_label)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(10)
+        enemy_col = QVBoxLayout()
+        enemy_col.setSpacing(2)
+        enemy_role = QLabel("ENEMY")
+        enemy_role.setAlignment(Qt.AlignCenter)
+        enemy_role.setStyleSheet("color: #6c7086; font-size: 8pt; letter-spacing: 1px;")
+        enemy_col.addWidget(enemy_role)
+        self._enemy_champ_label = QLabel("—")
+        self._enemy_champ_label.setFont(champ_font)
+        self._enemy_champ_label.setAlignment(Qt.AlignCenter)
+        self._enemy_champ_label.setStyleSheet("color: #cdd6f4;")
+        enemy_col.addWidget(self._enemy_champ_label)
+        matchup_row.addLayout(enemy_col, 1)
 
-        self.title_label = QLabel("Champion matchup assistant")
-        self.title_label.setObjectName("title")
-        layout.addWidget(self.title_label)
+        outer.addLayout(matchup_row)
 
-        self.meta_label = QLabel("Waiting for champion selection data...")
-        self.meta_label.setObjectName("meta")
-        self.meta_label.setWordWrap(True)
-        layout.addWidget(self.meta_label)
+        self._status_label = QLabel("Waiting for champion selection…")
+        self._status_label.setWordWrap(True)
+        self._status_label.setAlignment(Qt.AlignCenter)
+        self._status_label.setStyleSheet("color: #a6adc8; font-size: 10pt; padding: 4px 0;")
+        outer.addWidget(self._status_label)
 
-        self.details_box = QTextEdit()
-        self.details_box.setReadOnly(True)
-        self.details_box.setMinimumHeight(150)
-        layout.addWidget(self.details_box, 1)
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setStyleSheet("background: #313244; max-height: 1px; border: none;")
+        outer.addWidget(sep2)
 
-        button_row = QHBoxLayout()
-        self.open_matchup_btn = QPushButton("Open Matchup Build")
-        self.open_matchup_btn.setEnabled(False)
-        self.open_matchup_btn.clicked.connect(self._open_matchup)
-        button_row.addWidget(self.open_matchup_btn)
+        guide_label = QLabel("Build Guide  ·  u.gg")
+        guide_label.setStyleSheet("color: #6c7086; font-size: 9pt;")
+        outer.addWidget(guide_label)
 
-        self.open_fallback_btn = QPushButton("Open Fallback Champion Build")
-        self.open_fallback_btn.setEnabled(False)
-        self.open_fallback_btn.clicked.connect(self._open_fallback)
-        button_row.addWidget(self.open_fallback_btn)
-        button_row.addStretch()
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        self._matchup_btn = QPushButton("⚔  Matchup Build")
+        self._matchup_btn.setEnabled(False)
+        self._matchup_btn.clicked.connect(self._open_matchup)
+        btn_row.addWidget(self._matchup_btn)
 
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(self.close)
-        button_row.addWidget(close_btn)
-        layout.addLayout(button_row)
+        self._fallback_btn = QPushButton("📋  Champion Build")
+        self._fallback_btn.setEnabled(False)
+        self._fallback_btn.clicked.connect(self._open_fallback)
+        btn_row.addWidget(self._fallback_btn)
+        outer.addLayout(btn_row)
+
+        outer.addStretch()
 
     def update_payload(self, payload: dict):
+        in_game = bool(payload.get("in_game", False))
         my_champion = str(payload.get("my_champion", "") or "").strip()
         enemy_champion = str(payload.get("enemy_champion", "") or "").strip()
         queue_type = str(payload.get("queue_type", "") or "").strip()
-        rank_label = str(payload.get("rank_label", "") or "").strip() or "Unknown"
-        summary_lines = list(payload.get("summary_lines", []) or [])
+        rank_label = str(payload.get("rank_label", "") or "").strip() or "Overall"
         self._matchup_url = str(payload.get("matchup_url", "") or "").strip()
         self._fallback_url = str(payload.get("fallback_url", "") or "").strip()
 
-        if my_champion and enemy_champion:
-            self.title_label.setText(f"{my_champion} vs {enemy_champion}")
-        elif my_champion:
-            self.title_label.setText(f"{my_champion} build guidance")
+        phase_text = "In Game" if in_game else "Champ Select"
+        phase_color = "#fab387" if in_game else "#89b4fa"
+        self._phase_label.setText(phase_text)
+        self._phase_label.setStyleSheet(
+            f"color: {phase_color}; font-size: 12pt; font-weight: bold;"
+        )
+        self._queue_label.setText(f"— {queue_type}" if queue_type else "")
+        self._elo_label.setText(f"Elo: {rank_label}" if (rank_label and not in_game) else "")
+
+        self._my_champ_label.setText(my_champion if my_champion else "—")
+        self._enemy_champ_label.setText(enemy_champion if enemy_champion else "—")
+
+        if in_game:
+            if my_champion and enemy_champion:
+                hint = f"Playing {my_champion} against {enemy_champion}"
+            elif my_champion:
+                hint = f"Playing {my_champion}"
+            else:
+                hint = "Game in progress"
         else:
-            self.title_label.setText("Champion matchup assistant")
+            if my_champion and enemy_champion:
+                hint = f"Matched up: {my_champion} vs {enemy_champion}"
+            elif my_champion:
+                hint = f"Picked {my_champion} — waiting for enemy champion…"
+            else:
+                hint = "Waiting for champion selection…"
 
-        meta_bits = []
-        if queue_type:
-            meta_bits.append(f"Queue: {queue_type}")
-        meta_bits.append(f"Elo target: {rank_label}")
-        self.meta_label.setText(" | ".join(meta_bits))
-
-        if summary_lines:
-            self.details_box.setPlainText("\n".join(str(line) for line in summary_lines))
-        else:
-            self.details_box.setPlainText(
-                "Waiting for more champ select info.\n"
-                "Lock your champion (and enemy champion if visible) to get matchup-specific guidance."
-            )
-
-        self.open_matchup_btn.setEnabled(bool(self._matchup_url))
-        self.open_fallback_btn.setEnabled(bool(self._fallback_url))
+        self._status_label.setText(hint)
+        self._matchup_btn.setEnabled(bool(self._matchup_url))
+        self._fallback_btn.setEnabled(bool(self._fallback_url))
 
     def _open_matchup(self):
         if not self._matchup_url:
@@ -3252,7 +3309,8 @@ class MainWindow(QMainWindow):
         self.login_thread: Optional[LoginThread] = None
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
-        self.champ_select_assistant_dialog: Optional[ChampSelectAssistantDialog] = None
+        self.game_info_panel: Optional[InClientGamePanel] = None
+        self.main_area_stack: Optional[QStackedWidget] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
         self._rank_data_by_username: dict[str, dict] = {}
@@ -3502,7 +3560,11 @@ class MainWindow(QMainWindow):
         self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
-        layout.addWidget(self.account_list_background)
+        self.game_info_panel = InClientGamePanel()
+        self.main_area_stack = QStackedWidget()
+        self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
+        self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
+        layout.addWidget(self.main_area_stack)
         
         # Apply clipping mask to account list viewport
         self._apply_account_list_clipping_mask()
@@ -3626,6 +3688,9 @@ class MainWindow(QMainWindow):
             edge_fade=self._champion_splash_edge_fade,
             inner_fade=self._champion_splash_inner_fade,
         )
+        if self.game_info_panel:
+            self.game_info_panel.set_dark_mode(self._dark_mode)
+            self.game_info_panel.set_base_color(self._app_surface_color)
 
     def _apply_window_size(self, resolution: str):
         """Resize the window without treating it as a user-initiated custom resize."""
@@ -4557,6 +4622,8 @@ QMenu#trayQuickMenu::separator {
         self._update_tray_watcher_status()
         if bool(next_status.get("in_champ_select", False)):
             self._maybe_refresh_champ_select_assistant(force=False)
+        elif bool(next_status.get("in_game", False)):
+            self._show_game_panel_ingame()
         else:
             self._close_champ_select_assistant()
         self.update_account_item_states()
@@ -5535,25 +5602,61 @@ QMenu#trayQuickMenu::separator {
             queue_type,
             rank_slug,
         ])
-        if signature == self._last_champ_select_signature and self.champ_select_assistant_dialog:
+        if (
+            signature == self._last_champ_select_signature
+            and self.main_area_stack
+            and self.main_area_stack.currentIndex() == 1
+        ):
             return
         self._last_champ_select_signature = signature
 
-        if not self.champ_select_assistant_dialog:
-            self.champ_select_assistant_dialog = ChampSelectAssistantDialog(self)
-
-        self.champ_select_assistant_dialog.update_payload(payload)
-        if not self.champ_select_assistant_dialog.isVisible():
-            self.champ_select_assistant_dialog.show()
-            self.champ_select_assistant_dialog.raise_()
-            self.champ_select_assistant_dialog.activateWindow()
+        if self.game_info_panel:
+            self.game_info_panel.update_payload(payload)
+        if self.main_area_stack:
+            self.main_area_stack.setCurrentIndex(1)
 
     def _close_champ_select_assistant(self):
-        """Close champ-select assistant and clear transient refresh state."""
+        """Hide the in-client game panel and switch back to the account list."""
         self._last_champ_select_signature = ""
         self._last_champ_select_refresh_at = 0.0
-        if self.champ_select_assistant_dialog and self.champ_select_assistant_dialog.isVisible():
-            self.champ_select_assistant_dialog.close()
+        if self.main_area_stack:
+            self.main_area_stack.setCurrentIndex(0)
+
+    def _show_game_panel_ingame(self):
+        """Show the inline game panel with in-game state, reusing last known champion data."""
+        if not (self.main_area_stack and self.game_info_panel):
+            return
+        status = self._ingame_watch_status or {}
+        queue_type = str(status.get("queue_type", "") or "")
+        queue_id = status.get("queue_id")
+
+        # Recover champion names from the last champ-select signature
+        sig = self._last_champ_select_signature or ""
+        parts = sig.split("|") if sig else []
+        my_champion = parts[0] if len(parts) > 0 else ""
+        enemy_champion = parts[1] if len(parts) > 1 else ""
+        if not queue_id and len(parts) > 2:
+            try:
+                queue_id = int(parts[2])
+            except (ValueError, TypeError):
+                pass
+
+        rank_slug, rank_label = self._resolve_logged_in_elo()
+        matchup_url, fallback_url = self._build_u_gg_build_urls(
+            my_champion, enemy_champion, rank_slug, queue_id
+        )
+
+        payload = {
+            "in_game": True,
+            "my_champion": my_champion,
+            "enemy_champion": enemy_champion,
+            "queue_type": queue_type,
+            "rank_label": rank_label,
+            "matchup_url": matchup_url,
+            "fallback_url": fallback_url,
+        }
+        self.game_info_panel.update_payload(payload)
+        self.main_area_stack.setCurrentIndex(1)
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
