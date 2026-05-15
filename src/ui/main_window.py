@@ -2835,7 +2835,7 @@ class AccountListItem(QFrame):
         self._shadow.setColor(QColor(0, 0, 0, 120))
         # Do NOT call setGraphicsEffect here — applying it during list builds
         # forces Qt to set up a software-rendering pipeline for every row,
-        # which can briefly activate the Windows console window.  The effect
+        # which can briefly activate the Windows console window. The effect
         # is applied lazily in _update_visual_state on first hover.
 
         # Colored status circle
@@ -3220,6 +3220,11 @@ class AccountListItem(QFrame):
             mid_active = self._rgba(self._logged_in_gradient_color, int(14 + 50 * t))
             left_idle = self._rgba(self._logged_in_gradient_color, int(18 + 56 * t))
             mid_idle = self._rgba(self._logged_in_gradient_color, int(10 + 40 * t))
+            border_scale = self._logged_in_border_opacity / 100.0
+            border_active = self._rgba(self._logged_in_gradient_color, int((90 + 90 * t) * border_scale))
+            border_idle = self._rgba(self._logged_in_gradient_color, int((70 + 70 * t) * border_scale))
+            border_width = max(1, self._logged_in_border_width - 2)
+            left_border_width = self._logged_in_border_width
 
             if self._logged_in and active:
                 self.setStyleSheet(
@@ -3232,8 +3237,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
             elif self._logged_in:
                 self.setStyleSheet(
                     "#accountListItem {"
@@ -3245,8 +3250,8 @@ class AccountListItem(QFrame):
                     "border-radius: 10px;"
                     "}"
                 )
-                if self.graphicsEffect() is not None:
-                    self.setGraphicsEffect(None)
+                self._shadow.setBlurRadius(0)
+                self._shadow.setColor(QColor(0, 0, 0, 0))
             elif active:
                 hover_bg = self._rgba(self._hover_highlight_color, 170)
                 hover_border = self._rgba(self._hover_highlight_color, 118)
@@ -3278,6 +3283,11 @@ class AccountListItem(QFrame):
         mid_active = self._rgba(self._logged_in_gradient_color, int(24 + 56 * t))
         left_idle = self._rgba(self._logged_in_gradient_color, int(28 + 58 * t))
         mid_idle = self._rgba(self._logged_in_gradient_color, int(16 + 44 * t))
+        border_scale = self._logged_in_border_opacity / 100.0
+        border_active = self._rgba(self._logged_in_gradient_color, int((96 + 90 * t) * border_scale))
+        border_idle = self._rgba(self._logged_in_gradient_color, int((78 + 74 * t) * border_scale))
+        border_width = max(1, self._logged_in_border_width - 2)
+        left_border_width = self._logged_in_border_width
 
         if self._logged_in and active:
             self.setStyleSheet(
@@ -3290,8 +3300,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            if self.graphicsEffect() is not None:
-                self.setGraphicsEffect(None)
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
         elif self._logged_in:
             self.setStyleSheet(
                 "#accountListItem {"
@@ -3303,8 +3313,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            if self.graphicsEffect() is not None:
-                self.setGraphicsEffect(None)
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
         elif active:
             hover_bg = self._rgba(self._hover_highlight_color, 145)
             hover_border = self._rgba(self._hover_highlight_color, 128)
@@ -3317,8 +3327,6 @@ class AccountListItem(QFrame):
             )
             self._shadow.setBlurRadius(14)
             self._shadow.setColor(QColor(15, 23, 42, 28))
-            if self.graphicsEffect() is None:
-                self.setGraphicsEffect(self._shadow)
         else:
             self.setStyleSheet(
                 "#accountListItem {"
@@ -3327,8 +3335,8 @@ class AccountListItem(QFrame):
                 "border-radius: 10px;"
                 "}"
             )
-            if self.graphicsEffect() is not None:
-                self.setGraphicsEffect(None)
+            self._shadow.setBlurRadius(0)
+            self._shadow.setColor(QColor(0, 0, 0, 0))
 
 
 class MainWindow(QMainWindow):
@@ -4318,6 +4326,24 @@ class MainWindow(QMainWindow):
             self.update_account_item_states()
 
         self.refresh_account_list(fetch_ranks=False)
+
+    def _apply_title_bar_theme(self):
+        """Update the native Windows title bar to match the active theme."""
+        _apply_windows11_chrome(self, self._dark_mode)
+
+    def _configure_diagnostics_logging(self):
+        """Configure lightweight file logging based on user-selected level."""
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        level = getattr(logging, self._diagnostics_log_level, logging.INFO)
+        root = logging.getLogger()
+        if not root.handlers:
+            logging.basicConfig(
+                filename=str(LOG_FILE),
+                level=level,
+                format="%(asctime)s [%(levelname)s] %(message)s",
+            )
+        else:
+            root.setLevel(level)
 
     def open_logs_folder(self):
         """Open diagnostics logs folder in file manager."""
