@@ -154,6 +154,7 @@ if !errorlevel! neq 0 (
 
 popd >nul 2>&1
 endlocal
+pause
 exit /b 0
 
 :stage_and_relaunch
