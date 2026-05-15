@@ -620,161 +620,6 @@ QTabBar::tab:hover:!selected {
 }
 """
 
-LIGHT_STYLESHEET = """
-QMainWindow, QDialog, QWidget {
-    background-color: #e7e8ec;
-    color: #2e2d2a;
-}
-QListWidget {
-    background-color: #ededf0;
-    border: 1px solid #c4c6cf;
-    border-radius: 6px;
-    padding: 0px;
-}
-QListWidget::item {
-    background: transparent;
-    border: none;
-    margin: 0px;
-    padding: 0px;
-}
-QListWidget::item:selected {
-    background: transparent;
-    border: none;
-}
-QListWidget::item:hover {
-    background: transparent;
-    border: none;
-}
-QScrollBar:vertical {
-    background: #dfdcd6;
-    width: 12px;
-    margin: 2px;
-    border: 1px solid #c4beb4;
-    border-radius: 6px;
-}
-QScrollBar::handle:vertical {
-    background: #9b9489;
-    min-height: 26px;
-    border-radius: 5px;
-}
-QScrollBar::handle:vertical:hover {
-    background: #847c72;
-}
-QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    background: transparent;
-    height: 0px;
-}
-QScrollBar::add-page:vertical,
-QScrollBar::sub-page:vertical {
-    background: transparent;
-}
-QScrollBar:horizontal {
-    background: #dfdcd6;
-    height: 12px;
-    margin: 2px;
-    border: 1px solid #c4beb4;
-    border-radius: 6px;
-}
-QScrollBar::handle:horizontal {
-    background: #9b9489;
-    min-width: 26px;
-    border-radius: 5px;
-}
-QScrollBar::handle:horizontal:hover {
-    background: #847c72;
-}
-QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {
-    background: transparent;
-    width: 0px;
-}
-QScrollBar::add-page:horizontal,
-QScrollBar::sub-page:horizontal {
-    background: transparent;
-}
-QPushButton {
-    background-color: #d2d3db;
-    color: #2e2d2a;
-    border: 1px solid #c4c6cf;
-    border-radius: 5px;
-    padding: 5px 10px;
-}
-QPushButton:hover {
-    background-color: #c8c9d1;
-}
-QPushButton:pressed {
-    background-color: #bebfc8;
-}
-QPushButton:disabled {
-    background-color: #ececf0;
-    color: #9a9a9a;
-    border: 1px solid #d8d9e1;
-}
-QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
-    background-color: #fafafa;
-    color: #2e2d2a;
-    border: 1px solid #d0d0d6;
-    border-radius: 4px;
-    padding: 4px;
-}
-QComboBox {
-    padding-right: 24px;
-}
-QComboBox::drop-down {
-    subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 20px;
-    border-left: 1px solid #c4c6cf;
-    background-color: #d2d3db;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-}
-QSpinBox::up-button, QSpinBox::down-button {
-    subcontrol-origin: border;
-    background-color: #d2d3db;
-    border-left: 1px solid #c4c6cf;
-    width: 16px;
-}
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #c8c9d1;
-}
-QComboBox QAbstractItemView {
-    background-color: #fafafa;
-    color: #2e2d2a;
-    selection-background-color: #e7e8ee;
-}
-QLabel {
-    color: #2e2d2a;
-}
-QLineEdit::placeholder {
-    color: #7c756b;
-}
-QTabWidget::pane {
-    border: 1px solid #c7c1b6;
-    border-radius: 8px;
-    top: -1px;
-    background-color: #e7e8ec;
-}
-QTabBar::tab {
-    background-color: #e7e8ee;
-    color: #4a4742;
-    border: 1px solid #d0d0d6;
-    border-bottom: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    padding: 6px 12px;
-    margin-right: 4px;
-}
-QTabBar::tab:selected {
-    background-color: #e7e8ec;
-    color: #2e2d2a;
-}
-QTabBar::tab:hover:!selected {
-    background-color: #d2d3db;
-}
-"""
-
 REGION_OPTIONS = [
     ("NA", "North America"),
     ("EUW", "Europe West"),
@@ -3234,7 +3079,7 @@ class AccountListItem(QFrame):
             self.rank_icon_label.setVisible(False)
 
     def set_dark_mode(self, enabled: bool):
-        self._dark_mode = enabled
+        self._dark_mode = True
         self._refresh_tag_chip_styles()
         self._refresh_text_styles()
         self._refresh_logged_in_badge_style()
@@ -3778,7 +3623,7 @@ class MainWindow(QMainWindow):
         self._window_resize_save_timer.start()
     
     def toggle_theme(self):
-        """Toggle between dark and light mode."""
+        """Force dark mode."""
         self._dark_mode = True
         self._apply_theme()
 
