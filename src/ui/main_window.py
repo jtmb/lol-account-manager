@@ -5568,7 +5568,9 @@ class MainWindow(QMainWindow):
             return
         if getattr(self, '_spotlight_user_dismissed', False):
             return
-        if not (self.account_manager and self._logged_in_username and self.account_spotlight_panel):
+        if not (self.account_manager and self._logged_in_username):
+            return
+        if not self._ensure_spotlight_panel():
             return
 
         account = self.account_manager.get_account(self._logged_in_username)
@@ -7455,9 +7457,12 @@ QMenu#trayQuickMenu::separator {
             # Re-parent spotlight panel before clear() so Qt doesn't delete it
             # (QAbstractItemView::clear() calls deleteLater on all item widgets).
             if self.account_spotlight_panel:
-                self.account_spotlight_panel.setParent(self.account_list_background)
-                self.account_spotlight_panel.hide()
-                self._exit_spotlight_ui_mode()
+                try:
+                    self.account_spotlight_panel.setParent(self.account_list_background)
+                    self.account_spotlight_panel.hide()
+                    self._exit_spotlight_ui_mode()
+                except RuntimeError:
+                    self.account_spotlight_panel = None
             self.account_list.clear()
 
             if not self.account_manager:
@@ -7923,9 +7928,26 @@ QMenu#trayQuickMenu::separator {
         self._stop_ingame_watcher()
         self._show_logged_in_spotlight()
 
+    def _ensure_spotlight_panel(self) -> bool:
+        """Return True if account_spotlight_panel is alive, recreating it if deleted."""
+        if self.account_spotlight_panel is None:
+            return False
+        try:
+            # Accessing isVisible() will raise RuntimeError if C++ object is gone
+            self.account_spotlight_panel.isVisible()
+            return True
+        except RuntimeError:
+            # C++ object was deleted — recreate the panel
+            self.account_spotlight_panel = AccountSpotlightPanel()
+            self.account_spotlight_panel.setParent(self.account_list_background)
+            self.account_spotlight_panel.hide()
+            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            return True
+
     def _show_spotlight_for_account(self, account: "Account"):
         """Show the spotlight panel for any account row (not just the logged-in one)."""
-        if not self.account_spotlight_panel:
+        if not self._ensure_spotlight_panel():
             return
         self._spotlight_user_dismissed = False
 
