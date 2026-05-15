@@ -5296,9 +5296,11 @@ QMenu#trayQuickMenu::separator {
                     item.setSizeHint(QSize(0, row_height + row_gap))
                     self.account_list.addItem(item)
 
-                    # Create custom widget
+                    # Create custom widget — parented to the viewport so Qt
+                    # never creates a top-level HWND that flashes white at (0,0).
                     widget = AccountListItem(
                         account,
+                        parent=self.account_list.viewport(),
                         show_ranks=self._show_ranks,
                         show_rank_images=self._show_rank_images,
                         show_tags=self._show_tags,
