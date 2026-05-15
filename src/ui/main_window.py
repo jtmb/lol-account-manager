@@ -5617,9 +5617,9 @@ class MainWindow(QMainWindow):
             if logged_in_row < 0:
                 # Logged-in account is not currently visible in the list.
                 return
-            # Re-parent away from any previous owner so Qt won't delete it
-            # when insertItem triggers internal housekeeping.
-            self.account_spotlight_panel.setParent(self.account_list_background)
+            # Do NOT call setParent() here.  The panel stays as a viewport()
+            # child so setItemWidget's internal setParent(viewport()) is a
+            # no-op, avoiding unnecessary renderer surface changes.
             spotlight_item = QListWidgetItem()
             spotlight_item.setFlags(Qt.NoItemFlags)
             spotlight_item.setSizeHint(QSize(0, 480))
@@ -8043,7 +8043,8 @@ QMenu#trayQuickMenu::separator {
         if target_row < 0:
             return
 
-        self.account_spotlight_panel.setParent(self.account_list_background)
+        # Do NOT call setParent() here — the panel must stay as a viewport()
+        # child so setItemWidget's internal setParent(viewport()) is a no-op.
         spotlight_item = QListWidgetItem()
         spotlight_item.setFlags(Qt.NoItemFlags)
         spotlight_item.setSizeHint(QSize(0, 480))
