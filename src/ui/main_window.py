@@ -362,6 +362,14 @@ def _apply_windows11_chrome(widget, dark_mode: bool):
             ctypes.sizeof(value),
         )
 
+        disable_transitions = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            ctypes.byref(disable_transitions),
+            ctypes.sizeof(disable_transitions),
+        )
+
         caption_color = ctypes.c_int(0x302B2B)
         text_color = ctypes.c_int(0xF4D6CD)
 
@@ -644,6 +652,7 @@ REGION_OPTIONS = [
 REGION_NAMES = {code: label for code, label in REGION_OPTIONS}
 
 if sys.platform.startswith("win"):
+    DWMWA_TRANSITIONS_FORCEDISABLED = 3
     DWMWA_USE_IMMERSIVE_DARK_MODE = 20
     DWMWA_WINDOW_CORNER_PREFERENCE = 33
     DWMWA_BORDER_COLOR = 34
@@ -1387,7 +1396,6 @@ class SettingsDialog(QDialog):
         # the dialog is being constructed and styled.
         self.setAttribute(Qt.WA_NativeWindow, True)
         self.setUpdatesEnabled(False)
-        self.setWindowOpacity(0.0)
 
         # Force HWND creation so we can apply dark-mode chrome to the title bar
         # *before* the dialog is shown — prevents the white title bar flash.
@@ -1402,11 +1410,6 @@ class SettingsDialog(QDialog):
         super().showEvent(event)
         if sys.platform.startswith("win"):
             QTimer.singleShot(0, lambda: _apply_windows11_chrome(self, True))
-        QTimer.singleShot(0, self._reveal_after_first_paint)
-
-    def _reveal_after_first_paint(self):
-        if self.windowOpacity() < 1.0:
-            self.setWindowOpacity(1.0)
 
     def _default_settings_values(self) -> dict:
         return dict(SETTINGS_PANEL_DEFAULTS)
@@ -3181,6 +3184,10 @@ class MainWindow(QMainWindow):
             "error": "",
         }
         self._suppress_window_size_persistence = False
+        if sys.platform.startswith("win"):
+            self.setAttribute(Qt.WA_NativeWindow, True)
+            self.create()
+            _apply_windows11_chrome(self, self._dark_mode)
         self.init_ui()
         app = QApplication.instance()
         if app:
