@@ -402,70 +402,6 @@ def _hide_windows_console_window():
         pass
 
 
-def _hide_own_python_titled_windows(main_hwnd: int = 0):
-    """Hide any top-level window from this process titled like 'python'.
-
-    This catches both console and accidental Qt top-level windows when they
-    surface with the default python title on Windows.
-    """
-    if not sys.platform.startswith("win"):
-        return
-
-    try:
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-    except Exception:
-        return
-
-    try:
-        hwnd = kernel32.GetConsoleWindow()
-        if hwnd:
-            user32.ShowWindow(hwnd, 0)
-    except Exception:
-        pass
-
-    try:
-        get_text = user32.GetWindowTextW
-        get_text_len = user32.GetWindowTextLengthW
-        is_visible = user32.IsWindowVisible
-        get_pid = user32.GetWindowThreadProcessId
-        show_window = user32.ShowWindow
-        current_pid = os.getpid()
-
-        WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-
-        def _enum_cb(hwnd, _lparam):
-            try:
-                if not is_visible(hwnd):
-                    return True
-
-                if main_hwnd and int(hwnd) == int(main_hwnd):
-                    return True
-
-                pid = ctypes.c_ulong(0)
-                get_pid(hwnd, ctypes.byref(pid))
-                if int(pid.value) != int(current_pid):
-                    return True
-
-                text_len = get_text_len(hwnd)
-                if text_len <= 0:
-                    return True
-
-                text_buf = ctypes.create_unicode_buffer(text_len + 1)
-                get_text(hwnd, text_buf, text_len + 1)
-                title = (text_buf.value or "").strip().lower()
-
-                if title == "python" or title.startswith("python "):
-                    show_window(hwnd, 0)
-            except Exception:
-                pass
-            return True
-
-        user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
-    except Exception:
-        pass
-
-
 DARK_STYLESHEET = """
 QMainWindow, QDialog, QWidget {
     background-color: #1e1e2e;
@@ -2676,9 +2612,12 @@ class SettingsDialog(QDialog):
 
     def _save_and_close(self):
         """Apply settings and close the dialog."""
-        if self._apply_callback:
-            self._apply_callback(self.get_values())
+        values = self.get_values()
         self.accept()
+        # Apply after the dialog closes to avoid repainting the main window
+        # under an active modal, which can create transient top-level flashes.
+        if self._apply_callback:
+            QTimer.singleShot(0, lambda: self._apply_callback(values))
 
     def _selected_app_preset(self) -> dict:
         if not hasattr(self, "app_theme_combo"):
@@ -3409,7 +3348,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         _hide_windows_console_window()
-        _hide_own_python_titled_windows()
         self._settings = dict(SETTINGS_PANEL_DEFAULTS)
         self._settings.update(load_settings())
         self.account_manager: Optional[AccountManager] = None
@@ -3530,13 +3468,6 @@ class MainWindow(QMainWindow):
         self._session_sync_timer.start()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
-        if sys.platform.startswith("win"):
-            self._console_guard_timer = QTimer(self)
-            self._console_guard_timer.setInterval(50)
-            self._console_guard_timer.timeout.connect(
-                lambda: _hide_own_python_titled_windows(int(self.winId()))
-            )
-            self._console_guard_timer.start()
         QTimer.singleShot(0, self.check_master_password)
         if self._auto_check_updates:
             QTimer.singleShot(4000, self._check_for_updates)
@@ -3982,12 +3913,10 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         # Refresh button should not force a full stylesheet reapply.
-        _hide_own_python_titled_windows(int(self.winId()))
         self._apply_account_list_background()
         self.update_account_item_states()
         self.refresh_account_list(fetch_ranks=True)
         self._set_refresh_icon_normal()
-        _hide_own_python_titled_windows(int(self.winId()))
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
@@ -4269,7 +4198,6 @@ class MainWindow(QMainWindow):
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""
-        _hide_own_python_titled_windows(int(self.winId()))
         theme_before = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -4401,7 +4329,6 @@ class MainWindow(QMainWindow):
             self.update_account_item_states()
 
         self.refresh_account_list(fetch_ranks=True)
-        _hide_own_python_titled_windows(int(self.winId()))
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
@@ -5145,6 +5072,18 @@ QMenu#trayQuickMenu::separator {
 
     def eventFilter(self, obj, event):
         """Apply consistent Windows 11 chrome to all shown dialogs/message boxes."""
+        if (
+            sys.platform.startswith("win")
+            and event.type() == QEvent.Show
+            and isinstance(obj, QWidget)
+            and obj.isWindow()
+            and obj is not self
+        ):
+            title = (obj.windowTitle() or "").strip().lower()
+            if title == "python" or title.startswith("python "):
+                obj.hide()
+                return True
+
         if event.type() == QEvent.Show and isinstance(obj, QDialog):
             _apply_windows11_chrome(obj, self._dark_mode)
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseMove, QEvent.KeyPress):
