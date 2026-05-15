@@ -1090,7 +1090,11 @@ class _UggBuildFetchThread(QThread):
             "perk_ids": [int(x) for x in (rec_runes.get("active_perks") or []) if str(x).isdigit()],
             "shard_ids": [int(x) for x in (rec_shards.get("active_shards") or []) if str(x).isdigit()],
             "starting_item_ids": [int(x) for x in (rec_start.get("ids") or []) if str(x).isdigit()],
+            "starting_item_matches": int(rec_start.get("matches", 0) or 0),
+            "starting_item_win_rate": float(rec_start.get("win_rate", 0.0) or 0.0),
             "core_item_ids": [int(x) for x in (rec_core.get("ids") or []) if str(x).isdigit()],
+            "core_item_matches": int(rec_core.get("matches", 0) or 0),
+            "core_item_win_rate": float(rec_core.get("win_rate", 0.0) or 0.0),
             "skill_priority": [str(x) for x in (rec_skills.get("slots") or [])],
             "skill_path": [str(x) for x in (rec_skill_path.get("slots") or [])],
             "skill_matches": int(rec_skill_path.get("matches", 0) or 0),
@@ -1314,49 +1318,62 @@ class InClientGamePanel(AccountListBackgroundFrame):
         build_page = QWidget()
         build_layout = QVBoxLayout(build_page)
         build_layout.setContentsMargins(0, 0, 0, 0)
-        build_layout.setSpacing(8)
+        build_layout.setSpacing(10)
 
         item_title = QLabel("Top Build")
-        item_title.setStyleSheet("color: #cdd6f4; font-size: 9pt; font-weight: bold;")
+        item_title.setStyleSheet("color: #f5f7ff; font-size: 10pt; font-weight: bold;")
         build_layout.addWidget(item_title)
 
         start_label = QLabel("Starting Items")
-        start_label.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+        start_label.setStyleSheet("color: #a6adc8; font-size: 8pt; letter-spacing: 0.5px;")
         build_layout.addWidget(start_label)
         self._starting_items_row = QHBoxLayout()
         self._starting_items_row.setSpacing(6)
         self._starting_item_labels: list[QLabel] = []
         for _ in range(4):
             lbl = QLabel()
-            lbl.setFixedSize(28, 28)
+            lbl.setFixedSize(32, 32)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
             self._starting_item_labels.append(lbl)
             self._starting_items_row.addWidget(lbl)
         self._starting_items_row.addStretch()
         build_layout.addLayout(self._starting_items_row)
 
+        self._starting_items_meta = QLabel("—")
+        self._starting_items_meta.setStyleSheet("color: #8ea2d0; font-size: 8pt;")
+        build_layout.addWidget(self._starting_items_meta)
+
         core_label = QLabel("Core Items")
-        core_label.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+        core_label.setStyleSheet("color: #a6adc8; font-size: 8pt; letter-spacing: 0.5px;")
         build_layout.addWidget(core_label)
         self._core_items_row = QHBoxLayout()
-        self._core_items_row.setSpacing(6)
+        self._core_items_row.setSpacing(4)
         self._core_item_labels: list[QLabel] = []
         for _ in range(4):
             lbl = QLabel()
-            lbl.setFixedSize(28, 28)
+            lbl.setFixedSize(36, 36)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 7px; background: #171b29; border: 1px solid #4a5f93;")
             self._core_item_labels.append(lbl)
             self._core_items_row.addWidget(lbl)
+            if _ < 2:
+                arr = QLabel("→")
+                arr.setStyleSheet("color: #7fa0ff; font-size: 10pt; font-weight: bold; padding: 0 2px;")
+                arr.setAlignment(Qt.AlignCenter)
+                self._core_items_row.addWidget(arr)
         self._core_items_row.addStretch()
         build_layout.addLayout(self._core_items_row)
+
+        self._core_items_meta = QLabel("—")
+        self._core_items_meta.setStyleSheet("color: #8ea2d0; font-size: 8pt;")
+        build_layout.addWidget(self._core_items_meta)
 
         self._stage_option_icon_labels: dict[int, list[QLabel]] = {}
         self._stage_option_meta_labels: dict[int, QLabel] = {}
         for stage_num, stage_title in ((1, "4th Item Options"), (2, "5th Item Options"), (3, "6th Item Options")):
             title_lbl = QLabel(stage_title)
-            title_lbl.setStyleSheet("color: #a6adc8; font-size: 8pt;")
+            title_lbl.setStyleSheet("color: #a6adc8; font-size: 8pt; letter-spacing: 0.5px;")
             build_layout.addWidget(title_lbl)
 
             icon_row = QHBoxLayout()
@@ -1364,9 +1381,9 @@ class InClientGamePanel(AccountListBackgroundFrame):
             icon_labels: list[QLabel] = []
             for _ in range(3):
                 il = QLabel()
-                il.setFixedSize(28, 28)
+                il.setFixedSize(32, 32)
                 il.setAlignment(Qt.AlignCenter)
-                il.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+                il.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
                 icon_labels.append(il)
                 icon_row.addWidget(il)
             icon_row.addStretch()
@@ -1375,7 +1392,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
 
             meta_lbl = QLabel("—")
             meta_lbl.setWordWrap(True)
-            meta_lbl.setStyleSheet("color: #94a0be; font-size: 8pt;")
+            meta_lbl.setStyleSheet("color: #8ea2d0; font-size: 8pt;")
             build_layout.addWidget(meta_lbl)
             self._stage_option_meta_labels[stage_num] = meta_lbl
 
@@ -1909,13 +1926,15 @@ class InClientGamePanel(AccountListBackgroundFrame):
             lbl.setStyleSheet("color: #a6adc8; border-radius: 4px; background: #1e1e2e;")
         for lbl in self._starting_item_labels + self._core_item_labels:
             lbl.clear()
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
+        self._starting_items_meta.setText("—")
+        self._core_items_meta.setText("—")
         for style_id, lbl in self._rune_path_labels.items():
             lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e; opacity: 0.4;")
         for stage_num, labels in self._stage_option_icon_labels.items():
             for lbl in labels:
                 lbl.clear()
-                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+                lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
             meta = self._stage_option_meta_labels.get(stage_num)
             if meta:
                 meta.setText("—")
@@ -2013,7 +2032,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         start_ids = list(data.get("starting_item_ids") or [])[:len(self._starting_item_labels)]
         for idx, lbl in enumerate(self._starting_item_labels):
             lbl.clear()
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
             if idx >= len(start_ids):
                 continue
             item_id = int(start_ids[idx])
@@ -2029,10 +2048,17 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._image_threads.append(t)
             t.start()
 
+        start_wr = float(data.get("starting_item_win_rate", 0.0) or 0.0)
+        start_matches = int(data.get("starting_item_matches", 0) or 0)
+        if start_ids:
+            self._starting_items_meta.setText(f"{start_wr:.2f}% WR · {start_matches:,} matches")
+        else:
+            self._starting_items_meta.setText("—")
+
         core_ids = list(data.get("core_item_ids") or [])[:len(self._core_item_labels)]
         for idx, lbl in enumerate(self._core_item_labels):
             lbl.clear()
-            lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+            lbl.setStyleSheet("border-radius: 7px; background: #171b29; border: 1px solid #4a5f93;")
             if idx >= len(core_ids):
                 continue
             item_id = int(core_ids[idx])
@@ -2048,6 +2074,13 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._image_threads.append(t)
             t.start()
 
+        core_wr = float(data.get("core_item_win_rate", 0.0) or 0.0)
+        core_matches = int(data.get("core_item_matches", 0) or 0)
+        if core_ids:
+            self._core_items_meta.setText(f"{core_wr:.2f}% WR · {core_matches:,} matches")
+        else:
+            self._core_items_meta.setText("—")
+
         # Stage options (4th/5th/6th item)
         options_map = data.get("item_stage_options") if isinstance(data.get("item_stage_options"), dict) else {}
         for stage_num, labels in self._stage_option_icon_labels.items():
@@ -2056,7 +2089,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
             meta_lbl = self._stage_option_meta_labels.get(stage_num)
             for lbl in labels:
                 lbl.clear()
-                lbl.setStyleSheet("border-radius: 4px; background: #1e1e2e;")
+                lbl.setStyleSheet("border-radius: 6px; background: #171b29; border: 1px solid #36415f;")
             if not options:
                 if meta_lbl:
                     meta_lbl.setText("no data")
@@ -2068,7 +2101,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                 item_id = int(opt.get("id", 0) or 0)
                 wr = float(opt.get("win_rate", 0.0) or 0.0)
                 mm = int(opt.get("matches", 0) or 0)
-                chunks.append(f"{item_id} ({wr:.1f}%/{mm})")
+                chunks.append(f"{wr:.1f}% WR · {mm:,}")
                 if idx < len(labels):
                     cached = self._item_icon_cache.get(item_id)
                     if cached and not cached.isNull():
@@ -2082,7 +2115,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                         self._image_threads.append(t)
                         t.start()
             if meta_lbl:
-                meta_lbl.setText(" | ".join(chunks) if chunks else "no data")
+                meta_lbl.setText("   |   ".join(chunks) if chunks else "no data")
 
         # Skill sections
         skill_priority = [str(s).upper() for s in (data.get("skill_priority") or []) if str(s).strip()]
