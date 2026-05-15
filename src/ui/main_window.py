@@ -5654,27 +5654,27 @@ class MainWindow(QMainWindow):
             # Use the list widget height (more reliable than viewport() which may
             # lag behind layout changes by one event-loop iteration).
             list_h = self.account_list.height()
-        if list_h <= 0:
-            return
-        new_h = max(380, list_h)
-        for index in range(self.account_list.count()):
-            item = self.account_list.item(index)
-            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                # Always apply — skip-guard can silently miss a post-restore
-                # resize when account_list.height() hasn't settled yet.
-                item.setSizeHint(QSize(0, new_h))
-                self.account_spotlight_panel.setMinimumHeight(new_h)
-                self.account_spotlight_panel.setMaximumHeight(new_h)
-                self.account_list.doItemsLayout()
-                self.account_list.viewport().update()
-                # Restore scroll position that doItemsLayout resets.
-                if index > 0:
-                    row_above = self.account_list.item(index - 1)
-                    if row_above:
-                        self.account_list.scrollToItem(
-                            row_above, self.account_list.PositionAtTop
-                        )
-                break
+            if list_h <= 0:
+                return
+            new_h = max(380, list_h)
+            for index in range(self.account_list.count()):
+                item = self.account_list.item(index)
+                if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                    # Always apply — skip-guard can silently miss a post-restore
+                    # resize when account_list.height() hasn't settled yet.
+                    item.setSizeHint(QSize(0, new_h))
+                    self.account_spotlight_panel.setMinimumHeight(new_h)
+                    self.account_spotlight_panel.setMaximumHeight(new_h)
+                    self.account_list.doItemsLayout()
+                    self.account_list.viewport().update()
+                    # Restore scroll position that doItemsLayout resets.
+                    if index > 0:
+                        row_above = self.account_list.item(index - 1)
+                        if row_above:
+                            self.account_list.scrollToItem(
+                                row_above, self.account_list.PositionAtTop
+                            )
+                    break
         except RuntimeError:
             # C++ object deleted before the deferred timer fired.
             self.account_spotlight_panel = None
