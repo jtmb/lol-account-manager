@@ -3626,7 +3626,7 @@ class MainWindow(QMainWindow):
             return
         self._pending_settings_refresh = False
         self._apply_theme()
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
 
     def refresh_ui(self):
         """Force a refresh of UI styling and list visuals."""
@@ -3637,7 +3637,7 @@ class MainWindow(QMainWindow):
 
     def _perform_refresh_ui(self):
         self._apply_theme()
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
         self._set_refresh_icon_normal()
 
     def _configure_icon_buttons(self):
@@ -4003,7 +4003,7 @@ class MainWindow(QMainWindow):
 
         self._pending_settings_refresh = False
         self._apply_theme()
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
 
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
@@ -4799,14 +4799,14 @@ QMenu#trayQuickMenu::separator {
     def initialize_account_manager(self, password: str):
         """Initialize account manager with master password"""
         self.account_manager = AccountManager(password)
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=True)
         self._reset_auto_lock_timer()
         self._update_tray_actions_state()
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
         self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
 
     def _clear_filters(self):
         self.search_input.clear()
@@ -4897,7 +4897,7 @@ QMenu#trayQuickMenu::separator {
         indexed.sort(key=lambda pair: (not bool(getattr(pair[1], "is_pinned", False)), pair[0]))
         return [acc for _, acc in indexed]
     
-    def refresh_account_list(self):
+    def refresh_account_list(self, fetch_ranks: bool = True):
         """Refresh the account list display"""
         if self._settings_dialog_open or QApplication.activeModalWidget():
             self._pending_settings_refresh = True
@@ -4961,7 +4961,7 @@ QMenu#trayQuickMenu::separator {
                     self.account_list.setItemWidget(item, widget)
 
                 self.update_account_item_states()
-                if self._show_ranks:
+                if fetch_ranks and self._show_ranks:
                     self._start_rank_fetches()
         finally:
             self.account_list.setUpdatesEnabled(True)
@@ -5143,7 +5143,7 @@ QMenu#trayQuickMenu::separator {
         if chosen_action == toggle_pin_action:
             try:
                 self.account_manager.set_account_pinned(account.username, not bool(getattr(account, "is_pinned", False)))
-                self.refresh_account_list()
+                self.refresh_account_list(fetch_ranks=False)
             except Exception as exc:
                 self._show_error("Pin", f"Could not update pin state: {exc}")
         elif chosen_action == open_opgg_profile_action:
@@ -5256,7 +5256,7 @@ QMenu::separator {
                 )
                 if old_logged_in and old_logged_in == username:
                     self._logged_in_username = data['username']
-                self.refresh_account_list()
+                self.refresh_account_list(fetch_ranks=False)
                 QMessageBox.information(self, "Success", "Account updated successfully!")
             except ValueError as e:
                 self._show_error("Error", str(e))
@@ -5284,7 +5284,7 @@ QMenu::separator {
                     ban_status=data['ban_status'],
                     ban_end_date=data['ban_end_date'],
                 )
-                self.refresh_account_list()
+                self.refresh_account_list(fetch_ranks=False)
                 QMessageBox.information(self, "Success", "Account added successfully!")
             except ValueError as e:
                 self._show_error("Error", str(e))
@@ -5321,7 +5321,7 @@ QMenu::separator {
                 self.account_manager.delete_account(username)
                 if self._logged_in_username == username:
                     self._logged_in_username = None
-                self.refresh_account_list()
+                self.refresh_account_list(fetch_ranks=False)
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
                 self._show_error("Error", f"Failed to delete account: {str(e)}")
@@ -5402,7 +5402,7 @@ QMenu::separator {
                     logging.debug("Could not update last launch timestamp", exc_info=True)
                 self._logged_in_username = account.username
                 self._session_miss_count = 0
-                self.refresh_account_list()
+                self.refresh_account_list(fetch_ranks=False)
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
         else:
@@ -5685,7 +5685,7 @@ QMenu::separator {
 
         try:
             count = self.account_manager.import_from_file(file_path, source_password, merge=merge)
-            self.refresh_account_list()
+            self.refresh_account_list(fetch_ranks=False)
             QMessageBox.information(
                 self,
                 "Import Successful",
