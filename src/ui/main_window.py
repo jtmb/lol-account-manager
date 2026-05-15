@@ -1144,6 +1144,10 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._auto_role_hint = ""
         self._manual_role_hint = ""
         self._last_build_url = ""
+        self._last_skill_priority: list[str] = []
+        self._last_skill_path: list[str] = []
+        self._last_skill_wr: float = 0.0
+        self._last_skill_matches: int = 0
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(20, 16, 20, 16)
@@ -1580,7 +1584,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         self._skill_path_grid.setHorizontalSpacing(3)
         self._skill_path_grid.setVerticalSpacing(4)
         self._skill_path_grid_wrap = QWidget()
-        self._skill_path_grid_wrap.setMaximumWidth(620)
+        self._skill_path_grid_wrap.setMaximumWidth(700)
         skill_grid_wrap_layout = QVBoxLayout(self._skill_path_grid_wrap)
         skill_grid_wrap_layout.setContentsMargins(0, 0, 0, 0)
         skill_grid_wrap_layout.setSpacing(0)
@@ -1893,6 +1897,11 @@ class InClientGamePanel(AccountListBackgroundFrame):
         t.start()
 
     def _render_skill_section(self, skill_priority: list[str], skill_path: list[str], skill_wr: float = 0.0, skill_matches: int = 0):
+        self._last_skill_priority = [str(s).upper().strip() for s in (skill_priority or []) if str(s).strip()]
+        self._last_skill_path = [str(s).upper().strip() for s in (skill_path or []) if str(s).strip()]
+        self._last_skill_wr = float(skill_wr or 0.0)
+        self._last_skill_matches = int(skill_matches or 0)
+
         self._clear_layout(self._skill_priority_row)
         self._clear_layout(self._skill_path_grid)
 
@@ -1929,10 +1938,23 @@ class InClientGamePanel(AccountListBackgroundFrame):
         # Grid headers
         row_skills = ["Q", "W", "E", "R"]
         self._skill_path_grid.setColumnStretch(0, 0)  # row label col fixed
+
+        available_width = self._skill_path_grid_wrap.width() if hasattr(self, "_skill_path_grid_wrap") else 0
+        if available_width <= 0:
+            available_width = 620
+        spacing = max(0, self._skill_path_grid.horizontalSpacing())
+        usable = max(520, available_width - 8)
+        cell_w = int((usable - 24 - (18 * spacing)) / 18)
+        cell_w = max(24, min(32, cell_w))
+        cell_h = 26 if cell_w <= 26 else 28
+        row_label_w = 24 if cell_w <= 26 else 26
+        header_h = 18
+        font_size = 7 if cell_w <= 26 else 8
+
         for col in range(1, 19):
             header = QLabel(str(col))
             header.setAlignment(Qt.AlignCenter)
-            header.setFixedSize(24, 18)
+            header.setFixedSize(cell_w, header_h)
             header.setStyleSheet("color: #7f8aa3; font-size: 7pt;")
             self._skill_path_grid.addWidget(header, 0, col)
             self._skill_path_grid.setColumnStretch(col, 0)
@@ -1940,7 +1962,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
         for row_idx, skill in enumerate(row_skills, start=1):
             row_lbl = QLabel(skill)
             row_lbl.setAlignment(Qt.AlignCenter)
-            row_lbl.setFixedSize(24, 26)
+            row_lbl.setFixedSize(row_label_w, cell_h)
             row_lbl.setStyleSheet(
                 f"border-radius: 4px; background: #1e1e2e; color: {color_by_skill.get(skill, '#cdd6f4')}; font-weight: bold;"
             )
@@ -1949,8 +1971,8 @@ class InClientGamePanel(AccountListBackgroundFrame):
             for lv in range(1, 19):
                 cell = QLabel("")
                 cell.setAlignment(Qt.AlignCenter)
-                cell.setFixedSize(24, 26)
-                cell.setStyleSheet("border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: 7pt;")
+                cell.setFixedSize(cell_w, cell_h)
+                cell.setStyleSheet(f"border-radius: 4px; background: #20263a; color: #f5f7ff; font-size: {font_size}pt;")
 
                 if lv <= len(skill_path):
                     picked = str(skill_path[lv - 1]).upper().strip()
@@ -1958,7 +1980,7 @@ class InClientGamePanel(AccountListBackgroundFrame):
                         color = color_by_skill.get(skill, "#4fb4ff")
                         cell.setText(str(lv))
                         cell.setStyleSheet(
-                            f"border-radius: 4px; background: {color}; color: #0b1020; font-size: 7pt; font-weight: bold;"
+                            f"border-radius: 4px; background: {color}; color: #0b1020; font-size: {font_size}pt; font-weight: bold;"
                         )
                 self._skill_path_grid.addWidget(cell, row_idx, lv)
 
@@ -1967,6 +1989,16 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._skill_path_meta.setText(compact)
         else:
             self._skill_path_meta.setText("—")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._last_skill_priority or self._last_skill_path:
+            self._render_skill_section(
+                self._last_skill_priority,
+                self._last_skill_path,
+                self._last_skill_wr,
+                self._last_skill_matches,
+            )
 
     def _render_rune_style_slots(self, style_id: int, container_layout, active_ids: set[int], max_slots: int, skip_keystone: bool = False):
         self._clear_layout(container_layout)
