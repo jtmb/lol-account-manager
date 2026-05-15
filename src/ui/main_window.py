@@ -5613,8 +5613,9 @@ class MainWindow(QMainWindow):
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
         # Safety fallback: list resize event fires instantly if the viewport grew,
-        # but add a 200 ms shot in case the layout settles later.
-        QTimer.singleShot(200, self._update_spotlight_size_hint)
+        # but add shots at 50 ms and 300 ms in case the layout settles later.
+        QTimer.singleShot(50, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
@@ -5631,21 +5632,26 @@ class MainWindow(QMainWindow):
 
     def _update_spotlight_size_hint(self):
         """Resize the spotlight list item so it fills the viewport height.
-        Setting height = full viewport height ensures that, once the account
+        Setting height = full list height ensures that, once the account
         row above is scrolled to the top, all rows below the spotlight are
         pushed off-screen regardless of any spacing/DPI differences."""
         if not self.account_spotlight_panel:
             return
-        viewport_h = self.account_list.viewport().height()
-        if viewport_h <= 0:
+        # Use the list widget height (more reliable than viewport() which may
+        # lag behind layout changes by one event-loop iteration).
+        list_h = self.account_list.height()
+        if list_h <= 0:
             return
+        new_h = max(380, list_h)
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                new_h = max(380, viewport_h)
-                if item.sizeHint().height() != new_h:
+                if abs(item.sizeHint().height() - new_h) > 2:
                     item.setSizeHint(QSize(0, new_h))
+                    # Force the widget itself to match — doItemsLayout alone may
+                    # lag when called from a zero-ms timer.
                     self.account_spotlight_panel.setMinimumHeight(new_h)
+                    self.account_spotlight_panel.setMaximumHeight(new_h)
                     self.account_list.doItemsLayout()
                     self.account_list.viewport().update()
                     self._reapply_ugg_embed_css()
@@ -5692,6 +5698,13 @@ class MainWindow(QMainWindow):
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._home_button.setEnabled(False)
         self._set_icon_state(self._home_button, "normal")
+        # Release the fixed-height constraint set during spotlight sizing
+        if self.account_spotlight_panel:
+            try:
+                self.account_spotlight_panel.setMinimumHeight(420)
+                self.account_spotlight_panel.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
+            except RuntimeError:
+                pass
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
@@ -8005,9 +8018,10 @@ QMenu#trayQuickMenu::separator {
 
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
-        # Safety fallback at 200 ms; the list's own resizeEvent will also fire
+        # Safety fallback at 50 ms and 300 ms; the list's own resizeEvent will also fire
         # immediately if the viewport height changed when filter rows were hidden.
-        QTimer.singleShot(200, self._update_spotlight_size_hint)
+        QTimer.singleShot(50, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
