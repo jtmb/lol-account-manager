@@ -5646,16 +5646,15 @@ class MainWindow(QMainWindow):
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
-                if abs(item.sizeHint().height() - new_h) > 2:
-                    item.setSizeHint(QSize(0, new_h))
-                    # Force the widget itself to match — doItemsLayout alone may
-                    # lag when called from a zero-ms timer.
-                    self.account_spotlight_panel.setMinimumHeight(new_h)
-                    self.account_spotlight_panel.setMaximumHeight(new_h)
-                    self.account_list.doItemsLayout()
-                    self.account_list.viewport().update()
-                    self._reapply_ugg_embed_css()
-                # Always restore scroll after doItemsLayout resets it
+                # Always apply — skip-guard can silently miss a post-restore
+                # resize when account_list.height() hasn't settled yet.
+                item.setSizeHint(QSize(0, new_h))
+                self.account_spotlight_panel.setMinimumHeight(new_h)
+                self.account_spotlight_panel.setMaximumHeight(new_h)
+                self.account_list.doItemsLayout()
+                self.account_list.viewport().update()
+                self._reapply_ugg_embed_css()
+                # Restore scroll position that doItemsLayout resets.
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
                     if row_above:
@@ -5753,7 +5752,9 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         # Update spotlight size on every resize (manual drag or maximize/restore).
+        # Fire at 10 ms (fast) and 300 ms (safety net after slow layout settle).
         QTimer.singleShot(10, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
         QTimer.singleShot(100, self._reapply_ugg_embed_css)
         # After a window-state change, Qt issues an extra resize; use it to
         # reapply zoom and CSS for the new dimensions.
@@ -5780,6 +5781,7 @@ class MainWindow(QMainWindow):
         # Re-run the u.gg embed CSS when window is maximized/restored
         if event.type() == QEvent.WindowStateChange:
             QTimer.singleShot(100, self._update_spotlight_size_hint)
+            QTimer.singleShot(500, self._update_spotlight_size_hint)  # safety net
             QTimer.singleShot(200, self._update_webview_zoom)
             QTimer.singleShot(300, self._reapply_ugg_embed_css)
             # Set flag to trigger additional CSS reapply on next resize
