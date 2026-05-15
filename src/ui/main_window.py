@@ -2886,17 +2886,13 @@ class AccountListItem(QFrame):
         super().leaveEvent(event)
 
     def _update_visual_state(self):
-        # Guard: if Qt deleted the C++ shadow object (e.g. via a stale
-        # setGraphicsEffect(None) elsewhere), recreate it rather than crash.
+        # Guard: if the C++ shadow object has been deleted (happens when Qt
+        # destroys widgets during app close, or via any stale
+        # setGraphicsEffect(None) call), bail out silently rather than crash.
         try:
             self._shadow.blurRadius()
         except RuntimeError:
-            self._shadow = QGraphicsDropShadowEffect(self)
-            self._shadow.setOffset(0, 3)
-            self._shadow.setBlurRadius(0)
-            self._shadow.setColor(QColor(0, 0, 0, 0))
-            # Re-apply to widget if it had the effect before
-            self.setGraphicsEffect(self._shadow)
+            return
 
         active = self._selected or self._hovered
         if self._dark_mode:
