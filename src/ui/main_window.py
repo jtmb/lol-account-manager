@@ -1406,14 +1406,24 @@ class SettingsDialog(QDialog):
         _pal.setColor(QPalette.ButtonText,  _text)
         self.setPalette(_pal)
 
-        # Pre-apply a dialog background before HWND creation to avoid a
-        # first-frame light theme flash.
+        # Pre-apply the *final* dialog stylesheet before any child widgets are
+        # created so there is no first-frame theme swap.
         app_bg = str(getattr(parent, '_app_bg_color', DEFAULT_APP_BG_COLOR))
+        app_surface = str(getattr(parent, '_app_surface_color', DEFAULT_APP_SURFACE_COLOR))
+        app_border = str(getattr(parent, '_app_border_color', DEFAULT_APP_BORDER_COLOR))
         app_text = str(getattr(parent, '_app_text_color', DEFAULT_APP_TEXT_COLOR))
-        self.setAutoFillBackground(True)
-        self.setStyleSheet(
+        app_hover = str(getattr(parent, '_app_hover_color', DEFAULT_APP_HOVER_COLOR))
+        self._dialog_stylesheet = (
             f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QWidget {{ background-color: {app_bg}; color: {app_text}; }}"
+            f"QLineEdit {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
+            f"QComboBox {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
+            f"QCheckBox {{ color: {app_text}; }}"
+            f"QPushButton {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 5px 10px; }}"
+            f"QPushButton:hover {{ background-color: {app_hover}; }}"
         )
+        self.setAutoFillBackground(True)
+        self.setStyleSheet(self._dialog_stylesheet)
 
         # Ensure a native HWND exists early and avoid partial paints while
         # the dialog is being constructed and styled.
@@ -1576,22 +1586,7 @@ class SettingsDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(620)
 
-        mw = self.parent()
-        app_bg = str(getattr(mw, "_app_bg_color", DEFAULT_APP_BG_COLOR))
-        app_surface = str(getattr(mw, "_app_surface_color", DEFAULT_APP_SURFACE_COLOR))
-        app_border = str(getattr(mw, "_app_border_color", DEFAULT_APP_BORDER_COLOR))
-        app_text = str(getattr(mw, "_app_text_color", DEFAULT_APP_TEXT_COLOR))
-        app_hover = str(getattr(mw, "_app_hover_color", DEFAULT_APP_HOVER_COLOR))
-
-        self.setStyleSheet(
-            f"QDialog {{ background-color: {app_bg}; color: {app_text}; }}"
-            f"QWidget {{ background-color: {app_bg}; color: {app_text}; }}"
-            f"QLineEdit {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
-            f"QComboBox {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 4px; }}"
-            f"QCheckBox {{ color: {app_text}; }}"
-            f"QPushButton {{ background-color: {app_surface}; color: {app_text}; border: 1px solid {app_border}; padding: 5px 10px; }}"
-            f"QPushButton:hover {{ background-color: {app_hover}; }}"
-        )
+        self.setStyleSheet(self._dialog_stylesheet)
 
         layout = QVBoxLayout()
 
@@ -3126,6 +3121,9 @@ class MainWindow(QMainWindow):
         self._app_text_color: str = str(self._settings.get('app_text_color', DEFAULT_APP_TEXT_COLOR) or DEFAULT_APP_TEXT_COLOR)
         self._app_accent_color: str = str(self._settings.get('app_accent_color', DEFAULT_APP_ACCENT_COLOR) or DEFAULT_APP_ACCENT_COLOR)
         self._app_hover_color: str = str(self._settings.get('app_hover_color', DEFAULT_APP_HOVER_COLOR) or DEFAULT_APP_HOVER_COLOR)
+        # Apply the final stylesheet before creating child widgets to avoid
+        # first-paint fallback styles.
+        self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
         base_pal = QPalette()
         base_pal.setColor(QPalette.Window, QColor(self._app_bg_color))
         base_pal.setColor(QPalette.WindowText, QColor(self._app_text_color))
@@ -3937,7 +3935,6 @@ class MainWindow(QMainWindow):
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
-        original_settings = dict(self._settings)
         dialog_settings = dict(self._settings)
         dialog_settings['current_window_size'] = f"{self.width()}x{self.height()}"
         dialog = SettingsDialog(
@@ -3951,17 +3948,21 @@ class MainWindow(QMainWindow):
             _apply_windows11_chrome(dialog, self._dark_mode)
         self._settings_icon_latched = True
         self._set_icon_state(self._settings_button, "pressed")
-        try:
-            if dialog.exec_() != QDialog.Accepted:
-                return
-            if getattr(dialog, "_save_requested", False):
-                self._apply_settings_values(dialog.get_values())
-        finally:
-            self._settings_icon_latched = False
-            self._sync_icon_button_state(self._settings_button)
-            if self._pending_rank_fetch_after_modal and not QApplication.activeModalWidget():
-                self._pending_rank_fetch_after_modal = False
-                QTimer.singleShot(0, lambda: self.refresh_account_list(fetch_ranks=True))
+
+        def _on_settings_finished(result: int):
+            try:
+                if result == QDialog.Accepted and getattr(dialog, "_save_requested", False):
+                    self._apply_settings_values(dialog.get_values())
+            finally:
+                self._settings_icon_latched = False
+                self._sync_icon_button_state(self._settings_button)
+                if self._pending_rank_fetch_after_modal and not QApplication.activeModalWidget():
+                    self._pending_rank_fetch_after_modal = False
+                    QTimer.singleShot(0, lambda: self.refresh_account_list(fetch_ranks=True))
+                dialog.deleteLater()
+
+        dialog.finished.connect(_on_settings_finished)
+        dialog.open()
 
     def _apply_settings_values(self, values: dict, persist: bool = True):
         """Apply settings values to runtime state and persist them."""

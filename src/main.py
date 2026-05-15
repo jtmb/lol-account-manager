@@ -114,6 +114,26 @@ def _apply_dark_palette(app: QApplication, settings: Optional[dict] = None) -> N
     palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled)
     app.setPalette(palette)
 
+    app.setStyleSheet(
+        "QMainWindow, QDialog, QWidget {"
+        f" background-color: {dark_bg.name()};"
+        f" color: {text.name()};"
+        " }"
+        "QLineEdit, QComboBox, QTextEdit, QPlainTextEdit, QSpinBox {"
+        f" background-color: {surface.name()};"
+        f" color: {text.name()};"
+        f" border: 1px solid {border.name()};"
+        " }"
+        "QPushButton {"
+        f" background-color: {surface.name()};"
+        f" color: {text.name()};"
+        f" border: 1px solid {border.name()};"
+        " }"
+        "QPushButton:hover {"
+        f" background-color: {highlight.name()};"
+        " }"
+    )
+
 
 def main():
     """Run the application"""
