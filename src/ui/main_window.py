@@ -743,8 +743,9 @@ QTabBar::tab:hover:!selected {
     background-color: #353b55;
 }
 #tagFilterCombo {
-    padding: 2px 2px;
+    padding: 2px 0px;
     padding-right: 20px;
+    min-width: 60px;
 }
 """
 
@@ -6406,18 +6407,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self.tag_filter_combo.setPalette(combo_palette)
 
     def _sync_filter_control_widths(self):
-        """Make combo same width as Clear button and fit text."""
-        if not hasattr(self, "tag_filter_combo") or not hasattr(self, "clear_filters_btn"):
+        """Fit combo to "All tags" text with minimal padding."""
+        if not hasattr(self, "tag_filter_combo"):
             return
-        # Match combo width to Clear button width
-        clear_width = self.clear_filters_btn.width()
-        if clear_width > 0:
-            self.tag_filter_combo.setFixedWidth(clear_width)
-        else:
-            # Fallback if button not yet laid out
-            combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-            target_width = combo_text_width + 8
-            self.tag_filter_combo.setFixedWidth(target_width)
+        # Calculate exact width needed for "All tags" text to fit without clipping
+        combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
+        # Minimal padding: 0px left + 20px right for dropdown arrow + 2px margin
+        target_width = combo_text_width + 0 + 20 + 2
+        self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
