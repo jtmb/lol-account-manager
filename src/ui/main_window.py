@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
-    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
+    QDateEdit, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
     QStackedWidget, QSizePolicy, QLayout
 )
