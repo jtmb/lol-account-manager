@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget, QSizePolicy, QLayout
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF, QPointF, QUrl, QObject
-from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
+from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen, QFontDatabase
 from pathlib import Path
 from typing import Optional, Callable
 import sys
@@ -5246,13 +5246,11 @@ class MainWindow(QMainWindow):
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(8)
 
-        title = QLabel("LOL Account Manager")
-        title.setObjectName("appNavTitle")
-        title_font = QFont()
-        title_font.setPointSize(13)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        top_row.addWidget(title)
+        self._nav_banner = QLabel()
+        self._nav_banner.setObjectName("appNavBanner")
+        self._nav_banner.setFixedSize(232, 30)
+        self._refresh_nav_banner()
+        top_row.addWidget(self._nav_banner)
 
         self._filter_row_widget = QWidget()
         filter_row = QHBoxLayout(self._filter_row_widget)
@@ -6156,6 +6154,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
         self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
+        self._refresh_nav_banner()
 
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
@@ -6449,36 +6448,109 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self._sync_search_input_icon()
 
     def _sync_search_input_icon(self):
-        """Render the leading search icon to match active theme colors."""
+        """Render the leading hourglass icon to match active theme colors."""
         if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
             return
         search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
 
     def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
-        """Build a simple magnifying glass icon for the search field."""
+        """Build a simple hourglass icon for the search field."""
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
         color = QColor(color_hex)
-        pen = QPen(color, max(1.2, size * 0.14), Qt.SolidLine)
+        pen = QPen(color, max(1.0, size * 0.12), Qt.SolidLine)
         pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
 
-        lens_r = size * 0.32
-        lens_cx = size * 0.42
-        lens_cy = size * 0.42
-        painter.drawEllipse(QPointF(lens_cx, lens_cy), lens_r, lens_r)
+        left = size * 0.20
+        right = size * 0.80
+        top = size * 0.12
+        mid = size * 0.50
+        bottom = size * 0.88
 
-        handle_start = QPointF(lens_cx + lens_r * 0.55, lens_cy + lens_r * 0.55)
-        handle_end = QPointF(size * 0.90, size * 0.90)
-        painter.drawLine(handle_start, handle_end)
+        painter.drawLine(QPointF(left, top), QPointF(right, top))
+        painter.drawLine(QPointF(left, bottom), QPointF(right, bottom))
+        painter.drawLine(QPointF(left, top), QPointF(mid, mid))
+        painter.drawLine(QPointF(right, top), QPointF(mid, mid))
+        painter.drawLine(QPointF(left, bottom), QPointF(mid, mid))
+        painter.drawLine(QPointF(right, bottom), QPointF(mid, mid))
+
+        sand = QColor(color)
+        sand.setAlpha(180)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(sand)
+
+        top_sand = QPainterPath()
+        top_sand.moveTo(left + size * 0.06, top + size * 0.08)
+        top_sand.lineTo(right - size * 0.06, top + size * 0.08)
+        top_sand.lineTo(mid, mid - size * 0.05)
+        top_sand.closeSubpath()
+        painter.drawPath(top_sand)
+
+        bottom_sand = QPainterPath()
+        bottom_sand.moveTo(mid - size * 0.07, bottom - size * 0.12)
+        bottom_sand.lineTo(mid + size * 0.07, bottom - size * 0.12)
+        bottom_sand.lineTo(mid, bottom - size * 0.04)
+        bottom_sand.closeSubpath()
+        painter.drawPath(bottom_sand)
 
         painter.end()
         return QIcon(pixmap)
+
+    def _refresh_nav_banner(self):
+        """Render a compact banner in the nav using League-style font fallbacks."""
+        if not hasattr(self, "_nav_banner"):
+            return
+
+        width, height = 232, 30
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        app_surface = QColor(self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR))
+        app_border = QColor(self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR))
+        app_text = QColor(self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR))
+        app_accent = QColor(self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR))
+
+        bg = QColor(app_surface)
+        bg.setAlpha(140)
+        painter.setPen(QPen(app_border, 1))
+        painter.setBrush(bg)
+        painter.drawRoundedRect(0.5, 0.5, width - 1.0, height - 1.0, 7, 7)
+
+        accent_pen = QPen(app_accent, 2)
+        accent_pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(accent_pen)
+        painter.drawLine(10, height // 2, 24, height // 2)
+
+        db = QFontDatabase()
+        preferred_fonts = [
+            "Beaufort for LOL",
+            "Beaufort for LOL Bold",
+            "Friz Quadrata Std",
+            "Friz Quadrata",
+            "Trajan Pro",
+            "Times New Roman",
+        ]
+        available = set(db.families())
+        chosen_font = next((name for name in preferred_fonts if name in available), self.font().family())
+
+        banner_font = QFont(chosen_font, 10)
+        banner_font.setBold(True)
+        banner_font.setLetterSpacing(QFont.AbsoluteSpacing, 0.9)
+        painter.setFont(banner_font)
+        painter.setPen(app_text)
+        painter.drawText(QRectF(30, 0, width - 36, height), Qt.AlignVCenter | Qt.AlignLeft, "LEAGUE ACCOUNT MANAGER")
+
+        painter.end()
+        self._nav_banner.setPixmap(pixmap)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
