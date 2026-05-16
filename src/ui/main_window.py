@@ -5266,6 +5266,8 @@ class MainWindow(QMainWindow):
         self.search_input.setMinimumWidth(320)
         self.search_input.setMaximumWidth(640)
         self.search_input.textChanged.connect(self._on_filters_changed)
+        self._search_leading_action = self.search_input.addAction(QIcon(), QLineEdit.LeadingPosition)
+        self._search_leading_action.setEnabled(False)
         filter_row.addWidget(self.search_input)
 
         top_row.addSpacing(14)
@@ -5298,7 +5300,7 @@ class MainWindow(QMainWindow):
         self._nav_actions_widget = QFrame()
         self._nav_actions_widget.setObjectName("appNavActions")
         nav_actions_layout = QHBoxLayout(self._nav_actions_widget)
-        nav_actions_layout.setContentsMargins(4, 2, 4, 2)
+        nav_actions_layout.setContentsMargins(2, 1, 2, 1)
         nav_actions_layout.setSpacing(2)
         nav_actions_layout.addWidget(self._home_button, 0, Qt.AlignVCenter)
         nav_actions_layout.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
@@ -6003,8 +6005,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    padding: 0px 2px 0px 0px;\n"
             + "}\n"
             + "QFrame#appNavActions {\n"
-            + f"    background-color: {app_surface};\n"
-            + f"    border: 1px solid {app_border};\n"
+            + "    background-color: transparent;\n"
+            + f"    border: 1px solid {app_hover};\n"
             + "    border-radius: 8px;\n"
             + "}\n"
             + "QPushButton#homeIconButton, QPushButton#settingsCogButton {\n"
@@ -6416,6 +6418,39 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         search_palette.setColor(QPalette.PlaceholderText, placeholder_color)
 
         self.search_input.setPalette(search_palette)
+        self._sync_search_input_icon()
+
+    def _sync_search_input_icon(self):
+        """Render the leading search icon to match active theme colors."""
+        if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
+            return
+        search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+        self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
+
+    def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
+        """Build a simple magnifying glass icon for the search field."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        color = QColor(color_hex)
+        pen = QPen(color, max(1.2, size * 0.14), Qt.SolidLine)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+
+        lens_r = size * 0.32
+        lens_cx = size * 0.42
+        lens_cy = size * 0.42
+        painter.drawEllipse(QPointF(lens_cx, lens_cy), lens_r, lens_r)
+
+        handle_start = QPointF(lens_cx + lens_r * 0.55, lens_cy + lens_r * 0.55)
+        handle_end = QPointF(size * 0.90, size * 0.90)
+        painter.drawLine(handle_start, handle_end)
+
+        painter.end()
+        return QIcon(pixmap)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
