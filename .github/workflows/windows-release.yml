@@ -116,17 +116,18 @@ jobs:
             $tagExists = $true
           }
 
+          $headCommit = (git rev-parse HEAD).Trim()
           if ($tagExists) {
             $tagCommit = (git rev-list -n 1 $tag).Trim()
-            $headCommit = (git rev-parse HEAD).Trim()
             if ($tagCommit -ne $headCommit) {
-              throw "Tag '$tag' already exists on commit $tagCommit, but HEAD is $headCommit. Bump app_version before releasing."
+              Write-Host "Tag '$tag' exists on $tagCommit; moving it to $headCommit for this release."
+              git tag -d $tag | Out-Null
+              git push origin ":refs/tags/$tag"
             }
           }
-          else {
-            git tag -a $tag -m "Release $tag"
-            git push origin $tag
-          }
+
+          git tag -a $tag -m "Release $tag" $headCommit
+          git push origin $tag --force
 
       - name: Generate release notes
         id: notes
