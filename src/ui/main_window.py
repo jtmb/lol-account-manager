@@ -5270,6 +5270,12 @@ class MainWindow(QMainWindow):
         self._search_leading_action.setEnabled(False)
         filter_row.addWidget(self.search_input)
 
+        self._nav_search_placeholder = QWidget()
+        self._nav_search_placeholder.setObjectName("navSearchPlaceholder")
+        self._nav_search_placeholder.setFixedHeight(28)
+        self._nav_search_placeholder.hide()
+        filter_row.addWidget(self._nav_search_placeholder)
+
         top_row.addSpacing(14)
         top_row.addWidget(self._filter_row_widget, 1, Qt.AlignVCenter)
 
@@ -5808,7 +5814,7 @@ class MainWindow(QMainWindow):
 
     def _enter_spotlight_ui_mode(self):
         """Hide filters, bottom buttons and main scrollbar while spotlight is visible."""
-        self._filter_row_widget.hide()
+        self._set_nav_search_collapsed(True)
         self._button_row_widget.hide()
         self.lol_path_label.hide()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -5817,7 +5823,7 @@ class MainWindow(QMainWindow):
 
     def _exit_spotlight_ui_mode(self):
         """Restore filters, bottom buttons and scrollbar when spotlight is hidden."""
-        self._filter_row_widget.show()
+        self._set_nav_search_collapsed(False)
         self._button_row_widget.show()
         self.lol_path_label.show()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -5830,6 +5836,19 @@ class MainWindow(QMainWindow):
                 self.account_spotlight_panel.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
             except RuntimeError:
                 pass
+
+    def _set_nav_search_collapsed(self, collapsed: bool):
+        """Collapse search without changing nav geometry between modes."""
+        if not hasattr(self, "search_input") or not hasattr(self, "_nav_search_placeholder"):
+            return
+        if collapsed:
+            preserved_width = max(self.search_input.width(), self.search_input.minimumWidth())
+            self._nav_search_placeholder.setFixedWidth(preserved_width)
+            self.search_input.hide()
+            self._nav_search_placeholder.show()
+        else:
+            self._nav_search_placeholder.hide()
+            self.search_input.show()
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
@@ -5970,7 +5989,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         list_border = app_border
         search_fg = app_text
         search_bg = app_bg
-        search_border = app_border
+        search_border = app_surface
         search_placeholder = placeholder
         return (
             base
@@ -5986,17 +6005,17 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    max-height: 28px;\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:hover {\n"
-            + f"    border: 1px solid {app_accent};\n"
+            + f"    border: 1px solid {app_border};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:focus {\n"
-            + f"    border: 1px solid {app_accent};\n"
+            + f"    border: 1px solid {app_border};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QFrame#appMenuBar {\n"
             + f"    background-color: {app_bg};\n"
-            + f"    border: 1px solid {app_border};\n"
+            + f"    border: 1px solid {app_surface};\n"
             + "    border-radius: 12px;\n"
             + "}\n"
             + "QLabel#appNavTitle {\n"
@@ -6008,7 +6027,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "}\n"
             + "QFrame#appNavActions {\n"
             + "    background-color: transparent;\n"
-            + f"    border: 1px solid {app_hover};\n"
+            + "    border: none;\n"
             + "    border-radius: 8px;\n"
             + "}\n"
             + "QPushButton#homeIconButton, QPushButton#settingsCogButton {\n"
