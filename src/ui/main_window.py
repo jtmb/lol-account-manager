@@ -5442,8 +5442,11 @@ class MainWindow(QMainWindow):
             self.game_info_panel.set_dark_mode(self._dark_mode)
             self.game_info_panel.set_base_color(self._app_surface_color)
         if self.account_spotlight_panel:
-            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
-            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            try:
+                self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+                self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            except RuntimeError:
+                self.account_spotlight_panel = None
 
     def _apply_window_size(self, resolution: str):
         """Resize the window without treating it as a user-initiated custom resize."""
@@ -5694,18 +5697,23 @@ class MainWindow(QMainWindow):
         """Exit spotlight mode and return to the normal home view."""
         if not self.account_spotlight_panel:
             return
+        spotlight_panel = self.account_spotlight_panel
         # Suppress auto-reshow until the logged-in account changes
         self._spotlight_user_dismissed = True
         self._spotlight_account_username = ""
         # Remove the spotlight list item without triggering a full list rebuild
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
-            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+            if self.account_list.itemWidget(item) is spotlight_panel:
                 # Re-parent BEFORE takeItem so Qt doesn't delete the widget
-                self.account_spotlight_panel.setParent(self.account_list_background)
-                self.account_spotlight_panel.hide()
+                try:
+                    spotlight_panel.setParent(self.account_list_background)
+                    spotlight_panel.hide()
+                except RuntimeError:
+                    pass
                 self.account_list.takeItem(index)
                 break
+        self.account_spotlight_panel = None
         self._exit_spotlight_ui_mode()
 
     def _enter_spotlight_ui_mode(self):
@@ -8035,7 +8043,12 @@ QMenu#trayQuickMenu::separator {
     def _ensure_spotlight_panel(self) -> bool:
         """Return True if account_spotlight_panel is alive, recreating it if deleted."""
         if self.account_spotlight_panel is None:
-            return False
+            self.account_spotlight_panel = AccountSpotlightPanel()
+            self.account_spotlight_panel.setParent(self.account_list_background)
+            self.account_spotlight_panel.hide()
+            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            return True
         try:
             # Accessing isVisible() will raise RuntimeError if C++ object is gone
             self.account_spotlight_panel.isVisible()
