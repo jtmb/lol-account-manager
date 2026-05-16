@@ -2453,6 +2453,25 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._fetch_build_data(build_url, self._effective_role_hint())
         else:
             self._apply_empty_build_state("Waiting for champion selection...")
+        
+class ChampSelectWindow(QMainWindow):
+    """Dedicated top-level window that hosts the champ-select assistant."""
+
+    def __init__(self, panel: InClientGamePanel, parent=None):
+        super().__init__(None)
+        self._owner = parent
+        self.setWindowTitle("Champ Select Assistant")
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(panel)
+        self.setCentralWidget(container)
+
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
 
 
 class MasterPasswordDialog(QDialog):
@@ -5013,6 +5032,7 @@ class MainWindow(QMainWindow):
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
         self.game_info_panel: Optional[InClientGamePanel] = None
+        self.champ_select_window: Optional[ChampSelectWindow] = None
         self.account_spotlight_panel: Optional[AccountSpotlightPanel] = None
         self.main_area_stack: Optional[QStackedWidget] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
@@ -5022,6 +5042,8 @@ class MainWindow(QMainWindow):
         self._last_champ_select_role_hint: str = ""
         self._last_champ_select_refresh_at: float = 0.0
         self._last_champ_select_close_at: float = 0.0
+        self._last_champ_select_geometry: Optional[tuple[int, int, int, int]] = None
+        self._main_hidden_for_champ_select = False
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = True
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
@@ -5298,10 +5320,9 @@ class MainWindow(QMainWindow):
         self.account_spotlight_panel.hide()
         self._spotlight_account_username: str = ""  # username whose spotlight is currently visible
         self.game_info_panel = InClientGamePanel()
-        self.main_area_stack = QStackedWidget()
-        self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
-        self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
-        layout.addWidget(self.main_area_stack)
+        self.champ_select_window = ChampSelectWindow(self.game_info_panel, self)
+        self.main_area_stack = None
+        layout.addWidget(self.account_list_background)
         
         # Apply clipping mask to account list viewport
         self._apply_account_list_clipping_mask()
@@ -5473,6 +5494,10 @@ class MainWindow(QMainWindow):
                 screen = None
         if screen is None:
             screen = QApplication.primaryScreen()
+        return self._scale_factor_for_screen(screen)
+
+    def _scale_factor_for_screen(self, screen) -> float:
+        """Return DPI scale factor for the provided screen."""
         if screen is None:
             return 1.0
 
@@ -5485,31 +5510,56 @@ class MainWindow(QMainWindow):
 
         return max(1.0, min(2.0, dpi / 96.0))
 
-    def _apply_champ_select_window_size(self):
-        """Apply champ-select size scaled for the monitor's DPI setting."""
+    def _champ_select_target_screen(self):
+        """Resolve the screen that should host the champ-select window."""
+        screens = QApplication.screens()
+        if self._champ_select_secondary_monitor and len(screens) > 1:
+            return screens[1]
+        if self.champ_select_window:
+            handle = self.champ_select_window.windowHandle()
+            if handle is not None:
+                try:
+                    screen = handle.screen()
+                except Exception:
+                    screen = None
+                if screen is not None:
+                    return screen
+        return QApplication.primaryScreen()
+
+    def _sync_champ_select_window_geometry(self):
+        """Apply saved champ-select geometry from a single code path."""
+        if not self.champ_select_window:
+            return
+
+        screen = self._champ_select_target_screen()
+        scale = self._scale_factor_for_screen(screen)
         base_w, base_h = _parse_resolution(self._champ_select_window_size, fallback=(941, 1053))
-        scale = self._current_screen_scale_factor()
-        self._last_screen_scale_factor = scale
         width = max(660, int(round(base_w * scale)))
         height = max(480, int(round(base_h * scale)))
 
+        if screen is not None:
+            screen_geo = screen.availableGeometry()
+            x = screen_geo.x() + (screen_geo.width() - width) // 2
+            y = screen_geo.y() + (screen_geo.height() - height) // 2
+        else:
+            x = self.x() + max(0, (self.width() - width) // 2)
+            y = self.y() + max(0, (self.height() - height) // 2)
+
+        geometry_signature = (x, y, width, height)
+        self._last_screen_scale_factor = scale
+        if geometry_signature == self._last_champ_select_geometry:
+            return
+
+        self._last_champ_select_geometry = geometry_signature
         self._suppress_window_size_persistence = True
         try:
-            self.resize(width, height)
-            
-            # If secondary monitor setting is enabled, move window to secondary monitor
-            if self._champ_select_secondary_monitor:
-                screens = QApplication.screens()
-                if len(screens) > 1:
-                    # Move to second screen (index 1)
-                    secondary_screen = screens[1]
-                    screen_geo = secondary_screen.geometry()
-                    # Center window on secondary screen
-                    new_x = screen_geo.x() + (screen_geo.width() - width) // 2
-                    new_y = screen_geo.y() + (screen_geo.height() - height) // 2
-                    self.move(new_x, new_y)
+            self.champ_select_window.setGeometry(x, y, width, height)
         finally:
             self._suppress_window_size_persistence = False
+
+    def _apply_champ_select_window_size(self):
+        """Apply champ-select size scaled for the monitor's DPI setting."""
+        self._sync_champ_select_window_geometry()
 
     def _maybe_reapply_layout_for_dpi(self):
         """Re-apply active layout dimensions after crossing into another monitor scale."""
@@ -5529,41 +5579,42 @@ class MainWindow(QMainWindow):
         try:
             self._last_screen_scale_factor = current_scale
             if self._in_champ_select_mode:
-                self._apply_champ_select_window_size()
+                self._sync_champ_select_window_geometry()
             else:
                 self._apply_account_list_scale(current_scale)
         finally:
             self._dpi_resize_in_progress = False
 
     def _enter_champ_select_mode(self):
-        """Resize window and hide home-page UI elements for champ select."""
+        """Show the dedicated champ-select window and hide the main client to tray."""
         if self._in_champ_select_mode:
+            self._sync_champ_select_window_geometry()
+            if self.champ_select_window:
+                self.champ_select_window.show()
+                self.champ_select_window.raise_()
+                self.champ_select_window.activateWindow()
             return
         self._in_champ_select_mode = True
-        self._pre_champ_select_size = f"{self.width()}x{self.height()}"
-        self._last_screen_scale_factor = self._current_screen_scale_factor()
-        self._apply_champ_select_window_size()
-        self._filter_row_widget.hide()
-        self._saved_accounts_label.hide()
-        self._button_row_widget.hide()
-        self.lol_path_label.hide()
-        # Bring the app window to the foreground
-        self.activateWindow()
-        self.raise_()
+        self._sync_champ_select_window_geometry()
+        if self.champ_select_window:
+            self.champ_select_window.show()
+            self.champ_select_window.raise_()
+            self.champ_select_window.activateWindow()
+        if self._tray_icon and self._tray_icon.isVisible() and self.isVisible():
+            self._main_hidden_for_champ_select = True
+            self.hide()
 
     def _exit_champ_select_mode(self):
-        """Restore window size and show home-page UI elements after champ select."""
+        """Hide the champ-select window and restore the main client from tray."""
         if not self._in_champ_select_mode:
             return
         self._in_champ_select_mode = False
-        restore = self._pre_champ_select_size or self._window_size
-        self._pre_champ_select_size = ""
-        self._apply_window_size(restore)
-        self._apply_account_list_scale(self._current_screen_scale_factor())
-        self._filter_row_widget.show()
-        self._saved_accounts_label.show()
-        self._button_row_widget.show()
-        self.lol_path_label.show()
+        if self.champ_select_window:
+            self.champ_select_window.hide()
+        self._last_champ_select_geometry = None
+        if self._main_hidden_for_champ_select:
+            self._main_hidden_for_champ_select = False
+            self._show_from_tray()
         self.update_account_item_states()
 
     def _build_ugg_profile_overview_url(self, account: Account) -> str:
@@ -5755,6 +5806,19 @@ class MainWindow(QMainWindow):
             # C++ object already deleted (panel or webview was closed before timer fired)
             pass
 
+    def _scroll_account_row_to_top(self, username: str):
+        """Scroll the matching account row to the top if it still exists."""
+        if not username:
+            return
+        try:
+            for index in range(self.account_list.count()):
+                item = self.account_list.item(index)
+                if item and item.data(Qt.UserRole) == username:
+                    self.account_list.scrollToItem(item, self.account_list.PositionAtTop)
+                    return
+        except RuntimeError:
+            pass
+
     def _reapply_ugg_embed_css(self):
         """Dispatch resize event to trigger u.gg's responsive layout."""
         try:
@@ -5831,7 +5895,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             and event.type() == screen_change_type
             and self._in_champ_select_mode
         ):
-            QTimer.singleShot(80, self._apply_champ_select_window_size)
+            QTimer.singleShot(0, self._sync_champ_select_window_geometry)
         else:
             self._maybe_reapply_layout_for_dpi()
 
@@ -6460,6 +6524,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
+        if self._in_champ_select_mode:
+            self._sync_champ_select_window_geometry()
         theme_after = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -6657,6 +6723,10 @@ QMenu#trayQuickMenu::separator {
             self._show_from_tray()
 
     def _show_from_tray(self):
+        if self._in_champ_select_mode and self.champ_select_window and self.champ_select_window.isVisible():
+            self.champ_select_window.raise_()
+            self.champ_select_window.activateWindow()
+            return
         self.showNormal()
         if not self.account_manager:
             unlocked = self.request_master_password(fatal_on_fail=False)
@@ -7886,8 +7956,9 @@ QMenu#trayQuickMenu::separator {
         ])
         if (
             signature == self._last_champ_select_signature
-            and self.main_area_stack
-            and self.main_area_stack.currentIndex() == 1
+            and self._in_champ_select_mode
+            and self.champ_select_window
+            and self.champ_select_window.isVisible()
         ):
             return
         self._last_champ_select_signature = signature
@@ -7895,10 +7966,7 @@ QMenu#trayQuickMenu::separator {
 
         if self.game_info_panel:
             self.game_info_panel.update_payload(payload)
-        if self.main_area_stack:
-            if self.main_area_stack.currentIndex() != 1:
-                self._enter_champ_select_mode()
-            self.main_area_stack.setCurrentIndex(1)
+        self._enter_champ_select_mode()
 
     def _close_champ_select_assistant(self):
         """Hide the in-client game panel and switch back to the account list."""
@@ -7906,14 +7974,13 @@ QMenu#trayQuickMenu::separator {
         self._last_champ_select_role_hint = ""
         self._last_champ_select_refresh_at = 0.0
         self._last_champ_select_close_at = time.time()
-        if self.main_area_stack:
-            if self.main_area_stack.currentIndex() == 1:
-                self._exit_champ_select_mode()
-            self._show_logged_in_spotlight()
+        if self._in_champ_select_mode:
+            self._exit_champ_select_mode()
+        self._show_logged_in_spotlight()
 
     def _show_game_panel_ingame(self):
         """Show the inline game panel with in-game state, reusing last known champion data."""
-        if not (self.main_area_stack and self.game_info_panel):
+        if not self.game_info_panel:
             return
         if not self._in_champ_select_mode:
             self._enter_champ_select_mode()
@@ -7949,7 +8016,7 @@ QMenu#trayQuickMenu::separator {
             "fallback_url": fallback_url,
         }
         self.game_info_panel.update_payload(payload)
-        self.main_area_stack.setCurrentIndex(1)
+        self._enter_champ_select_mode()
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
@@ -8091,9 +8158,12 @@ QMenu#trayQuickMenu::separator {
                 if index > 0:
                     row_above = self.account_list.item(index - 1)
                     if row_above:
-                        QTimer.singleShot(50, lambda r=row_above: self.account_list.scrollToItem(
-                            r, self.account_list.PositionAtTop
-                        ))
+                        row_above_username = row_above.data(Qt.UserRole)
+                        if row_above_username:
+                            QTimer.singleShot(
+                                50,
+                                lambda u=str(row_above_username): self._scroll_account_row_to_top(u),
+                            )
                 return
 
         # Find the row for this account and insert spotlight after it
@@ -8127,11 +8197,7 @@ QMenu#trayQuickMenu::separator {
         self.account_spotlight_panel.set_account(account, rank_data, profile_url, force_reload=force_reload)
         QTimer.singleShot(200, self._update_webview_zoom)
         # Defer scroll until layout has settled so PositionAtTop takes effect
-        account_item = self.account_list.item(target_row)
-        if account_item:
-            QTimer.singleShot(50, lambda: self.account_list.scrollToItem(
-                account_item, self.account_list.PositionAtTop
-            ))
+        QTimer.singleShot(50, lambda u=account.username: self._scroll_account_row_to_top(u))
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
