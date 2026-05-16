@@ -654,7 +654,7 @@ QComboBox {
     color: #cdd6f4;
     border: 1px solid #404758;
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 4px 12px;
     padding-right: 32px;
     min-height: 24px;
 }
@@ -5294,6 +5294,7 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(self.tag_filter_combo)
 
         self.clear_filters_btn = QPushButton("Clear")
+        self.clear_filters_btn.setObjectName("clearFiltersBtn")
         self.clear_filters_btn.clicked.connect(self._clear_filters)
         filter_row.addWidget(self.clear_filters_btn)
 
@@ -5970,9 +5971,13 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    border: 1px solid {search_border};\n"
             + "    border-radius: 4px;\n"
             + "    padding: 4px 6px;\n"
+            + "    min-height: 24px;\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
+            + "}\n"
+            + "QPushButton#clearFiltersBtn {\n"
+            + "    min-height: 24px;\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
