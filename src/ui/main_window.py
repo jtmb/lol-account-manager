@@ -5316,7 +5316,8 @@ class MainWindow(QMainWindow):
         self._saved_accounts_label = QLabel("Saved Accounts:")
         self._saved_accounts_label.setObjectName("savedAccountsTab")
         self._saved_accounts_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        layout.addWidget(self._saved_accounts_label)
+        self._saved_accounts_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        layout.addWidget(self._saved_accounts_label, 0, Qt.AlignLeft)
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
         account_list_layout = QVBoxLayout(self.account_list_background)
@@ -5812,6 +5813,9 @@ class MainWindow(QMainWindow):
     def _enter_spotlight_ui_mode(self):
         """Lock nav search, hide bottom buttons and main scrollbar while spotlight is visible."""
         self._set_nav_search_collapsed(True)
+        if hasattr(self, "_saved_accounts_label"):
+            self._saved_accounts_label.setText("Spotlight View")
+            self._saved_accounts_label.adjustSize()
         self._button_row_widget.hide()
         self.lol_path_label.hide()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -5821,6 +5825,9 @@ class MainWindow(QMainWindow):
     def _exit_spotlight_ui_mode(self):
         """Restore nav search, bottom buttons and scrollbar when spotlight is hidden."""
         self._set_nav_search_collapsed(False)
+        if hasattr(self, "_saved_accounts_label"):
+            self._saved_accounts_label.setText("Saved Accounts:")
+            self._saved_accounts_label.adjustSize()
         self._button_row_widget.show()
         self.lol_path_label.show()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
