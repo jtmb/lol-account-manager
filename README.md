@@ -1,6 +1,6 @@
 <h1 align="center">
 	<a href="https://github.com/brajam/lol-account-manager">
-		<img src="assets/nav_banner.png" alt="LoL Account Manager Logo" width="auto" height="300">
+		<img src="https://github.com/jtmb/lol-account-manager/blob/main/assets/nav_banner.png" alt="LoL Account Manager Logo" width="auto" height="300">
 	</a>
 </h1>
 
