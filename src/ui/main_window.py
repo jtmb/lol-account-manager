@@ -79,6 +79,12 @@ DEFAULT_APP_ACCENT_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_accent_color", "
 DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#45475a"))
 
 
+def _asset_path(*parts: str) -> Path:
+    """Return a path under the bundled assets directory or project assets dir."""
+    base_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+    return base_dir / "assets" / Path(*parts)
+
+
 def _default_logged_in_highlight(dark_mode: bool) -> str:
     """Return theme-appropriate default logged-in highlight color."""
     return DEFAULT_LOGGED_IN_HIGHLIGHT_DARK
@@ -6539,7 +6545,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         """Render a leading search icon that matches nav icon styling."""
         if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
             return
-        asset_icon_path = Path(__file__).resolve().parents[2] / "assets" / "search_icon.svg"
+        asset_icon_path = _asset_path("search_icon.svg")
         self._search_leading_action.setIcon(QIcon(str(asset_icon_path)))
 
     def _refresh_nav_banner(self):
@@ -6547,8 +6553,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         if not hasattr(self, "_nav_banner"):
             return
 
-        assets_dir = Path(__file__).resolve().parents[2] / "assets"
-        asset_path = assets_dir / "nav_banner.png"
+        asset_path = _asset_path("nav_banner.png")
         asset_pixmap = QPixmap(str(asset_path))
         scaled = asset_pixmap.scaled(
             self._nav_banner.size(),
