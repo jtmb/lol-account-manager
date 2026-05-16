@@ -2560,7 +2560,7 @@ class MasterPasswordDialog(QDialog):
         button_layout = QHBoxLayout()
         
         ok_btn = QPushButton("OK")
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(ok_btn)
         
         cancel_btn = QPushButton("Cancel")
@@ -2569,6 +2569,30 @@ class MasterPasswordDialog(QDialog):
         
         layout.addLayout(button_layout)
         self.setLayout(layout)
+
+    def validate_and_accept(self):
+        """Validate password fields before accepting the dialog."""
+        password = self.password_input.text()
+        if not password:
+            QMessageBox.warning(self, "Error", "Please enter a master password!")
+            return
+
+        if self.is_setup:
+            confirm = self.confirm_input.text() if hasattr(self, "confirm_input") else ""
+            if password != confirm:
+                QMessageBox.warning(self, "Error", "Passwords do not match!")
+                return
+
+        self.password = password
+        self.accept()
+
+    def get_password(self):
+        """Return the dialog password safely for setup and unlock flows."""
+        if self.password:
+            return self.password
+        if hasattr(self, "password_input"):
+            return self.password_input.text()
+        return ""
 
     def showEvent(self, event):
         super().showEvent(event)
