@@ -5284,9 +5284,12 @@ class MainWindow(QMainWindow):
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("accountSearchInput")
-        self.search_input.setPlaceholderText("Search accounts")
+        self.search_input.setPlaceholderText("Search by display name, username, or tag")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setMaximumWidth(760)
         self.search_input.textChanged.connect(self._on_filters_changed)
-        filter_row.addWidget(self.search_input, 1)
+        filter_row.addWidget(self.search_input)
+        filter_row.addStretch(1)
 
         layout.addWidget(self._filter_row_widget)
         
@@ -5959,9 +5962,16 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    color: {search_fg};\n"
             + f"    background-color: {search_bg};\n"
             + f"    border: 1px solid {search_border};\n"
-            + "    border-radius: 4px;\n"
-            + "    padding: 6px 12px;\n"
-            + "    min-height: 28px;\n"
+            + "    border-radius: 6px;\n"
+            + "    padding: 5px 12px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:hover {\n"
+            + f"    border: 1px solid {accent_color};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:focus {\n"
+            + f"    border: 1px solid {accent_color};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
