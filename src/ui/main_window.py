@@ -5284,19 +5284,9 @@ class MainWindow(QMainWindow):
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("accountSearchInput")
-        self.search_input.setPlaceholderText("Search by display name, username, or tag")
+        self.search_input.setPlaceholderText("Search accounts")
         self.search_input.textChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.search_input, 1)
-
-        self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
-        filter_row.addWidget(self.tag_filter_combo)
-
-        self.clear_filters_btn = QPushButton("Clear")
-        self.clear_filters_btn.setObjectName("clearFiltersBtn")
-        self.clear_filters_btn.clicked.connect(self._clear_filters)
-        filter_row.addWidget(self.clear_filters_btn)
 
         layout.addWidget(self._filter_row_widget)
         
@@ -5970,16 +5960,11 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    background-color: {search_bg};\n"
             + f"    border: 1px solid {search_border};\n"
             + "    border-radius: 4px;\n"
-            + "    padding: 4px 6px;\n"
-            + "    min-height: 24px;\n"
+            + "    padding: 6px 12px;\n"
+            + "    min-height: 28px;\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
-            + "}\n"
-            + "QPushButton#clearFiltersBtn {\n"
-            + "    min-height: 20px;\n"
-            + "    max-height: 20px;\n"
-            + "    padding: 2px 12px;\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
@@ -6388,7 +6373,6 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             return
 
         search_palette = self.search_input.palette()
-        combo_palette = self.tag_filter_combo.palette()
 
         base_color = QColor(self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR))
         text_color = QColor(self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR))
@@ -6397,12 +6381,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         search_palette.setColor(QPalette.Base, base_color)
         search_palette.setColor(QPalette.Text, text_color)
         search_palette.setColor(QPalette.PlaceholderText, placeholder_color)
-        combo_palette.setColor(QPalette.Base, base_color)
-        combo_palette.setColor(QPalette.Text, text_color)
-        combo_palette.setColor(QPalette.ButtonText, text_color)
 
         self.search_input.setPalette(search_palette)
-        self.tag_filter_combo.setPalette(combo_palette)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
@@ -7503,39 +7483,17 @@ QMenu#trayQuickMenu::separator {
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
-        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
         self.refresh_account_list(fetch_ranks=False)
 
     def _clear_filters(self):
         self.search_input.clear()
-        idx = self.tag_filter_combo.findData("__all__")
-        if idx >= 0:
-            self.tag_filter_combo.setCurrentIndex(idx)
         self._on_filters_changed()
 
     def _rebuild_tag_filter_options(self, accounts: list[Account]):
-        selected = str(self.tag_filter_combo.currentData() or "__all__")
-        tags = sorted({t for acc in accounts for t in (getattr(acc, 'tags', []) or [])})
-
-        self.tag_filter_combo.blockSignals(True)
-        self.tag_filter_combo.clear()
-        self.tag_filter_combo.addItem("All tags", "__all__")
-        for tag in tags:
-            self.tag_filter_combo.addItem(f"#{tag}", tag)
-
-        idx = self.tag_filter_combo.findData(selected)
-        if idx < 0:
-            idx = 0
-        self.tag_filter_combo.setCurrentIndex(idx)
-        self.tag_filter_combo.blockSignals(False)
-        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
+        """No longer used - tag filtering removed."""
+        pass
 
     def _account_matches_filters(self, account: Account) -> bool:
-        if self._tag_filter_value != "__all__":
-            tags = set(getattr(account, 'tags', []) or [])
-            if self._tag_filter_value not in tags:
-                return False
-
         if self._search_query:
             haystack = " ".join([
                 str(getattr(account, 'display_name', '') or ''),
@@ -7647,7 +7605,6 @@ QMenu#trayQuickMenu::separator {
 
             accounts = self.account_manager.get_all_accounts()
             accounts = self._sorted_accounts(accounts)
-            self._rebuild_tag_filter_options(accounts)
             filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
 
             if not accounts:
