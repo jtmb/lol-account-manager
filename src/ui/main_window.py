@@ -7648,6 +7648,8 @@ QMenu#trayQuickMenu::separator {
         self._last_screen_scale_factor = self._current_screen_scale_factor()
         self._apply_account_list_scale(self._last_screen_scale_factor)
         self._apply_title_bar_theme()
+        # Defer blur until after Qt assigns initial focus, preventing a parked caret.
+        QTimer.singleShot(0, self._blur_search_input)
         _reveal_after_first_show(self)
 
     def check_master_password(self):
