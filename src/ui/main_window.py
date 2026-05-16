@@ -7639,7 +7639,11 @@ QMenu#trayQuickMenu::separator {
         if not AccountManager.master_password_set():
             dialog = MasterPasswordDialog(self, is_setup=True)
             if dialog.exec_() == QDialog.Accepted:
-                password = dialog.get_password()
+                get_password = getattr(dialog, "get_password", None)
+                if callable(get_password):
+                    password = get_password()
+                else:
+                    password = dialog.password_input.text() if hasattr(dialog, "password_input") else ""
                 if password:
                     AccountManager.set_master_password(password)
                     self.initialize_account_manager(password)
