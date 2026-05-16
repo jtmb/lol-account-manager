@@ -5978,6 +5978,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "}\n"
             + "QPushButton#clearFiltersBtn {\n"
             + "    min-height: 24px;\n"
+            + "    max-height: 24px;\n"
+            + "    padding: 4px 12px;\n"
             + "}\n"
             + "QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
