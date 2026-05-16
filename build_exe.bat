@@ -51,6 +51,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [*] Copying assets next to the executable...
+if not exist "dist\assets" mkdir "dist\assets"
+xcopy /e /i /y "assets" "dist\assets" >nul
+
 echo.
 echo [SUCCESS] Build complete.
 echo EXE location: %CD%\dist\LoL Account Manager.exe
