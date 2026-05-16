@@ -56,6 +56,17 @@ jobs:
         run: |
           python build_exe.py
 
+          # Mirror local build_exe.bat behavior: place assets beside built executable.
+          $distRoot = Join-Path $PWD "dist"
+          if (-not (Test-Path $distRoot)) {
+            throw "dist folder not found after build"
+          }
+          $distAssets = Join-Path $distRoot "assets"
+          if (-not (Test-Path $distAssets)) {
+            New-Item -ItemType Directory -Path $distAssets | Out-Null
+          }
+          Copy-Item -Recurse -Force (Join-Path $PWD "assets\*") $distAssets
+
       - name: Create zip artifact
         shell: pwsh
         run: |
@@ -63,6 +74,12 @@ jobs:
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
+
+          $stageDir = Join-Path $PWD "release_stage"
+          if (Test-Path $stageDir) {
+            Remove-Item -Recurse -Force $stageDir
+          }
+          New-Item -ItemType Directory -Path $stageDir | Out-Null
 
           $distRoot = Join-Path $PWD "dist"
           if (-not (Test-Path $distRoot)) {
@@ -77,7 +94,8 @@ jobs:
           $sourcePath = $null
           foreach ($candidate in $folderCandidates) {
             if (Test-Path $candidate) {
-              $sourcePath = Join-Path $candidate "*"
+              Copy-Item -Recurse -Force (Join-Path $candidate "*") $stageDir
+              $sourcePath = $stageDir
               break
             }
           }
@@ -89,7 +107,12 @@ jobs:
             )
             foreach ($exe in $exeCandidates) {
               if (Test-Path $exe) {
-                $sourcePath = $exe
+                Copy-Item -Force $exe $stageDir
+                $distAssets = Join-Path $distRoot "assets"
+                if (Test-Path $distAssets) {
+                  Copy-Item -Recurse -Force $distAssets (Join-Path $stageDir "assets")
+                }
+                $sourcePath = $stageDir
                 break
               }
             }
@@ -100,7 +123,7 @@ jobs:
             throw "No supported build output found under dist"
           }
 
-          Compress-Archive -Path $sourcePath -DestinationPath $zipPath -Force
+          Compress-Archive -Path (Join-Path $sourcePath "*") -DestinationPath $zipPath -Force
 
       - name: Ensure release tag exists
         shell: pwsh
