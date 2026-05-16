@@ -56,6 +56,17 @@ jobs:
         run: |
           python build_exe.py
 
+          # Mirror local build_exe.bat behavior: place assets beside built executable.
+          $distRoot = Join-Path $PWD "dist"
+          if (-not (Test-Path $distRoot)) {
+            throw "dist folder not found after build"
+          }
+          $distAssets = Join-Path $distRoot "assets"
+          if (-not (Test-Path $distAssets)) {
+            New-Item -ItemType Directory -Path $distAssets | Out-Null
+          }
+          Copy-Item -Recurse -Force (Join-Path $PWD "assets\*") $distAssets
+
       - name: Create zip artifact
         shell: pwsh
         run: |
@@ -63,6 +74,14 @@ jobs:
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
+
+          $stageDir = Join-Path $PWD "release_stage"
+          if (Test-Path $stageDir) {
+            Remove-Item -Recurse -Force $stageDir
+          }
+          New-Item -ItemType Directory -Path $stageDir | Out-Null
+          $packageRoot = Join-Path $stageDir "LoLAccountManager"
+          New-Item -ItemType Directory -Path $packageRoot | Out-Null
 
           $distRoot = Join-Path $PWD "dist"
           if (-not (Test-Path $distRoot)) {
@@ -77,7 +96,8 @@ jobs:
           $sourcePath = $null
           foreach ($candidate in $folderCandidates) {
             if (Test-Path $candidate) {
-              $sourcePath = Join-Path $candidate "*"
+              Copy-Item -Recurse -Force (Join-Path $candidate "*") $packageRoot
+              $sourcePath = $packageRoot
               break
             }
           }
@@ -89,7 +109,12 @@ jobs:
             )
             foreach ($exe in $exeCandidates) {
               if (Test-Path $exe) {
-                $sourcePath = $exe
+                Copy-Item -Force $exe $packageRoot
+                $distAssets = Join-Path $distRoot "assets"
+                if (Test-Path $distAssets) {
+                  Copy-Item -Recurse -Force $distAssets (Join-Path $packageRoot "assets")
+                }
+                $sourcePath = $packageRoot
                 break
               }
             }
@@ -100,7 +125,7 @@ jobs:
             throw "No supported build output found under dist"
           }
 
-          Compress-Archive -Path $sourcePath -DestinationPath $zipPath -Force
+          Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -Force
 
       - name: Ensure release tag exists
         shell: pwsh
@@ -116,18 +141,14 @@ jobs:
             $tagExists = $true
           }
 
-          $headCommit = (git rev-parse HEAD).Trim()
           if ($tagExists) {
-            $tagCommit = (git rev-list -n 1 $tag).Trim()
-            if ($tagCommit -ne $headCommit) {
-              Write-Host "Tag '$tag' exists on $tagCommit; moving it to $headCommit for this release."
-              git tag -d $tag | Out-Null
-              git push origin ":refs/tags/$tag"
-            }
+            Write-Host "Tag '$tag' already exists. Reusing tag and updating release assets/body."
           }
-
-          git tag -a $tag -m "Release $tag" $headCommit
-          git push origin $tag --force
+          else {
+            $headCommit = (git rev-parse HEAD).Trim()
+            git tag -a $tag -m "Release $tag" $headCommit
+            git push origin $tag
+          }
 
       - name: Generate release notes
         id: notes
@@ -148,27 +169,7 @@ jobs:
             }
           }
 
-          $subjects = @()
-          if ([string]::IsNullOrWhiteSpace($prevTag)) {
-            $subjects = @(git log -n 25 --pretty=format:"%s")
-          }
-          else {
-            $subjects = @(git log "$prevTag..HEAD" --pretty=format:"%s")
-          }
-
-          $subjects = $subjects |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Where-Object { $_ -notmatch "^(merge|Merge)\b" }
-
-          $featureLines = @()
-          if ($subjects.Count -eq 0) {
-            $featureLines += "- No new commits detected since the previous release tag."
-          }
-          else {
-            foreach ($s in $subjects) {
-              $featureLines += "- $s"
-            }
-          }
+          $featureLines = @("<placeholder>")
 
           $downloadUrl = "https://github.com/$repo/releases/download/$currentTag/LoLAccountManager.zip"
           $bugUrl = "https://github.com/$repo/issues/new?assignees=&labels=bug&title=bug%3A+"
