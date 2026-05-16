@@ -742,15 +742,6 @@ QTabBar::tab:selected {
 QTabBar::tab:hover:!selected {
     background-color: #353b55;
 }
-#tagFilterCombo {
-    padding: 4px 6px;
-    padding-right: 24px;
-    border-radius: 4px;
-    min-width: 100px;
-}
-#tagFilterCombo:focus {
-    border: 1px solid #404758;
-}
 """
 
 REGION_OPTIONS = [
@@ -5298,7 +5289,6 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(self.search_input, 1)
 
         self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setObjectName("tagFilterCombo")
         self.tag_filter_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.tag_filter_combo)
@@ -5306,7 +5296,6 @@ class MainWindow(QMainWindow):
         self.clear_filters_btn = QPushButton("Clear")
         self.clear_filters_btn.clicked.connect(self._clear_filters)
         filter_row.addWidget(self.clear_filters_btn)
-        self._sync_filter_control_widths()
 
         layout.addWidget(self._filter_row_widget)
         
@@ -6116,8 +6105,6 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
         QTimer.singleShot(0, self._apply_filter_input_palette)
-        self._sync_filter_control_widths()
-        QTimer.singleShot(0, self._sync_filter_control_widths)
         self._apply_account_list_background()
 
         self.update_account_item_states()
@@ -6409,15 +6396,6 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
 
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
-
-    def _sync_filter_control_widths(self):
-        """Fit combo wide enough to display "All tags" completely."""
-        if not hasattr(self, "tag_filter_combo"):
-            return
-        combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        # Padding: 6px left + 24px right (for dropdown) = 30px total
-        target_width = combo_text_width + 30
-        self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
@@ -7459,7 +7437,6 @@ QMenu#trayQuickMenu::separator {
         self._last_screen_scale_factor = self._current_screen_scale_factor()
         self._apply_account_list_scale(self._last_screen_scale_factor)
         self._apply_title_bar_theme()
-        self._sync_filter_control_widths()  # Sync after layout is settled
         _reveal_after_first_show(self)
 
     def check_master_password(self):
