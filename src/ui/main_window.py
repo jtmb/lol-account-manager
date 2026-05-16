@@ -5240,7 +5240,7 @@ class MainWindow(QMainWindow):
         self._menu_bar_widget.setObjectName("appMenuBar")
         menu_bar_layout = QVBoxLayout(self._menu_bar_widget)
         menu_bar_layout.setContentsMargins(10, 8, 10, 8)
-        menu_bar_layout.setSpacing(8)
+        menu_bar_layout.setSpacing(0)
 
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
@@ -5254,7 +5254,23 @@ class MainWindow(QMainWindow):
         title.setFont(title_font)
         top_row.addWidget(title)
 
-        top_row.addStretch()
+        self._filter_row_widget = QWidget()
+        filter_row = QHBoxLayout(self._filter_row_widget)
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(0)
+
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("accountSearchInput")
+        self.search_input.setPlaceholderText("Search by display name, username, or tag")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setMinimumWidth(360)
+        self.search_input.setMaximumWidth(520)
+        self.search_input.textChanged.connect(self._on_filters_changed)
+        filter_row.addWidget(self.search_input)
+
+        top_row.addStretch(1)
+        top_row.addWidget(self._filter_row_widget, 0, Qt.AlignVCenter)
+
         self._home_button = QPushButton("")
         self._home_button.setObjectName("homeIconButton")
         self._home_button.setFixedSize(26, 26)
@@ -5282,23 +5298,6 @@ class MainWindow(QMainWindow):
         self._settings_button.clicked.connect(self.open_settings_dialog)
         top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
         menu_bar_layout.addLayout(top_row)
-
-        self._filter_row_widget = QWidget()
-        filter_row = QHBoxLayout(self._filter_row_widget)
-        filter_row.setContentsMargins(0, 0, 0, 0)
-        filter_row.setSpacing(8)
-        filter_row.addStretch(1)
-
-        self.search_input = QLineEdit()
-        self.search_input.setObjectName("accountSearchInput")
-        self.search_input.setPlaceholderText("Search by display name, username, or tag")
-        self.search_input.setClearButtonEnabled(True)
-        self.search_input.setMinimumWidth(420)
-        self.search_input.setMaximumWidth(560)
-        self.search_input.textChanged.connect(self._on_filters_changed)
-        filter_row.addWidget(self.search_input)
-
-        menu_bar_layout.addWidget(self._filter_row_widget)
         layout.addWidget(self._menu_bar_widget)
         
         # Account list
