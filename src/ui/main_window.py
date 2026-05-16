@@ -5270,12 +5270,6 @@ class MainWindow(QMainWindow):
         self._search_leading_action.setEnabled(False)
         filter_row.addWidget(self.search_input)
 
-        self._nav_search_placeholder = QWidget()
-        self._nav_search_placeholder.setObjectName("navSearchPlaceholder")
-        self._nav_search_placeholder.setFixedHeight(28)
-        self._nav_search_placeholder.hide()
-        filter_row.addWidget(self._nav_search_placeholder)
-
         top_row.addSpacing(14)
         top_row.addWidget(self._filter_row_widget, 1, Qt.AlignVCenter)
 
@@ -5813,7 +5807,7 @@ class MainWindow(QMainWindow):
         self._exit_spotlight_ui_mode()
 
     def _enter_spotlight_ui_mode(self):
-        """Hide filters, bottom buttons and main scrollbar while spotlight is visible."""
+        """Lock nav search, hide bottom buttons and main scrollbar while spotlight is visible."""
         self._set_nav_search_collapsed(True)
         self._button_row_widget.hide()
         self.lol_path_label.hide()
@@ -5822,7 +5816,7 @@ class MainWindow(QMainWindow):
         self._set_icon_state(self._home_button, "normal")
 
     def _exit_spotlight_ui_mode(self):
-        """Restore filters, bottom buttons and scrollbar when spotlight is hidden."""
+        """Restore nav search, bottom buttons and scrollbar when spotlight is hidden."""
         self._set_nav_search_collapsed(False)
         self._button_row_widget.show()
         self.lol_path_label.show()
@@ -5838,17 +5832,15 @@ class MainWindow(QMainWindow):
                 pass
 
     def _set_nav_search_collapsed(self, collapsed: bool):
-        """Collapse search without changing nav geometry between modes."""
-        if not hasattr(self, "search_input") or not hasattr(self, "_nav_search_placeholder"):
+        """Lock/unlock search without changing nav geometry between modes."""
+        if not hasattr(self, "search_input"):
             return
         if collapsed:
-            preserved_width = max(self.search_input.width(), self.search_input.minimumWidth())
-            self._nav_search_placeholder.setFixedWidth(preserved_width)
-            self.search_input.hide()
-            self._nav_search_placeholder.show()
+            self.search_input.setReadOnly(True)
+            self.search_input.setEnabled(False)
         else:
-            self._nav_search_placeholder.hide()
-            self.search_input.show()
+            self.search_input.setEnabled(True)
+            self.search_input.setReadOnly(False)
 
     def _update_webview_zoom(self):
         """Zoom the embedded webview based on window state."""
@@ -6009,6 +6001,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "}\n"
             + "QLineEdit#accountSearchInput:focus {\n"
             + f"    border: 1px solid {app_border};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:disabled {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_border};\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:disabled::placeholder {\n"
+            + f"    color: {app_border};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
