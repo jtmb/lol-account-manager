@@ -743,8 +743,9 @@ QTabBar::tab:hover:!selected {
     background-color: #353b55;
 }
 #tagFilterCombo {
-    padding: 2px 0px;
-    padding-right: 20px;
+    padding: 4px 6px;
+    padding-right: 24px;
+    border-radius: 4px;
     min-width: 100px;
 }
 #tagFilterCombo:focus {
@@ -6414,8 +6415,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         if not hasattr(self, "tag_filter_combo"):
             return
         combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        # Extra generous buffer to ensure text always fits
-        target_width = combo_text_width + 60
+        # Padding: 6px left + 24px right (for dropdown) = 30px total
+        target_width = combo_text_width + 30
         self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
