@@ -157,43 +157,44 @@ jobs:
           $repoUrl = "https://github.com/$repo"
           $logoUrl = "https://github.com/jtmb/lol-account-manager/blob/main/assets/icon.ico"
 
-          $body = @"
-<h1 align="center">
-	<a href="$repoUrl">
-		<img src="$logoUrl" alt="LoL Account Manager Logo" width="220" height="auto">
-	</a>
-</h1>
-
-<div align="center">
-	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
-	<br />
-	<br />
-	<a href="$downloadUrl">Download</a>
-	·
-	<a href="$bugUrl">Report a Bug</a>
-	·
-	<a href="$featureUrl">Request a Feature</a>
-</div>
-
-<br>
-
-New features for this release include:
-
-$($featureLines -join "`n")
-
--------------------------
-
-
-**Install Instructions**
-
-1. Download [LoLAccountManager.zip]($downloadUrl)
-
-2. Extract the contents of the ZIP file.
-
-3. Run LoLAccountManager.exe
-
-4. You may see Windows SmartScreen warnings because the application is not yet digitally signed. These warnings are expected and can be safely ignored.
-"@
+          $bodyLines = @(
+            '<h1 align="center">',
+            "	<a href=\"$repoUrl\">",
+            "		<img src=\"$logoUrl\" alt=\"LoL Account Manager Logo\" width=\"220\" height=\"auto\">",
+            '	</a>',
+            '</h1>',
+            '',
+            '<div align="center">',
+            '	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.',
+            '	<br />',
+            '	<br />',
+            "	<a href=\"$downloadUrl\">Download</a>",
+            '	·',
+            "	<a href=\"$bugUrl\">Report a Bug</a>",
+            '	·',
+            "	<a href=\"$featureUrl\">Request a Feature</a>",
+            '</div>',
+            '',
+            '<br>',
+            '',
+            'New features for this release include:',
+            '',
+            ($featureLines -join "`n"),
+            '',
+            '-------------------------',
+            '',
+            '',
+            '**Install Instructions**',
+            '',
+            "1. Download [LoLAccountManager.zip]($downloadUrl)",
+            '',
+            '2. Extract the contents of the ZIP file.',
+            '',
+            '3. Run LoLAccountManager.exe',
+            '',
+            '4. You may see Windows SmartScreen warnings because the application is not yet digitally signed. These warnings are expected and can be safely ignored.'
+          )
+          $body = $bodyLines -join "`n"
 
           $notesPath = Join-Path $PWD "release-notes.generated.md"
           Set-Content -Path $notesPath -Value $body -Encoding UTF8
