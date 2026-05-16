@@ -5279,17 +5279,16 @@ class MainWindow(QMainWindow):
         filter_row = QHBoxLayout(self._filter_row_widget)
         filter_row.setContentsMargins(0, 0, 0, 0)
         filter_row.setSpacing(8)
-        self._filters_label = QLabel("Filters:")
-        filter_row.addWidget(self._filters_label)
+        filter_row.addStretch(1)
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("accountSearchInput")
         self.search_input.setPlaceholderText("Search by display name, username, or tag")
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.setMaximumWidth(760)
+        self.search_input.setMinimumWidth(420)
+        self.search_input.setMaximumWidth(560)
         self.search_input.textChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.search_input)
-        filter_row.addStretch(1)
 
         layout.addWidget(self._filter_row_widget)
         
