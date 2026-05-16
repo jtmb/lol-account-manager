@@ -59,30 +59,48 @@ jobs:
       - name: Create zip artifact
         shell: pwsh
         run: |
-          $candidates = @(
-            (Join-Path $PWD "dist\LoLAccountManager"),
-            (Join-Path $PWD "dist\LoL Account Manager")
-          )
-
-          $distDir = $null
-          foreach ($candidate in $candidates) {
-            if (Test-Path $candidate) {
-              $distDir = $candidate
-              break
-            }
-          }
-
-          if ($null -eq $distDir -or -not (Test-Path $distDir)) {
-            Get-ChildItem (Join-Path $PWD "dist") -ErrorAction SilentlyContinue | Format-Table -AutoSize
-            throw "Build output folder not found under dist"
-          }
-
           $zipPath = Join-Path $PWD "LoLAccountManager.zip"
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
 
-          Compress-Archive -Path (Join-Path $distDir "*") -DestinationPath $zipPath -Force
+          $distRoot = Join-Path $PWD "dist"
+          if (-not (Test-Path $distRoot)) {
+            throw "dist folder not found"
+          }
+
+          $folderCandidates = @(
+            (Join-Path $distRoot "LoLAccountManager"),
+            (Join-Path $distRoot "LoL Account Manager")
+          )
+
+          $sourcePath = $null
+          foreach ($candidate in $folderCandidates) {
+            if (Test-Path $candidate) {
+              $sourcePath = Join-Path $candidate "*"
+              break
+            }
+          }
+
+          if ($null -eq $sourcePath) {
+            $exeCandidates = @(
+              (Join-Path $distRoot "LoLAccountManager.exe"),
+              (Join-Path $distRoot "LoL Account Manager.exe")
+            )
+            foreach ($exe in $exeCandidates) {
+              if (Test-Path $exe) {
+                $sourcePath = $exe
+                break
+              }
+            }
+          }
+
+          if ($null -eq $sourcePath) {
+            Get-ChildItem $distRoot -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            throw "No supported build output found under dist"
+          }
+
+          Compress-Archive -Path $sourcePath -DestinationPath $zipPath -Force
 
       - name: Ensure release tag exists
         shell: pwsh
