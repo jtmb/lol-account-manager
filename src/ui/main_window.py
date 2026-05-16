@@ -5997,6 +5997,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         search_bg = app_surface
         search_border = app_surface
         search_placeholder = placeholder
+        saved_tab_surface = QColor(app_surface)
+        saved_tab_bg = QColor(app_bg)
+        saved_tab_top = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 220)"
+        )
+        saved_tab_bottom = (
+            f"rgba({saved_tab_bg.red()}, {saved_tab_bg.green()}, {saved_tab_bg.blue()}, 95)"
+        )
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -6034,16 +6042,20 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "}\n"
             + "QLabel#savedAccountsTab {\n"
             + f"    color: {app_text};\n"
-            + f"    background-color: {app_surface};\n"
-            + f"    border: 1px solid {app_border};\n"
+            + "    background-color: qlineargradient(\n"
+            + "        x1:0, y1:0, x2:0, y2:1,\n"
+            + f"        stop:0 {saved_tab_top},\n"
+            + f"        stop:0.78 {saved_tab_top},\n"
+            + f"        stop:1 {saved_tab_bottom}\n"
+            + "    );\n"
+            + f"    border: 1px solid {app_surface};\n"
             + "    border-bottom: none;\n"
             + "    border-top-left-radius: 8px;\n"
             + "    border-top-right-radius: 8px;\n"
             + "    border-bottom-left-radius: 2px;\n"
             + "    border-bottom-right-radius: 2px;\n"
             + "    padding: 4px 10px 5px 10px;\n"
-            + "    font-weight: 700;\n"
-            + "    letter-spacing: 0.2px;\n"
+            + "    font-weight: 600;\n"
             + "    min-height: 22px;\n"
             + "    max-height: 22px;\n"
             + "}\n"
