@@ -5236,12 +5236,20 @@ class MainWindow(QMainWindow):
         layout.setSpacing(8)
         layout.setContentsMargins(12, 10, 12, 12)
 
+        self._menu_bar_widget = QFrame()
+        self._menu_bar_widget.setObjectName("appMenuBar")
+        menu_bar_layout = QVBoxLayout(self._menu_bar_widget)
+        menu_bar_layout.setContentsMargins(10, 8, 10, 8)
+        menu_bar_layout.setSpacing(8)
+
         top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(8)
 
         title = QLabel("LOL Account Manager")
+        title.setObjectName("appNavTitle")
         title_font = QFont()
-        title_font.setPointSize(16)
+        title_font.setPointSize(13)
         title_font.setBold(True)
         title.setFont(title_font)
         top_row.addWidget(title)
@@ -5273,7 +5281,7 @@ class MainWindow(QMainWindow):
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
         top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
-        layout.addLayout(top_row)
+        menu_bar_layout.addLayout(top_row)
 
         self._filter_row_widget = QWidget()
         filter_row = QHBoxLayout(self._filter_row_widget)
@@ -5290,7 +5298,8 @@ class MainWindow(QMainWindow):
         self.search_input.textChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.search_input)
 
-        layout.addWidget(self._filter_row_widget)
+        menu_bar_layout.addWidget(self._filter_row_widget)
+        layout.addWidget(self._menu_bar_widget)
         
         # Account list
         self._saved_accounts_label = QLabel("Saved Accounts:")
@@ -5975,52 +5984,54 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton {\n"
+            + "QFrame#appMenuBar {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "    border-radius: 10px;\n"
+            + "}\n"
+            + "QLabel#appNavTitle {\n"
+            + f"    color: {app_text};\n"
+            + "    font-weight: 700;\n"
+            + "    letter-spacing: 0.3px;\n"
+            + "}\n"
+            + "QPushButton#homeIconButton, QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
             + "    max-width: 26px;\n"
             + "    min-height: 26px;\n"
             + "    max-height: 26px;\n"
             + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
-            + "    border: none;\n"
-            + "    border-radius: 0px;\n"
+            + "    border: 1px solid transparent;\n"
+            + "    border-radius: 6px;\n"
             + "    padding: 0px;\n"
             + "    font-size: 15px;\n"
             + "    font-weight: 400;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:hover {\n"
+            + "QLabel#refreshIconButton {\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
+            + "    border: 1px solid transparent;\n"
+            + "    border-radius: 6px;\n"
+            + "    padding: 0px;\n"
+            + f"    color: {cog_fg};\n"
+            + "    background: transparent;\n"
+            + "}\n"
+            + "QPushButton#homeIconButton:hover, QPushButton#settingsCogButton:hover, QLabel#refreshIconButton:hover {\n"
+            + f"    background-color: {app_hover};\n"
+            + f"    border: 1px solid {app_border};\n"
             + f"    color: {accent_text};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:pressed {\n"
+            + "QPushButton#homeIconButton:pressed, QPushButton#settingsCogButton:pressed {\n"
+            + f"    background-color: {app_accent};\n"
             + f"    color: {cog_pressed};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:focus {\n"
+            + "QPushButton#homeIconButton:focus, QPushButton#settingsCogButton:focus {\n"
             + "    outline: none;\n"
-            + "    border: none;\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton {\n"
-            + "    min-width: 26px;\n"
-            + "    max-width: 26px;\n"
-            + "    min-height: 26px;\n"
-            + "    max-height: 26px;\n"
-            + "    background-color: transparent;\n"
-            + f"    color: {cog_fg};\n"
-            + "    border: none;\n"
-            + "    border-radius: 0px;\n"
-            + "    padding: 0px;\n"
-            + "    font-size: 15px;\n"
-            + "    font-weight: 400;\n"
-            + "    margin: 0px;\n"
-            + "    text-align: center;\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton:hover {\n"
-            + f"    color: {accent_text};\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton:focus {\n"
-            + "    outline: none;\n"
-            + "    border: none;\n"
+            + f"    border: 1px solid {app_border};\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
