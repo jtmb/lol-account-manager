@@ -5289,7 +5289,9 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(self.search_input, 1)
 
         self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setMinimumWidth(150)
+        self.tag_filter_combo.setMinimumContentsLength(len("All tags") + 1)
+        self.tag_filter_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.tag_filter_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.tag_filter_combo)
 
