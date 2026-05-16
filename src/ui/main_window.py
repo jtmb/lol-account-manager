@@ -5264,6 +5264,8 @@ class MainWindow(QMainWindow):
         self.search_input.setMinimumWidth(320)
         self.search_input.setMaximumWidth(640)
         self.search_input.textChanged.connect(self._on_filters_changed)
+        self.search_input.returnPressed.connect(self._blur_search_input)
+        self.search_input.editingFinished.connect(self._blur_search_input)
         self._search_opacity_effect = QGraphicsOpacityEffect(self.search_input)
         self._search_opacity_effect.setOpacity(1.0)
         self.search_input.setGraphicsEffect(self._search_opacity_effect)
@@ -5841,6 +5843,12 @@ class MainWindow(QMainWindow):
             except RuntimeError:
                 pass
 
+    def _blur_search_input(self):
+        """Return focus to the main window so the search cursor stops blinking."""
+        if hasattr(self, "search_input") and self.search_input.hasFocus():
+            self.search_input.clearFocus()
+            self.setFocus()
+
     def _set_nav_search_collapsed(self, collapsed: bool):
         """Lock/unlock search without changing nav geometry between modes."""
         if not hasattr(self, "search_input"):
@@ -5850,6 +5858,7 @@ class MainWindow(QMainWindow):
                 self._search_opacity_effect.setOpacity(0.0)
             self.search_input.setReadOnly(True)
             self.search_input.setEnabled(False)
+            self._blur_search_input()
         else:
             if hasattr(self, "_search_opacity_effect"):
                 self._search_opacity_effect.setOpacity(1.0)
