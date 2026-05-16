@@ -107,11 +107,51 @@ class ClickableIconLabel(QLabel):
 
 
 class NoCaretLineEdit(QLineEdit):
-    """Text input that keeps editing behavior but never shows a caret."""
+    """Text input that hides the caret after a short period of inactivity."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._caret_active = False
+        self._caret_idle_timer = QTimer(self)
+        self._caret_idle_timer.setSingleShot(True)
+        self._caret_idle_timer.setInterval(2000)
+        self._caret_idle_timer.timeout.connect(self._deactivate_caret)
+        self.textEdited.connect(self._mark_activity)
+        self.cursorPositionChanged.connect(self._mark_activity)
+
+    def _mark_activity(self, *_args):
+        if not self.hasFocus():
+            return
+        if not self._caret_active:
+            self._caret_active = True
+            self.update()
+        self._caret_idle_timer.start()
+
+    def _deactivate_caret(self):
+        if self._caret_active:
+            self._caret_active = False
+            self.update()
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._mark_activity()
+
+    def focusOutEvent(self, event):
+        self._caret_idle_timer.stop()
+        self._deactivate_caret()
+        super().focusOutEvent(event)
+
+    def keyPressEvent(self, event):
+        super().keyPressEvent(event)
+        self._mark_activity()
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self._mark_activity()
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if not self.hasFocus():
+        if not self.hasFocus() or self._caret_active:
             return
 
         cursor_rect = self.inputMethodQuery(Qt.ImCursorRectangle)

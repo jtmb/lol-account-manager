@@ -170,8 +170,6 @@ def main():
 
         app = QApplication(sys.argv)
         _startup_trace("main:after_qapplication")
-        # Disable blinking text caret globally (no flashing cursor).
-        app.setCursorFlashTime(0)
         app.setStyle("Fusion")
         _startup_trace("main:after_style")
 
