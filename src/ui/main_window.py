@@ -6005,6 +6005,20 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         saved_tab_bottom = (
             f"rgba({saved_tab_bg.red()}, {saved_tab_bg.green()}, {saved_tab_bg.blue()}, 95)"
         )
+        saved_tab_text = QColor(app_text)
+        saved_tab_text.setAlpha(220)
+        saved_tab_text_rgba = (
+            f"rgba({saved_tab_text.red()}, {saved_tab_text.green()}, {saved_tab_text.blue()}, {saved_tab_text.alpha()})"
+        )
+        list_fade_top = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 160)"
+        )
+        list_fade_mid = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 70)"
+        )
+        list_fade_clear = (
+            f"rgba({saved_tab_bg.red()}, {saved_tab_bg.green()}, {saved_tab_bg.blue()}, 0)"
+        )
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -6041,7 +6055,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    border-radius: 12px;\n"
             + "}\n"
             + "QLabel#savedAccountsTab {\n"
-            + f"    color: {app_text};\n"
+            + f"    color: {saved_tab_text_rgba};\n"
             + "    background-color: qlineargradient(\n"
             + "        x1:0, y1:0, x2:0, y2:1,\n"
             + f"        stop:0 {saved_tab_top},\n"
@@ -6056,6 +6070,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    border-bottom-right-radius: 2px;\n"
             + "    padding: 4px 10px 5px 10px;\n"
             + "    font-weight: 600;\n"
+            + "    font-family: 'Segoe UI', 'Inter', 'Arial';\n"
+            + "    letter-spacing: 0.25px;\n"
             + "    min-height: 22px;\n"
             + "    max-height: 22px;\n"
             + "}\n"
@@ -6123,7 +6139,13 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "QFrame#accountListContainer {\n"
             + f"    border: 1px solid {list_border};\n"
             + "    border-radius: 10px;\n"
-            + "    background: transparent;\n"
+            + "    background-color: qlineargradient(\n"
+            + "        x1:0, y1:0, x2:0, y2:1,\n"
+            + f"        stop:0 {list_fade_top},\n"
+            + f"        stop:0.10 {list_fade_mid},\n"
+            + f"        stop:0.24 {list_fade_clear},\n"
+            + f"        stop:1 {list_fade_clear}\n"
+            + "    );\n"
             + "}\n"
             + "QListWidget#accountListWidget {\n"
             + "    background: transparent;\n"
@@ -6484,57 +6506,39 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self._sync_search_input_icon()
 
     def _sync_search_input_icon(self):
-        """Render the leading hourglass icon to match active theme colors."""
+        """Render a leading search icon that matches nav icon styling."""
         if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
             return
         search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+        if qta is not None:
+            try:
+                self._search_leading_action.setIcon(qta.icon("fa5s.search", color=search_fg))
+                return
+            except Exception:
+                pass
         self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
 
     def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
-        """Build a simple hourglass icon for the search field."""
+        """Build a simple magnifier icon for the search field (fallback)."""
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
         color = QColor(color_hex)
-        pen = QPen(color, max(1.0, size * 0.12), Qt.SolidLine)
+        pen = QPen(color, max(1.2, size * 0.14), Qt.SolidLine)
         pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
 
-        left = size * 0.20
-        right = size * 0.80
-        top = size * 0.12
-        mid = size * 0.50
-        bottom = size * 0.88
+        lens_r = size * 0.30
+        lens_cx = size * 0.42
+        lens_cy = size * 0.42
+        painter.drawEllipse(QPointF(lens_cx, lens_cy), lens_r, lens_r)
 
-        painter.drawLine(QPointF(left, top), QPointF(right, top))
-        painter.drawLine(QPointF(left, bottom), QPointF(right, bottom))
-        painter.drawLine(QPointF(left, top), QPointF(mid, mid))
-        painter.drawLine(QPointF(right, top), QPointF(mid, mid))
-        painter.drawLine(QPointF(left, bottom), QPointF(mid, mid))
-        painter.drawLine(QPointF(right, bottom), QPointF(mid, mid))
-
-        sand = QColor(color)
-        sand.setAlpha(180)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(sand)
-
-        top_sand = QPainterPath()
-        top_sand.moveTo(left + size * 0.06, top + size * 0.08)
-        top_sand.lineTo(right - size * 0.06, top + size * 0.08)
-        top_sand.lineTo(mid, mid - size * 0.05)
-        top_sand.closeSubpath()
-        painter.drawPath(top_sand)
-
-        bottom_sand = QPainterPath()
-        bottom_sand.moveTo(mid - size * 0.07, bottom - size * 0.12)
-        bottom_sand.lineTo(mid + size * 0.07, bottom - size * 0.12)
-        bottom_sand.lineTo(mid, bottom - size * 0.04)
-        bottom_sand.closeSubpath()
-        painter.drawPath(bottom_sand)
+        handle_start = QPointF(lens_cx + lens_r * 0.58, lens_cy + lens_r * 0.58)
+        handle_end = QPointF(size * 0.90, size * 0.90)
+        painter.drawLine(handle_start, handle_end)
 
         painter.end()
         return QIcon(pixmap)
