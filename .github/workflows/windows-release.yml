@@ -80,6 +80,8 @@ jobs:
             Remove-Item -Recurse -Force $stageDir
           }
           New-Item -ItemType Directory -Path $stageDir | Out-Null
+          $packageRoot = Join-Path $stageDir "LoLAccountManager"
+          New-Item -ItemType Directory -Path $packageRoot | Out-Null
 
           $distRoot = Join-Path $PWD "dist"
           if (-not (Test-Path $distRoot)) {
@@ -94,8 +96,8 @@ jobs:
           $sourcePath = $null
           foreach ($candidate in $folderCandidates) {
             if (Test-Path $candidate) {
-              Copy-Item -Recurse -Force (Join-Path $candidate "*") $stageDir
-              $sourcePath = $stageDir
+              Copy-Item -Recurse -Force (Join-Path $candidate "*") $packageRoot
+              $sourcePath = $packageRoot
               break
             }
           }
@@ -107,12 +109,12 @@ jobs:
             )
             foreach ($exe in $exeCandidates) {
               if (Test-Path $exe) {
-                Copy-Item -Force $exe $stageDir
+                Copy-Item -Force $exe $packageRoot
                 $distAssets = Join-Path $distRoot "assets"
                 if (Test-Path $distAssets) {
-                  Copy-Item -Recurse -Force $distAssets (Join-Path $stageDir "assets")
+                  Copy-Item -Recurse -Force $distAssets (Join-Path $packageRoot "assets")
                 }
-                $sourcePath = $stageDir
+                $sourcePath = $packageRoot
                 break
               }
             }
@@ -123,7 +125,7 @@ jobs:
             throw "No supported build output found under dist"
           }
 
-          Compress-Archive -Path (Join-Path $sourcePath "*") -DestinationPath $zipPath -Force
+          Compress-Archive -Path (Join-Path $stageDir "*") -DestinationPath $zipPath -Force
 
       - name: Ensure release tag exists
         shell: pwsh
@@ -139,18 +141,14 @@ jobs:
             $tagExists = $true
           }
 
-          $headCommit = (git rev-parse HEAD).Trim()
           if ($tagExists) {
-            $tagCommit = (git rev-list -n 1 $tag).Trim()
-            if ($tagCommit -ne $headCommit) {
-              Write-Host "Tag '$tag' exists on $tagCommit; moving it to $headCommit for this release."
-              git tag -d $tag | Out-Null
-              git push origin ":refs/tags/$tag"
-            }
+            Write-Host "Tag '$tag' already exists. Reusing tag and updating release assets/body."
           }
-
-          git tag -a $tag -m "Release $tag" $headCommit
-          git push origin $tag --force
+          else {
+            $headCommit = (git rev-parse HEAD).Trim()
+            git tag -a $tag -m "Release $tag" $headCommit
+            git push origin $tag
+          }
 
       - name: Generate release notes
         id: notes
