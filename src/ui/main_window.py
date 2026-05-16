@@ -5248,7 +5248,7 @@ class MainWindow(QMainWindow):
 
         self._nav_banner = QLabel()
         self._nav_banner.setObjectName("appNavBanner")
-        self._nav_banner.setFixedSize(316, 38)
+        self._nav_banner.setFixedSize(264, 32)
         self._refresh_nav_banner()
         top_row.addWidget(self._nav_banner)
 
@@ -5314,6 +5314,8 @@ class MainWindow(QMainWindow):
         
         # Account list
         self._saved_accounts_label = QLabel("Saved Accounts:")
+        self._saved_accounts_label.setObjectName("savedAccountsTab")
+        self._saved_accounts_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         layout.addWidget(self._saved_accounts_label)
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
@@ -6022,6 +6024,21 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    background-color: {app_bg};\n"
             + f"    border: 1px solid {app_surface};\n"
             + "    border-radius: 12px;\n"
+            + "}\n"
+            + "QLabel#savedAccountsTab {\n"
+            + f"    color: {app_text};\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "    border-bottom: none;\n"
+            + "    border-top-left-radius: 8px;\n"
+            + "    border-top-right-radius: 8px;\n"
+            + "    border-bottom-left-radius: 2px;\n"
+            + "    border-bottom-right-radius: 2px;\n"
+            + "    padding: 4px 10px 5px 10px;\n"
+            + "    font-weight: 700;\n"
+            + "    letter-spacing: 0.2px;\n"
+            + "    min-height: 22px;\n"
+            + "    max-height: 22px;\n"
             + "}\n"
             + "QLabel#appNavTitle {\n"
             + f"    color: {app_text};\n"
