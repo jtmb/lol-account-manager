@@ -5263,13 +5263,13 @@ class MainWindow(QMainWindow):
         self.search_input.setObjectName("accountSearchInput")
         self.search_input.setPlaceholderText("Search by display name, username, or tag")
         self.search_input.setClearButtonEnabled(True)
-        self.search_input.setMinimumWidth(360)
-        self.search_input.setMaximumWidth(520)
+        self.search_input.setMinimumWidth(320)
+        self.search_input.setMaximumWidth(640)
         self.search_input.textChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.search_input)
 
-        top_row.addStretch(1)
-        top_row.addWidget(self._filter_row_widget, 0, Qt.AlignVCenter)
+        top_row.addSpacing(14)
+        top_row.addWidget(self._filter_row_widget, 1, Qt.AlignVCenter)
 
         self._home_button = QPushButton("")
         self._home_button.setObjectName("homeIconButton")
@@ -5279,7 +5279,6 @@ class MainWindow(QMainWindow):
         self._home_button.setToolTip("Back to Home")
         self._home_button.setEnabled(False)
         self._home_button.clicked.connect(self._on_home_button_clicked)
-        top_row.addWidget(self._home_button, 0, Qt.AlignVCenter)
 
         self._refresh_button = ClickableIconLabel()
         self._refresh_button.setObjectName("refreshIconButton")
@@ -5287,7 +5286,6 @@ class MainWindow(QMainWindow):
         self._refresh_button.setAlignment(Qt.AlignCenter)
         self._refresh_button.setToolTip("Refresh UI")
         self._refresh_button.clicked.connect(self.refresh_ui)
-        top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
 
         self._settings_button = QPushButton("")
         self._settings_button.setObjectName("settingsCogButton")
@@ -5296,7 +5294,16 @@ class MainWindow(QMainWindow):
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
-        top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
+
+        self._nav_actions_widget = QFrame()
+        self._nav_actions_widget.setObjectName("appNavActions")
+        nav_actions_layout = QHBoxLayout(self._nav_actions_widget)
+        nav_actions_layout.setContentsMargins(4, 2, 4, 2)
+        nav_actions_layout.setSpacing(2)
+        nav_actions_layout.addWidget(self._home_button, 0, Qt.AlignVCenter)
+        nav_actions_layout.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
+        nav_actions_layout.addWidget(self._settings_button, 0, Qt.AlignVCenter)
+        top_row.addWidget(self._nav_actions_widget, 0, Qt.AlignVCenter)
         menu_bar_layout.addLayout(top_row)
         layout.addWidget(self._menu_bar_widget)
         
@@ -5958,7 +5965,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         cog_focus = app_border
         list_border = app_border
         search_fg = app_text
-        search_bg = app_surface
+        search_bg = app_bg
         search_border = app_border
         search_placeholder = placeholder
         return (
@@ -5969,10 +5976,10 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    color: {search_fg};\n"
             + f"    background-color: {search_bg};\n"
             + f"    border: 1px solid {search_border};\n"
-            + "    border-radius: 6px;\n"
+            + "    border-radius: 8px;\n"
             + "    padding: 5px 12px;\n"
-            + "    min-height: 26px;\n"
-            + "    max-height: 26px;\n"
+            + "    min-height: 28px;\n"
+            + "    max-height: 28px;\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:hover {\n"
             + f"    border: 1px solid {app_accent};\n"
@@ -5984,14 +5991,21 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QFrame#appMenuBar {\n"
-            + f"    background-color: {app_surface};\n"
+            + f"    background-color: {app_bg};\n"
             + f"    border: 1px solid {app_border};\n"
-            + "    border-radius: 10px;\n"
+            + "    border-radius: 12px;\n"
             + "}\n"
             + "QLabel#appNavTitle {\n"
             + f"    color: {app_text};\n"
             + "    font-weight: 700;\n"
-            + "    letter-spacing: 0.3px;\n"
+            + "    letter-spacing: 0.2px;\n"
+            + "    background: transparent;\n"
+            + "    padding: 0px 2px 0px 0px;\n"
+            + "}\n"
+            + "QFrame#appNavActions {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    border: 1px solid {app_border};\n"
+            + "    border-radius: 8px;\n"
             + "}\n"
             + "QPushButton#homeIconButton, QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
@@ -6021,7 +6035,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "}\n"
             + "QPushButton#homeIconButton:hover, QPushButton#settingsCogButton:hover, QLabel#refreshIconButton:hover {\n"
             + f"    background-color: {app_hover};\n"
-            + f"    border: 1px solid {app_border};\n"
+            + "    border: 1px solid transparent;\n"
             + f"    color: {accent_text};\n"
             + "}\n"
             + "QPushButton#homeIconButton:pressed, QPushButton#settingsCogButton:pressed {\n"
