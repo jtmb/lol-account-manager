@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
     QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
-    QStackedWidget, QSizePolicy
+    QStackedWidget, QSizePolicy, QLayout
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF, QPointF, QUrl, QObject
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
@@ -5299,9 +5299,11 @@ class MainWindow(QMainWindow):
 
         self._nav_actions_widget = QFrame()
         self._nav_actions_widget.setObjectName("appNavActions")
+        self._nav_actions_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         nav_actions_layout = QHBoxLayout(self._nav_actions_widget)
         nav_actions_layout.setContentsMargins(2, 1, 2, 1)
         nav_actions_layout.setSpacing(2)
+        nav_actions_layout.setSizeConstraint(QLayout.SetFixedSize)
         nav_actions_layout.addWidget(self._home_button, 0, Qt.AlignVCenter)
         nav_actions_layout.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
         nav_actions_layout.addWidget(self._settings_button, 0, Qt.AlignVCenter)
