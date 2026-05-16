@@ -4257,7 +4257,11 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
                 self._loaded_profile_url = self._profile_url
                 self._web_view.setUrl(QUrl(self._profile_url))
             elif force_reload:
-                self._web_view.reload()
+                # Defer the reload: calling reload() synchronously right after
+                # the panel's show() races with the renderer resuming its IPC
+                # channel, which causes STATUS_ACCESS_VIOLATION in QtWebEngine.
+                # 300 ms is enough for WasShown() to propagate to the renderer.
+                QTimer.singleShot(300, self._web_view.reload)
         elif self._profile_url:
             self._fallback_message.setText(
                 "Embedded profile view is unavailable in this build.\n"
