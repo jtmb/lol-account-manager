@@ -5849,6 +5849,20 @@ class MainWindow(QMainWindow):
             self.search_input.clearFocus()
             self.setFocus()
 
+    def mousePressEvent(self, event):
+        """Blur the search bar whenever the user clicks anywhere outside it."""
+        if hasattr(self, "search_input"):
+            widget_under = self.childAt(event.pos())
+            # Walk up the parent chain to check if the click landed inside the search input
+            w = widget_under
+            while w is not None:
+                if w is self.search_input:
+                    break
+                w = w.parent()
+            else:
+                self._blur_search_input()
+        super().mousePressEvent(event)
+
     def _set_nav_search_collapsed(self, collapsed: bool):
         """Lock/unlock search without changing nav geometry between modes."""
         if not hasattr(self, "search_input"):
