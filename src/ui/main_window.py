@@ -743,8 +743,8 @@ QTabBar::tab:hover:!selected {
     background-color: #353b55;
 }
 #tagFilterCombo {
-    padding: 4px 4px;
-    padding-right: 24px;
+    padding: 2px 2px;
+    padding-right: 20px;
 }
 """
 
@@ -6406,13 +6406,18 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self.tag_filter_combo.setPalette(combo_palette)
 
     def _sync_filter_control_widths(self):
-        """Keep the tag combo compact and visually aligned with the Clear button."""
-        if not hasattr(self, "tag_filter_combo"):
+        """Make combo same width as Clear button and fit text."""
+        if not hasattr(self, "tag_filter_combo") or not hasattr(self, "clear_filters_btn"):
             return
-        # Text width + custom stylesheet padding (4px left + 24px right)
-        combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        target_width = combo_text_width + 4 + 24
-        self.tag_filter_combo.setFixedWidth(target_width)
+        # Match combo width to Clear button width
+        clear_width = self.clear_filters_btn.width()
+        if clear_width > 0:
+            self.tag_filter_combo.setFixedWidth(clear_width)
+        else:
+            # Fallback if button not yet laid out
+            combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
+            target_width = combo_text_width + 8
+            self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
@@ -7454,6 +7459,7 @@ QMenu#trayQuickMenu::separator {
         self._last_screen_scale_factor = self._current_screen_scale_factor()
         self._apply_account_list_scale(self._last_screen_scale_factor)
         self._apply_title_bar_theme()
+        self._sync_filter_control_widths()  # Sync after layout is settled
         _reveal_after_first_show(self)
 
     def check_master_password(self):
