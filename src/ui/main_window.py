@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget, QSizePolicy, QLayout
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF, QPointF, QUrl, QObject
-from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen, QFontDatabase
+from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
 from pathlib import Path
 from typing import Optional, Callable
 import sys
@@ -5248,7 +5248,7 @@ class MainWindow(QMainWindow):
 
         self._nav_banner = QLabel()
         self._nav_banner.setObjectName("appNavBanner")
-        self._nav_banner.setFixedSize(232, 30)
+        self._nav_banner.setFixedSize(316, 38)
         self._refresh_nav_banner()
         top_row.addWidget(self._nav_banner)
 
@@ -6504,53 +6504,31 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         return QIcon(pixmap)
 
     def _refresh_nav_banner(self):
-        """Render a compact banner in the nav using League-style font fallbacks."""
+        """Load PNG banner from assets; fallback to plain text title."""
         if not hasattr(self, "_nav_banner"):
             return
 
-        width, height = 232, 30
-        pixmap = QPixmap(width, height)
-        pixmap.fill(Qt.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        assets_dir = Path(__file__).resolve().parents[2] / "assets"
+        asset_path = assets_dir / "nav_banner.png"
+        asset_pixmap = QPixmap(str(asset_path))
+        if not asset_pixmap.isNull():
+            scaled = asset_pixmap.scaled(
+                self._nav_banner.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            self._nav_banner.setText("")
+            self._nav_banner.setPixmap(scaled)
+            return
 
-        app_surface = QColor(self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR))
-        app_border = QColor(self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR))
-        app_text = QColor(self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR))
-        app_accent = QColor(self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR))
-
-        bg = QColor(app_surface)
-        bg.setAlpha(140)
-        painter.setPen(QPen(app_border, 1))
-        painter.setBrush(bg)
-        painter.drawRoundedRect(QRectF(0.5, 0.5, width - 1.0, height - 1.0), 7, 7)
-
-        accent_pen = QPen(app_accent, 2)
-        accent_pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(accent_pen)
-        painter.drawLine(10, height // 2, 24, height // 2)
-
-        db = QFontDatabase()
-        preferred_fonts = [
-            "Beaufort for LOL",
-            "Beaufort for LOL Bold",
-            "Friz Quadrata Std",
-            "Friz Quadrata",
-            "Trajan Pro",
-            "Times New Roman",
-        ]
-        available = set(db.families())
-        chosen_font = next((name for name in preferred_fonts if name in available), self.font().family())
-
-        banner_font = QFont(chosen_font, 10)
-        banner_font.setBold(True)
-        banner_font.setLetterSpacing(QFont.AbsoluteSpacing, 0.9)
-        painter.setFont(banner_font)
-        painter.setPen(app_text)
-        painter.drawText(QRectF(30, 0, width - 36, height), Qt.AlignVCenter | Qt.AlignLeft, "LEAGUE ACCOUNT MANAGER")
-
-        painter.end()
-        self._nav_banner.setPixmap(pixmap)
+        # Explicit plain-text fallback when the PNG asset is missing/unloadable.
+        self._nav_banner.setPixmap(QPixmap())
+        self._nav_banner.setText("LOL Account Manager")
+        fallback_font = QFont(self.font())
+        fallback_font.setBold(True)
+        fallback_font.setPointSize(12)
+        self._nav_banner.setFont(fallback_font)
+        self._nav_banner.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
