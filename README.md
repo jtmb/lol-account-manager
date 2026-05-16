@@ -1,16 +1,16 @@
 <h1 align="center">
-	<a href="https://github.com/brajam/lol-account-manager">
-		<img src="https://raw.githubusercontent.com/brajam/lol-account-manager/main/assets/nav_banner.png" alt="LoL Account Manager Logo" width="auto" height="300">
-	</a>
+        <a href=".">
+                <img src="assets/nav_banner.png" alt="LoL Account Manager Logo" height="300">
+        </a>
 </h1>
 
 <div align="center">
-	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
-	<br />
-	<br />
-	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=bug&title=bug%3A+">Report a Bug</a>
-	·
-	<a href="https://github.com/brajam/lol-account-manager/issues/new?assignees=&labels=enhancement&title=feat%3A+">Request a Feature</a>
+        <b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
+        <br />
+        <br />
+        <a href="./issues/new?assignees=&labels=bug&title=bug%3A+">Report a Bug</a>
+        ·
+        <a href="./issues/new?assignees=&labels=enhancement&title=feat%3A+">Request a Feature</a>
 </div>
 
 <br>
@@ -19,7 +19,7 @@
 <summary>Table of Contents</summary>
 
 - [About](#about)
-	- [Highlighted Features](#highlighted-features)
+        - [Highlighted Features](#highlighted-features)
 - [Installation](#installation)
 - [First Launch](#first-launch)
 - [Backup and Restore](#backup-and-restore)
@@ -102,23 +102,24 @@ Backups are encrypted and require the master password that was active when the b
 
 Application data is stored in:
 
-- `%APPDATA%\LoLAccountManager\accounts.json`
-- `%APPDATA%\LoLAccountManager\master.key`
-- `%APPDATA%\LoLAccountManager\settings.json`
+- \`%APPDATA%\LoLAccountManager\accounts.json\`
+- \`%APPDATA%\LoLAccountManager\master.key\`
+- \`%APPDATA%\LoLAccountManager\settings.json\`
 
 ## Color Defaults
 
-The app's default color definitions live in [app_config.json](app_config.json). Current defaults are:
+The app's default color definitions live in [app_config.json](app_config.json). 
+Current defaults are:
 
 | Setting | Name | Value |
 | --- | --- | --- |
-| `logged_in_gradient_color` | Cool Gray | `#6b7280` |
-| `hover_highlight_color` | Theme auto | `__theme__` |
-| `app_bg_color` | Dark surface | `#1e1e2e` |
-| `app_surface_color` | Panel surface | `#181825` |
-| `app_border_color` | Border | `#313244` |
-| `app_text_color` | Text | `#cdd6f4` |
-| `app_accent_color` | Accent | `#313244` |
+| \`logged_in_gradient_color\` | Cool Gray | \`#6b7280\` |
+| \`hover_highlight_color\` | Theme auto | \`__theme__\` |
+| \`app_bg_color\` | Dark surface | \`#1e1e2e\` |
+| \`app_surface_color\` | Panel surface | \`#181825\` |
+| \`app_border_color\` | Border | \`#313244\` |
+| \`app_text_color\` | Text | \`#cdd6f4\` |
+| \`app_accent_color\` | Accent | \`#313244\` |
 
 ## Requirements
 
@@ -130,20 +131,20 @@ The app's default color definitions live in [app_config.json](app_config.json). 
 
 If you want to run or build the project yourself:
 
-```bash
+\`\`\`bash
 python -m venv venv
 venv\Scripts\activate.bat
 pip install -r requirements.txt
 python src/main.py
-```
+\`\`\`
 
 ## Building the EXE
 
-```bash
+\`\`\`bash
 build_exe.bat
-```
+\`\`\`
 
-If `assets/icon.ico` exists, it will be used for the built executable and runtime window icon.
+If \`assets/icon.ico\` exists, it will be used for the built executable and runtime window icon.
 
 ## Documentation
 
@@ -155,4 +156,4 @@ If `assets/icon.ico` exists, it will be used for the built executable and runtim
 
 - The app is designed around Riot Client based launching.
 - If Riot login UI changes significantly, automation behavior may need updating.
-- If League is installed in a non-standard location, use `Set LoL Path...` in the app.
+- If League is installed in a non-standard location, use \`Set LoL Path...\` in the app.
