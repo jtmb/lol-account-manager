@@ -5289,8 +5289,6 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(self.search_input, 1)
 
         self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setMinimumContentsLength(len("All tags") + 1)
-        self.tag_filter_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.tag_filter_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.tag_filter_combo)
@@ -5298,6 +5296,7 @@ class MainWindow(QMainWindow):
         self.clear_filters_btn = QPushButton("Clear")
         self.clear_filters_btn.clicked.connect(self._clear_filters)
         filter_row.addWidget(self.clear_filters_btn)
+        self._sync_filter_control_widths()
 
         layout.addWidget(self._filter_row_widget)
         
@@ -6107,6 +6106,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
         QTimer.singleShot(0, self._apply_filter_input_palette)
+        self._sync_filter_control_widths()
+        QTimer.singleShot(0, self._sync_filter_control_widths)
         self._apply_account_list_background()
 
         self.update_account_item_states()
@@ -6398,6 +6399,15 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
 
         self.search_input.setPalette(search_palette)
         self.tag_filter_combo.setPalette(combo_palette)
+
+    def _sync_filter_control_widths(self):
+        """Keep the tag combo compact and visually aligned with the Clear button."""
+        if not hasattr(self, "tag_filter_combo") or not hasattr(self, "clear_filters_btn"):
+            return
+        combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
+        clear_button_width = self.clear_filters_btn.sizeHint().width()
+        target_width = max(clear_button_width + 26, combo_text_width + 42)
+        self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
