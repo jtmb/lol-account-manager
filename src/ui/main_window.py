@@ -4243,7 +4243,7 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
     def set_base_color(self, color: str):
         super().set_base_color(color)
 
-    def set_account(self, account: Optional[Account], rank_data: Optional[dict], profile_url: str):
+    def set_account(self, account: Optional[Account], rank_data: Optional[dict], profile_url: str, force_reload: bool = False):
         self._profile_url = str(profile_url or "").strip()
         if not account:
             self._active_username = ""
@@ -4256,6 +4256,8 @@ class AccountSpotlightPanel(AccountListBackgroundFrame):
             if self._profile_url != self._loaded_profile_url:
                 self._loaded_profile_url = self._profile_url
                 self._web_view.setUrl(QUrl(self._profile_url))
+            elif force_reload:
+                self._web_view.reload()
         elif self._profile_url:
             self._fallback_message.setText(
                 "Embedded profile view is unavailable in this build.\n"
@@ -5290,6 +5292,7 @@ class MainWindow(QMainWindow):
         self.account_spotlight_panel = AccountSpotlightPanel()
         self.account_spotlight_panel.setParent(self.account_list_background)
         self.account_spotlight_panel.hide()
+        self._spotlight_account_username: str = ""  # username whose spotlight is currently visible
         self.game_info_panel = InClientGamePanel()
         self.main_area_stack = QStackedWidget()
         self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
@@ -5626,6 +5629,7 @@ class MainWindow(QMainWindow):
             self.account_list.insertItem(logged_in_row + 1, spotlight_item)
             self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
+        self._spotlight_account_username = account.username
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
         # Safety fallback: list resize event fires instantly if the viewport grew,
@@ -5688,6 +5692,7 @@ class MainWindow(QMainWindow):
             return
         # Suppress auto-reshow until the logged-in account changes
         self._spotlight_user_dismissed = True
+        self._spotlight_account_username = ""
         # Remove the spotlight list item without triggering a full list rebuild
         for index in range(self.account_list.count()):
             item = self.account_list.item(index)
@@ -7496,6 +7501,8 @@ QMenu#trayQuickMenu::separator {
     
     def refresh_account_list(self, fetch_ranks: bool = True):
         """Refresh the account list display"""
+        # Remember which spotlight was open so we can restore it after the rebuild.
+        _was_spotlight_username = getattr(self, '_spotlight_account_username', '')
         self.account_list.setUpdatesEnabled(False)
         try:
             # On Windows, QWidget::setParent() destroys and recreates the HWND.
@@ -7583,7 +7590,14 @@ QMenu#trayQuickMenu::separator {
         finally:
             self.account_list.setUpdatesEnabled(True)
             if not self._in_champ_select_mode:
-                self._show_logged_in_spotlight()
+                _re_shown = False
+                if _was_spotlight_username and self.account_manager:
+                    _acct = self.account_manager.get_account(_was_spotlight_username)
+                    if _acct:
+                        self._show_spotlight_for_account(_acct, force_reload=True)
+                        _re_shown = True
+                if not _re_shown:
+                    self._show_logged_in_spotlight()
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
@@ -8000,7 +8014,7 @@ QMenu#trayQuickMenu::separator {
             self.account_spotlight_panel.set_base_color(self._app_surface_color)
             return True
 
-    def _show_spotlight_for_account(self, account: "Account"):
+    def _show_spotlight_for_account(self, account: "Account", force_reload: bool = False):
         """Show the spotlight panel for any account row (not just the logged-in one)."""
         if not self._ensure_spotlight_panel():
             return
@@ -8017,7 +8031,8 @@ QMenu#trayQuickMenu::separator {
             if self.account_list.itemWidget(item) is self.account_spotlight_panel:
                 profile_url = self._build_ugg_profile_overview_url(account)
                 rank_data = self._rank_data_by_username.get(account.username, {})
-                self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+                self._spotlight_account_username = account.username
+                self.account_spotlight_panel.set_account(account, rank_data, profile_url, force_reload=force_reload)
                 QTimer.singleShot(200, self._update_webview_zoom)
                 self._enter_spotlight_ui_mode()
                 # Ensure size is correct in case account_list grew (e.g. after
@@ -8051,6 +8066,7 @@ QMenu#trayQuickMenu::separator {
         self.account_list.insertItem(target_row + 1, spotlight_item)
         self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
 
+        self._spotlight_account_username = account.username
         self.account_spotlight_panel.show()
         self._enter_spotlight_ui_mode()
         # Safety fallback at 50 ms and 300 ms; the list's own resizeEvent will also fire
@@ -8060,7 +8076,7 @@ QMenu#trayQuickMenu::separator {
 
         profile_url = self._build_ugg_profile_overview_url(account)
         rank_data = self._rank_data_by_username.get(account.username, {})
-        self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+        self.account_spotlight_panel.set_account(account, rank_data, profile_url, force_reload=force_reload)
         QTimer.singleShot(200, self._update_webview_zoom)
         # Defer scroll until layout has settled so PositionAtTop takes effect
         account_item = self.account_list.item(target_row)
