@@ -2560,7 +2560,7 @@ class MasterPasswordDialog(QDialog):
         button_layout = QHBoxLayout()
         
         ok_btn = QPushButton("OK")
-        ok_btn.clicked.connect(self.accept)
+        ok_btn.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(ok_btn)
         
         cancel_btn = QPushButton("Cancel")
@@ -2569,6 +2569,30 @@ class MasterPasswordDialog(QDialog):
         
         layout.addLayout(button_layout)
         self.setLayout(layout)
+
+    def validate_and_accept(self):
+        """Validate password fields before accepting the dialog."""
+        password = self.password_input.text()
+        if not password:
+            QMessageBox.warning(self, "Error", "Please enter a master password!")
+            return
+
+        if self.is_setup:
+            confirm = self.confirm_input.text() if hasattr(self, "confirm_input") else ""
+            if password != confirm:
+                QMessageBox.warning(self, "Error", "Passwords do not match!")
+                return
+
+        self.password = password
+        self.accept()
+
+    def get_password(self):
+        """Return the dialog password safely for setup and unlock flows."""
+        if self.password:
+            return self.password
+        if hasattr(self, "password_input"):
+            return self.password_input.text()
+        return ""
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -7615,7 +7639,11 @@ QMenu#trayQuickMenu::separator {
         if not AccountManager.master_password_set():
             dialog = MasterPasswordDialog(self, is_setup=True)
             if dialog.exec_() == QDialog.Accepted:
-                password = dialog.get_password()
+                get_password = getattr(dialog, "get_password", None)
+                if callable(get_password):
+                    password = get_password()
+                else:
+                    password = dialog.password_input.text() if hasattr(dialog, "password_input") else ""
                 if password:
                     AccountManager.set_master_password(password)
                     self.initialize_account_manager(password)
@@ -8875,7 +8903,15 @@ QMenu::separator {
                 new_pass_dialog = MasterPasswordDialog(self, is_setup=True)
                 new_pass_dialog.setWindowTitle("Set New Master Password")
                 if new_pass_dialog.exec_() == QDialog.Accepted:
-                    new_password = new_pass_dialog.get_password()
+                    get_password = getattr(new_pass_dialog, "get_password", None)
+                    if callable(get_password):
+                        new_password = get_password()
+                    else:
+                        new_password = (
+                            new_pass_dialog.password_input.text()
+                            if hasattr(new_pass_dialog, "password_input")
+                            else ""
+                        )
                     if new_password:
                         # Re-encrypt all accounts with new password
                         try:
