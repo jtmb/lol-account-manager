@@ -6523,7 +6523,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         bg.setAlpha(140)
         painter.setPen(QPen(app_border, 1))
         painter.setBrush(bg)
-        painter.drawRoundedRect(0.5, 0.5, width - 1.0, height - 1.0, 7, 7)
+        painter.drawRoundedRect(QRectF(0.5, 0.5, width - 1.0, height - 1.0), 7, 7)
 
         accent_pen = QPen(app_accent, 2)
         accent_pen.setCapStyle(Qt.RoundCap)
