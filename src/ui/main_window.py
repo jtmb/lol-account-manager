@@ -80,11 +80,8 @@ DEFAULT_APP_HOVER_COLOR = str(SETTINGS_PANEL_DEFAULTS.get("app_hover_color", "#4
 
 
 def _asset_path(*parts: str) -> Path:
-    """Return a path under the app's assets directory."""
-    if getattr(sys, "frozen", False):
-        base_dir = Path(sys.executable).resolve().parent
-    else:
-        base_dir = Path(__file__).resolve().parents[2]
+    """Return a path under the bundled src/assets directory."""
+    base_dir = Path(__file__).resolve().parents[1]
     return base_dir / "assets" / Path(*parts)
 
 
