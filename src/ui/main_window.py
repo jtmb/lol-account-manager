@@ -5266,6 +5266,9 @@ class MainWindow(QMainWindow):
         self.search_input.setMinimumWidth(320)
         self.search_input.setMaximumWidth(640)
         self.search_input.textChanged.connect(self._on_filters_changed)
+        self._search_opacity_effect = QGraphicsOpacityEffect(self.search_input)
+        self._search_opacity_effect.setOpacity(1.0)
+        self.search_input.setGraphicsEffect(self._search_opacity_effect)
         self._search_leading_action = self.search_input.addAction(QIcon(), QLineEdit.LeadingPosition)
         self._search_leading_action.setEnabled(False)
         filter_row.addWidget(self.search_input)
@@ -5836,9 +5839,13 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "search_input"):
             return
         if collapsed:
+            if hasattr(self, "_search_opacity_effect"):
+                self._search_opacity_effect.setOpacity(0.0)
             self.search_input.setReadOnly(True)
             self.search_input.setEnabled(False)
         else:
+            if hasattr(self, "_search_opacity_effect"):
+                self._search_opacity_effect.setOpacity(1.0)
             self.search_input.setEnabled(True)
             self.search_input.setReadOnly(False)
 
@@ -5980,7 +5987,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         cog_focus = app_border
         list_border = app_border
         search_fg = app_text
-        search_bg = app_bg
+        search_bg = app_surface
         search_border = app_surface
         search_placeholder = placeholder
         return (
@@ -5997,18 +6004,18 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    max-height: 28px;\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:hover {\n"
-            + f"    border: 1px solid {app_border};\n"
+            + f"    border: 1px solid {app_surface};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:focus {\n"
-            + f"    border: 1px solid {app_border};\n"
+            + f"    border: 1px solid {app_surface};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:disabled {\n"
             + f"    background-color: {app_surface};\n"
-            + f"    color: {app_border};\n"
+            + f"    color: {app_text};\n"
             + f"    border: 1px solid {app_surface};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput:disabled::placeholder {\n"
-            + f"    color: {app_border};\n"
+            + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
