@@ -114,7 +114,7 @@ class NoCaretLineEdit(QLineEdit):
         self._caret_active = False
         self._caret_idle_timer = QTimer(self)
         self._caret_idle_timer.setSingleShot(True)
-        self._caret_idle_timer.setInterval(2000)
+        self._caret_idle_timer.setInterval(5000)
         self._caret_idle_timer.timeout.connect(self._deactivate_caret)
         self.textEdited.connect(self._mark_activity)
         self.cursorPositionChanged.connect(self._mark_activity)
