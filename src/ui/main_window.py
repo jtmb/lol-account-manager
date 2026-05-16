@@ -7598,7 +7598,38 @@ QMenu#trayQuickMenu::separator {
                 if _was_spotlight_username and self.account_manager:
                     _acct = self.account_manager.get_account(_was_spotlight_username)
                     if _acct:
-                        self._show_spotlight_for_account(_acct, force_reload=True)
+                        # Recreate the panel to eliminate stale QPersistentModelIndex
+                        # entries that accumulate in Qt's private indexWidgetHash.
+                        #
+                        # Each setItemWidget() call inserts {QPersistentModelIndex: panel}
+                        # into indexWidgetHash.  When clear() resets the model, those
+                        # indices become invalid but are NEVER removed from the hash.
+                        # After re-insertion the hash has both a stale-invalid entry and
+                        # a new valid entry for the same panel.  doItemsLayout() triggers
+                        # updateEditorGeometries() which does a linear scan of the hash
+                        # via indexWidgetHash.key(panel); if the stale entry is found
+                        # first it calls panel.hide() immediately after panel.show(),
+                        # creating a rapid WasShown→WasHidden flip in the QtWebEngine
+                        # renderer IPC that causes STATUS_ACCESS_VIOLATION (-1073741819).
+                        #
+                        # A freshly created panel has no entries in indexWidgetHash at
+                        # all, so updateEditorGeometries() always finds the one valid
+                        # key and positions the panel correctly — no flip, no crash.
+                        if self.account_spotlight_panel:
+                            old_panel = self.account_spotlight_panel
+                            old_panel.hide()  # pause renderer before discarding
+                            self.account_spotlight_panel = AccountSpotlightPanel()
+                            self.account_spotlight_panel.setParent(self.account_list_background)
+                            self.account_spotlight_panel.hide()
+                            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+                            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+                            # old_panel may still be referenced by pending singleShot
+                            # timers (e.g. _run_hide_script).  Those callbacks are safe
+                            # on a hidden panel and old_panel will be GC'd when they
+                            # expire.
+                        # force_reload=False: new panel always does a fresh setUrl()
+                        # because _loaded_profile_url starts empty.
+                        self._show_spotlight_for_account(_acct, force_reload=False)
                         _re_shown = True
                 if not _re_shown:
                     self._show_logged_in_spotlight()
