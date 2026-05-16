@@ -6516,6 +6516,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
             return
         search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+
+        asset_icon_path = Path(__file__).resolve().parents[2] / "assets" / "search_icon.svg"
+        if asset_icon_path.exists():
+            asset_icon = QIcon(str(asset_icon_path))
+            if not asset_icon.isNull():
+                self._search_leading_action.setIcon(asset_icon)
+                return
+
         if qta is not None:
             for icon_key in ("fa5s.search", "fa.search", "mdi.magnify"):
                 try:
