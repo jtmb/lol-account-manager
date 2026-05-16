@@ -169,27 +169,7 @@ jobs:
             }
           }
 
-          $subjects = @()
-          if ([string]::IsNullOrWhiteSpace($prevTag)) {
-            $subjects = @(git log -n 25 --pretty=format:"%s")
-          }
-          else {
-            $subjects = @(git log "$prevTag..HEAD" --pretty=format:"%s")
-          }
-
-          $subjects = $subjects |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-            Where-Object { $_ -notmatch "^(merge|Merge)\b" }
-
-          $featureLines = @()
-          if ($subjects.Count -eq 0) {
-            $featureLines += "- No new commits detected since the previous release tag."
-          }
-          else {
-            foreach ($s in $subjects) {
-              $featureLines += "- $s"
-            }
-          }
+          $featureLines = @("<placeholder>")
 
           $downloadUrl = "https://github.com/$repo/releases/download/$currentTag/LoLAccountManager.zip"
           $bugUrl = "https://github.com/$repo/issues/new?assignees=&labels=bug&title=bug%3A+"
