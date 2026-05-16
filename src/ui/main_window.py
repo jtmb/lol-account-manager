@@ -2457,11 +2457,15 @@ class InClientGamePanel(AccountListBackgroundFrame):
 class ChampSelectWindow(QMainWindow):
     """Dedicated top-level window that hosts the champ-select assistant."""
 
+    _MIN_WIDTH = 1088
+    _MIN_HEIGHT = 768
+
     def __init__(self, panel: InClientGamePanel, parent=None):
         super().__init__(None)
         self._owner = parent
         self.setWindowTitle("Champ Select Assistant")
         self.setAttribute(Qt.WA_DeleteOnClose, False)
+        self.setMinimumSize(self._MIN_WIDTH, self._MIN_HEIGHT)
         container = QWidget(self)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -5531,11 +5535,23 @@ class MainWindow(QMainWindow):
         if not self.champ_select_window:
             return
 
+        self.champ_select_window.setMinimumSize(
+            ChampSelectWindow._MIN_WIDTH,
+            ChampSelectWindow._MIN_HEIGHT,
+        )
+
+        if self.champ_select_window.isVisible():
+            self._last_champ_select_geometry = (
+                self.champ_select_window.x(),
+                self.champ_select_window.y(),
+                self.champ_select_window.width(),
+                self.champ_select_window.height(),
+            )
+            return
+
         screen = self._champ_select_target_screen()
-        scale = self._scale_factor_for_screen(screen)
-        base_w, base_h = _parse_resolution(self._champ_select_window_size, fallback=(941, 1053))
-        width = max(660, int(round(base_w * scale)))
-        height = max(480, int(round(base_h * scale)))
+        width = max(self.champ_select_window.width(), ChampSelectWindow._MIN_WIDTH)
+        height = max(self.champ_select_window.height(), ChampSelectWindow._MIN_HEIGHT)
 
         if screen is not None:
             screen_geo = screen.availableGeometry()
@@ -5546,7 +5562,7 @@ class MainWindow(QMainWindow):
             y = self.y() + max(0, (self.height() - height) // 2)
 
         geometry_signature = (x, y, width, height)
-        self._last_screen_scale_factor = scale
+        self._last_screen_scale_factor = self._scale_factor_for_screen(screen)
         if geometry_signature == self._last_champ_select_geometry:
             return
 
@@ -6723,11 +6739,8 @@ QMenu#trayQuickMenu::separator {
             self._show_from_tray()
 
     def _show_from_tray(self):
-        if self._in_champ_select_mode and self.champ_select_window and self.champ_select_window.isVisible():
-            self.champ_select_window.raise_()
-            self.champ_select_window.activateWindow()
-            return
         self.showNormal()
+        self._main_hidden_for_champ_select = False
         if not self.account_manager:
             unlocked = self.request_master_password(fatal_on_fail=False)
             if not unlocked:
