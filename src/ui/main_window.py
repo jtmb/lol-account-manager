@@ -742,6 +742,10 @@ QTabBar::tab:selected {
 QTabBar::tab:hover:!selected {
     background-color: #353b55;
 }
+#tagFilterCombo {
+    padding: 4px 4px;
+    padding-right: 24px;
+}
 """
 
 REGION_OPTIONS = [
@@ -5289,6 +5293,7 @@ class MainWindow(QMainWindow):
         filter_row.addWidget(self.search_input, 1)
 
         self.tag_filter_combo = QComboBox()
+        self.tag_filter_combo.setObjectName("tagFilterCombo")
         self.tag_filter_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
         filter_row.addWidget(self.tag_filter_combo)
@@ -6404,8 +6409,9 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         """Keep the tag combo compact and visually aligned with the Clear button."""
         if not hasattr(self, "tag_filter_combo"):
             return
+        # Text width + custom stylesheet padding (4px left + 24px right)
         combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        target_width = combo_text_width + 28
+        target_width = combo_text_width + 4 + 24
         self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
