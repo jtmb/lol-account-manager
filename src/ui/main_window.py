@@ -114,7 +114,7 @@ class NoCaretLineEdit(QLineEdit):
         self._caret_active = False
         self._caret_idle_timer = QTimer(self)
         self._caret_idle_timer.setSingleShot(True)
-        self._caret_idle_timer.setInterval(5000)
+        self._caret_idle_timer.setInterval(3000)
         self._caret_idle_timer.timeout.connect(self._deactivate_caret)
         self.textEdited.connect(self._mark_activity)
         self.cursorPositionChanged.connect(self._mark_activity)
@@ -165,8 +165,8 @@ class NoCaretLineEdit(QLineEdit):
         painter = QPainter(self)
         painter.setPen(Qt.NoPen)
         painter.setBrush(self.palette().brush(QPalette.Base))
-        # Cover an extra pixel on each side so styled caret edges are hidden.
-        painter.drawRect(cursor_rect.adjusted(-1, 0, 1, 0))
+        # Paint exactly over the caret bounds to avoid clipping nearby glyphs.
+        painter.drawRect(cursor_rect)
         painter.end()
 
 
