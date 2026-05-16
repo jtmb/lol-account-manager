@@ -24,9 +24,8 @@ datas += collect_data_files(
 datas += [
     (str(project_root / "src"), "src"),
     (str(project_root / "app_config.json"), "."),
+    (str(project_root / "assets"), "assets"),
 ]
-if icon_file.exists():
-    datas.append((str(icon_file), "assets"))
 
 binaries = []
 binaries += collect_dynamic_libs("PyQt5")

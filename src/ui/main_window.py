@@ -6539,75 +6539,24 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         """Render a leading search icon that matches nav icon styling."""
         if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
             return
-        search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
-
         asset_icon_path = Path(__file__).resolve().parents[2] / "assets" / "search_icon.svg"
-        if asset_icon_path.exists():
-            asset_icon = QIcon(str(asset_icon_path))
-            if not asset_icon.isNull():
-                self._search_leading_action.setIcon(asset_icon)
-                return
-
-        if qta is not None:
-            for icon_key in ("fa5s.search", "fa.search", "mdi.magnify"):
-                try:
-                    self._search_leading_action.setIcon(qta.icon(icon_key, color=search_fg))
-                    return
-                except Exception:
-                    continue
-        self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
-
-    def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
-        """Build a simple magnifier icon for the search field (fallback)."""
-        pixmap = QPixmap(size, size)
-        pixmap.fill(Qt.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-
-        color = QColor(color_hex)
-        pen = QPen(color, max(1.2, size * 0.14), Qt.SolidLine)
-        pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-
-        lens_r = size * 0.30
-        lens_cx = size * 0.42
-        lens_cy = size * 0.42
-        painter.drawEllipse(QPointF(lens_cx, lens_cy), lens_r, lens_r)
-
-        handle_start = QPointF(lens_cx + lens_r * 0.58, lens_cy + lens_r * 0.58)
-        handle_end = QPointF(size * 0.90, size * 0.90)
-        painter.drawLine(handle_start, handle_end)
-
-        painter.end()
-        return QIcon(pixmap)
+        self._search_leading_action.setIcon(QIcon(str(asset_icon_path)))
 
     def _refresh_nav_banner(self):
-        """Load PNG banner from assets; fallback to plain text title."""
+        """Load PNG banner from assets."""
         if not hasattr(self, "_nav_banner"):
             return
 
         assets_dir = Path(__file__).resolve().parents[2] / "assets"
         asset_path = assets_dir / "nav_banner.png"
         asset_pixmap = QPixmap(str(asset_path))
-        if not asset_pixmap.isNull():
-            scaled = asset_pixmap.scaled(
-                self._nav_banner.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
-            self._nav_banner.setText("")
-            self._nav_banner.setPixmap(scaled)
-            return
-
-        # Explicit plain-text fallback when the PNG asset is missing/unloadable.
-        self._nav_banner.setPixmap(QPixmap())
-        self._nav_banner.setText("LOL Account Manager")
-        fallback_font = QFont(self.font())
-        fallback_font.setBold(True)
-        fallback_font.setPointSize(12)
-        self._nav_banner.setFont(fallback_font)
-        self._nav_banner.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        scaled = asset_pixmap.scaled(
+            self._nav_banner.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        self._nav_banner.setText("")
+        self._nav_banner.setPixmap(scaled)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
