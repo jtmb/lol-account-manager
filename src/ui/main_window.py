@@ -5832,7 +5832,7 @@ class MainWindow(QMainWindow):
         self.lol_path_label.show()
         self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._home_button.setEnabled(False)
-        self._set_icon_state(self._home_button, "normal")
+        self._set_icon_state(self._home_button, "pressed")
         # Release the fixed-height constraint set during spotlight sizing
         if self.account_spotlight_panel:
             try:
@@ -6070,6 +6070,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             + "    border-bottom-right-radius: 2px;\n"
             + "    padding: 4px 10px 5px 10px;\n"
             + "    font-weight: 600;\n"
+            + "    font-size: 8.5pt;\n"
             + "    font-family: 'Segoe UI', 'Inter', 'Arial';\n"
             + "    letter-spacing: 0.25px;\n"
             + "    min-height: 22px;\n"
@@ -6275,6 +6276,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         for button in getattr(self, "_icon_buttons", {}):
             if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
                 self._set_icon_state(button, "pressed")
+            elif button is self._home_button and not self._home_button.isEnabled():
+                self._set_icon_state(button, "pressed")
             else:
                 self._set_icon_state(button, "hover" if button.underMouse() else "normal")
         # Clean stylesheet for icon buttons
@@ -6288,6 +6291,9 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
 
     def _sync_icon_button_state(self, button: QPushButton):
         if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+            self._set_icon_state(button, "pressed")
+            return
+        if button is self._home_button and not self._home_button.isEnabled():
             self._set_icon_state(button, "pressed")
             return
         self._set_icon_state(button, "hover" if button.underMouse() else "normal")
@@ -6304,7 +6310,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         
-        if state == "pressed" and button is self._settings_button:
+        if state == "pressed" and button in (self._settings_button, self._home_button):
             color = app_border
         elif state == "hover":
             color = app_accent
