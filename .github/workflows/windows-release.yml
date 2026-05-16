@@ -1,0 +1,214 @@
+name: Windows Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app_config.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Resolve app version
+        id: version
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $PWD "app_config.json"
+          if (-not (Test-Path $configPath)) {
+            throw "app_config.json not found"
+          }
+
+          $config = Get-Content -Raw -Path $configPath | ConvertFrom-Json
+          $version = "$($config.app_version)".Trim()
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "app_version is missing in app_config.json"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          python build_exe.py
+
+      - name: Create zip artifact
+        shell: pwsh
+        run: |
+          $candidates = @(
+            (Join-Path $PWD "dist\LoLAccountManager"),
+            (Join-Path $PWD "dist\LoL Account Manager")
+          )
+
+          $distDir = $null
+          foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+              $distDir = $candidate
+              break
+            }
+          }
+
+          if ($null -eq $distDir -or -not (Test-Path $distDir)) {
+            Get-ChildItem (Join-Path $PWD "dist") -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            throw "Build output folder not found under dist"
+          }
+
+          $zipPath = Join-Path $PWD "LoLAccountManager.zip"
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive -Path (Join-Path $distDir "*") -DestinationPath $zipPath -Force
+
+      - name: Ensure release tag exists
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          $tagExists = $false
+          git rev-parse "refs/tags/$tag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $tagExists = $true
+          }
+
+          if ($tagExists) {
+            $tagCommit = (git rev-list -n 1 $tag).Trim()
+            $headCommit = (git rev-parse HEAD).Trim()
+            if ($tagCommit -ne $headCommit) {
+              throw "Tag '$tag' already exists on commit $tagCommit, but HEAD is $headCommit. Bump app_version before releasing."
+            }
+          }
+          else {
+            git tag -a $tag -m "Release $tag"
+            git push origin $tag
+          }
+
+      - name: Generate release notes
+        id: notes
+        shell: pwsh
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          $currentTag = $env:TAG
+          $repo = $env:REPO
+
+          $allTags = @(git tag --sort=-creatordate)
+          $prevTag = ""
+          foreach ($t in $allTags) {
+            if (-not [string]::IsNullOrWhiteSpace($t) -and $t -ne $currentTag) {
+              $prevTag = $t
+              break
+            }
+          }
+
+          $subjects = @()
+          if ([string]::IsNullOrWhiteSpace($prevTag)) {
+            $subjects = @(git log -n 25 --pretty=format:"%s")
+          }
+          else {
+            $subjects = @(git log "$prevTag..HEAD" --pretty=format:"%s")
+          }
+
+          $subjects = $subjects |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Where-Object { $_ -notmatch "^(merge|Merge)\b" }
+
+          $featureLines = @()
+          if ($subjects.Count -eq 0) {
+            $featureLines += "- No new commits detected since the previous release tag."
+          }
+          else {
+            foreach ($s in $subjects) {
+              $featureLines += "- $s"
+            }
+          }
+
+          $downloadUrl = "https://github.com/$repo/releases/download/$currentTag/LoLAccountManager.zip"
+          $bugUrl = "https://github.com/$repo/issues/new?assignees=&labels=bug&title=bug%3A+"
+          $featureUrl = "https://github.com/$repo/issues/new?assignees=&labels=enhancement&title=feat%3A+"
+          $repoUrl = "https://github.com/$repo"
+          $logoUrl = "https://github.com/jtmb/lol-account-manager/blob/main/assets/icon.ico"
+
+          $body = @"
+<h1 align="center">
+	<a href="$repoUrl">
+		<img src="$logoUrl" alt="LoL Account Manager Logo" width="220" height="auto">
+	</a>
+</h1>
+
+<div align="center">
+	<b>League of Legends Account Manager</b> - Securely manage, organize, and launch multiple LoL accounts from one desktop app.
+	<br />
+	<br />
+	<a href="$downloadUrl">Download</a>
+	·
+	<a href="$bugUrl">Report a Bug</a>
+	·
+	<a href="$featureUrl">Request a Feature</a>
+</div>
+
+<br>
+
+New features for this release include:
+
+$($featureLines -join "`n")
+
+-------------------------
+
+
+**Install Instructions**
+
+1. Download [LoLAccountManager.zip]($downloadUrl)
+
+2. Extract the contents of the ZIP file.
+
+3. Run LoLAccountManager.exe
+
+4. You may see Windows SmartScreen warnings because the application is not yet digitally signed. These warnings are expected and can be safely ignored.
+"@
+
+          $notesPath = Join-Path $PWD "release-notes.generated.md"
+          Set-Content -Path $notesPath -Value $body -Encoding UTF8
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: LoL Account Manager ${{ steps.version.outputs.version }}
+          bodyFile: release-notes.generated.md
+          artifacts: LoLAccountManager.zip
+          artifactContentType: application/zip
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: true
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
