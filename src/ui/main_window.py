@@ -106,6 +106,30 @@ class ClickableIconLabel(QLabel):
         super().mouseReleaseEvent(event)
 
 
+class NoCaretLineEdit(QLineEdit):
+    """Text input that keeps editing behavior but never shows a caret."""
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self.hasFocus():
+            return
+
+        cursor_rect = self.inputMethodQuery(Qt.ImCursorRectangle)
+        if cursor_rect is None:
+            return
+        if hasattr(cursor_rect, "toRect"):
+            cursor_rect = cursor_rect.toRect()
+        if cursor_rect.isNull():
+            return
+
+        painter = QPainter(self)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(self.palette().brush(QPalette.Base))
+        # Cover an extra pixel on each side so styled caret edges are hidden.
+        painter.drawRect(cursor_rect.adjusted(-1, 0, 1, 0))
+        painter.end()
+
+
 CHAMPION_SPLASH_OPTIONS = [
     ('Aatrox', 'Aatrox'), ('Ahri', 'Ahri'), ('Akali', 'Akali'), ('Akshan', 'Akshan'),
     ('Alistar', 'Alistar'), ('Ambessa', 'Ambessa'), ('Amumu', 'Amumu'), ('Anivia', 'Anivia'),
@@ -5257,7 +5281,7 @@ class MainWindow(QMainWindow):
         filter_row.setContentsMargins(0, 0, 0, 0)
         filter_row.setSpacing(0)
 
-        self.search_input = QLineEdit()
+        self.search_input = NoCaretLineEdit()
         self.search_input.setObjectName("accountSearchInput")
         self.search_input.setPlaceholderText("Search by display name, username, or tag")
         self.search_input.setClearButtonEnabled(True)
