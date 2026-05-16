@@ -2466,6 +2466,13 @@ class ChampSelectWindow(QMainWindow):
         self.setWindowTitle("Champ Select Assistant")
         self.setAttribute(Qt.WA_DeleteOnClose, False)
         self.setMinimumSize(self._MIN_WIDTH, self._MIN_HEIGHT)
+        if sys.platform.startswith("win"):
+            self.setAttribute(Qt.WA_NativeWindow, True)
+            self.create()
+            dark_mode = bool(getattr(parent, "_dark_mode", True))
+            _apply_windows11_chrome(self, dark_mode)
+            self.setProperty("_chrome_preapplied", True)
+            _arm_first_show_reveal(self)
         container = QWidget(self)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -2476,6 +2483,10 @@ class ChampSelectWindow(QMainWindow):
     def closeEvent(self, event):
         self.hide()
         event.ignore()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        _reveal_after_first_show(self)
 
 
 class MasterPasswordDialog(QDialog):
@@ -6585,6 +6596,8 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
         _apply_windows11_chrome(self, self._dark_mode)
+        if self.champ_select_window:
+            _apply_windows11_chrome(self.champ_select_window, self._dark_mode)
 
     def _configure_diagnostics_logging(self):
         """Configure lightweight file logging based on user-selected level."""
