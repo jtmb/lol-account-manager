@@ -6407,13 +6407,13 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
         self.tag_filter_combo.setPalette(combo_palette)
 
     def _sync_filter_control_widths(self):
-        """Fit combo to "All tags" text with minimal padding."""
+        """Fit combo to "All tags" text with adequate width."""
         if not hasattr(self, "tag_filter_combo"):
             return
-        # Calculate exact width needed for "All tags" text to fit without clipping
+        # Calculate exact width needed for "All tags" text to fit completely
         combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        # Minimal padding: 0px left + 20px right for dropdown arrow + 2px margin
-        target_width = combo_text_width + 0 + 20 + 2
+        # Add buffer: 20px right for dropdown arrow + 10px margin to ensure text fits completely
+        target_width = combo_text_width + 20 + 10
         self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
