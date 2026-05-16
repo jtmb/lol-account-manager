@@ -106,70 +106,6 @@ class ClickableIconLabel(QLabel):
         super().mouseReleaseEvent(event)
 
 
-class NoCaretLineEdit(QLineEdit):
-    """Text input that hides the caret after a short period of inactivity."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._caret_active = False
-        self._caret_idle_timer = QTimer(self)
-        self._caret_idle_timer.setSingleShot(True)
-        self._caret_idle_timer.setInterval(3000)
-        self._caret_idle_timer.timeout.connect(self._deactivate_caret)
-        self.textEdited.connect(self._mark_activity)
-        self.cursorPositionChanged.connect(self._mark_activity)
-
-    def _mark_activity(self, *_args):
-        if not self.hasFocus():
-            return
-        if not self._caret_active:
-            self._caret_active = True
-            self.update()
-        self._caret_idle_timer.start()
-
-    def _deactivate_caret(self):
-        if self._caret_active:
-            self._caret_active = False
-            self.update()
-
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        self._mark_activity()
-
-    def focusOutEvent(self, event):
-        self._caret_idle_timer.stop()
-        self._deactivate_caret()
-        super().focusOutEvent(event)
-
-    def keyPressEvent(self, event):
-        super().keyPressEvent(event)
-        self._mark_activity()
-
-    def mousePressEvent(self, event):
-        super().mousePressEvent(event)
-        self._mark_activity()
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        if not self.hasFocus() or self._caret_active:
-            return
-
-        cursor_rect = self.inputMethodQuery(Qt.ImCursorRectangle)
-        if cursor_rect is None:
-            return
-        if hasattr(cursor_rect, "toRect"):
-            cursor_rect = cursor_rect.toRect()
-        if cursor_rect.isNull():
-            return
-
-        painter = QPainter(self)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(self.palette().brush(QPalette.Base))
-        # Paint exactly over the caret bounds to avoid clipping nearby glyphs.
-        painter.drawRect(cursor_rect)
-        painter.end()
-
-
 CHAMPION_SPLASH_OPTIONS = [
     ('Aatrox', 'Aatrox'), ('Ahri', 'Ahri'), ('Akali', 'Akali'), ('Akshan', 'Akshan'),
     ('Alistar', 'Alistar'), ('Ambessa', 'Ambessa'), ('Amumu', 'Amumu'), ('Anivia', 'Anivia'),
@@ -5321,7 +5257,7 @@ class MainWindow(QMainWindow):
         filter_row.setContentsMargins(0, 0, 0, 0)
         filter_row.setSpacing(0)
 
-        self.search_input = NoCaretLineEdit()
+        self.search_input = QLineEdit()
         self.search_input.setObjectName("accountSearchInput")
         self.search_input.setPlaceholderText("Search by display name, username, or tag")
         self.search_input.setClearButtonEnabled(True)
@@ -5406,6 +5342,7 @@ class MainWindow(QMainWindow):
         self.account_list.setFocusPolicy(Qt.NoFocus)
         self.account_list.setAttribute(Qt.WA_TranslucentBackground, True)
         self.account_list.viewport().setAutoFillBackground(False)
+        self.account_list.itemPressed.connect(lambda _: self._blur_search_input())
         self.account_list.itemClicked.connect(self.on_account_selected)
         self.account_list.itemDoubleClicked.connect(lambda _: self.launch_account())
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
