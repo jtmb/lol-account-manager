@@ -6402,11 +6402,10 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
 
     def _sync_filter_control_widths(self):
         """Keep the tag combo compact and visually aligned with the Clear button."""
-        if not hasattr(self, "tag_filter_combo") or not hasattr(self, "clear_filters_btn"):
+        if not hasattr(self, "tag_filter_combo"):
             return
         combo_text_width = self.tag_filter_combo.fontMetrics().horizontalAdvance("All tags")
-        clear_button_width = self.clear_filters_btn.sizeHint().width()
-        target_width = max(clear_button_width + 26, combo_text_width + 42)
+        target_width = combo_text_width + 28
         self.tag_filter_combo.setFixedWidth(target_width)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
