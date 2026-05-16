@@ -19,6 +19,8 @@ datas += collect_data_files(
         "Qt5/resources/*",
         "Qt5/translations/*",
         "Qt5/libexec/*",
+        "Qt5/plugins/imageformats/*",
+        "Qt5/plugins/iconengines/*",
     ],
 )
 datas += [

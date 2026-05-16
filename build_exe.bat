@@ -37,26 +37,12 @@ if errorlevel 1 (
 echo [*] Cleaning previous build artifacts...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
-if exist LoLAccountManager.spec del /q LoLAccountManager.spec
 
-echo [*] Running PyInstaller...
-set "ICON_ARG="
-set "DATA_ARG="
-if exist "assets\icon.ico" set "ICON_ARG=--icon assets\icon.ico"
-if exist "assets\icon.ico" set "DATA_ARG=--add-data assets\icon.ico;assets"
+echo [*] Running PyInstaller from spec...
 "%VENV_PY%" -m PyInstaller ^
   --noconfirm ^
   --clean ^
-  --name "LoLAccountManager" ^
-  --windowed ^
-    --collect-all PyQt5.QtWebEngineWidgets ^
-    --collect-all PyQt5.QtWebEngineCore ^
-    --collect-data PyQt5 ^
-    --collect-binaries PyQt5 ^
-    %ICON_ARG% ^
-    %DATA_ARG% ^
-  --collect-all pywinauto ^
-  src\main.py
+    lol_account_manager.spec
 
 if errorlevel 1 (
     echo.
@@ -67,6 +53,6 @@ if errorlevel 1 (
 
 echo.
 echo [SUCCESS] Build complete.
-echo EXE location: %CD%\dist\LoLAccountManager\LoLAccountManager.exe
+echo EXE location: %CD%\dist\LoL Account Manager.exe
 echo.
 pause
