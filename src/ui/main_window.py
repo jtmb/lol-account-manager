@@ -8903,7 +8903,15 @@ QMenu::separator {
                 new_pass_dialog = MasterPasswordDialog(self, is_setup=True)
                 new_pass_dialog.setWindowTitle("Set New Master Password")
                 if new_pass_dialog.exec_() == QDialog.Accepted:
-                    new_password = new_pass_dialog.get_password()
+                    get_password = getattr(new_pass_dialog, "get_password", None)
+                    if callable(get_password):
+                        new_password = get_password()
+                    else:
+                        new_password = (
+                            new_pass_dialog.password_input.text()
+                            if hasattr(new_pass_dialog, "password_input")
+                            else ""
+                        )
                     if new_password:
                         # Re-encrypt all accounts with new password
                         try:
