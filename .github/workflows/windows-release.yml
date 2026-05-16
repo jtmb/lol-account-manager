@@ -222,7 +222,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.version.outputs.tag }}
-          name: LoL Account Manager ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
           bodyFile: release-notes.generated.md
           artifacts: LoLAccountManager.zip
           artifactContentType: application/zip
