@@ -5175,7 +5175,15 @@ class MainWindow(QMainWindow):
         self._dpi_resize_in_progress: bool = False
         self._pre_champ_select_size: str = ""
         self._search_query: str = ""
+        self._pending_filter_refresh_key: str = ""
+        self._last_filter_refresh_key: str = "__init__"
+        self._filter_refresh_timer = QTimer(self)
+        self._filter_refresh_timer.setSingleShot(True)
+        self._filter_refresh_timer.setInterval(120)
+        self._filter_refresh_timer.timeout.connect(self._apply_debounced_filter_refresh)
         self._tag_filter_value: str = "__all__"
+        self._custom_icon_cache: dict[tuple[str, str, int], QIcon] = {}
+        self._button_icon_state: dict[QPushButton, tuple[str, str]] = {}
         self._rank_threads: list = []  # keep references so threads aren't GC'd
         self._logged_in_username: Optional[str] = None
         self._session_miss_count: int = 0
@@ -6305,6 +6313,7 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
+        self._button_icon_state.clear()
         self._set_refresh_icon_normal()
         self._refresh_button.setCursor(Qt.PointingHandCursor)
         self._refresh_button.installEventFilter(self)
@@ -6373,6 +6382,10 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             color = app_accent
         else:
             color = app_text
+
+        new_state = (icon_type, color)
+        if self._button_icon_state.get(button) == new_state:
+            return
         
         icon = self._build_custom_icon(icon_type, color, 24)
         if icon:
@@ -6380,9 +6393,15 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
                 button.setPixmap(icon.pixmap(24, 24))
             else:
                 button.setIcon(icon)
+            self._button_icon_state[button] = new_state
 
     def _build_custom_icon(self, icon_type: str, color_hex: str, size: int) -> Optional[QIcon]:
         """Build minimalistic custom icons using Qt painting."""
+        cache_key = (icon_type, color_hex, size)
+        cached_icon = self._custom_icon_cache.get(cache_key)
+        if cached_icon is not None:
+            return cached_icon
+
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
@@ -6400,9 +6419,14 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             self._draw_settings_icon(painter, size, color)
         elif icon_type == "home":
             self._draw_home_icon(painter, size, color)
+        else:
+            painter.end()
+            return None
         
         painter.end()
-        return QIcon(pixmap)
+        icon = QIcon(pixmap)
+        self._custom_icon_cache[cache_key] = icon
+        return icon
     
     def _draw_refresh_icon(self, painter: QPainter, size: int, color: QColor):
         """Draw a minimalistic refresh/reload icon."""
@@ -7695,11 +7719,21 @@ QMenu#trayQuickMenu::separator {
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
+        self._pending_filter_refresh_key = self._search_query
+        self._filter_refresh_timer.start()
+
+    def _apply_debounced_filter_refresh(self):
+        """Apply search filter refresh at most once per debounce interval."""
+        if self._pending_filter_refresh_key == self._last_filter_refresh_key:
+            return
+        self._last_filter_refresh_key = self._pending_filter_refresh_key
         self.refresh_account_list(fetch_ranks=False)
 
     def _clear_filters(self):
-        self.search_input.clear()
-        self._on_filters_changed()
+        if self.search_input.text():
+            self.search_input.clear()
+        else:
+            self._on_filters_changed()
 
     def _rebuild_tag_filter_options(self, accounts: list[Account]):
         """No longer used - tag filtering removed."""
