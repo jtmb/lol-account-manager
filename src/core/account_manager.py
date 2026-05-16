@@ -31,6 +31,7 @@ class Account:
     ban_end_date: str = ""     # ISO date "YYYY-MM-DD", only for temporary bans
     is_pinned: bool = False
     last_launched_at: str = ""  # ISO datetime (UTC)
+    email: str = ""  # Optional email field
 
     def is_banned(self) -> bool:
         """Return True if the account is currently under an active ban."""

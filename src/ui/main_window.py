@@ -3,11 +3,11 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
     QListWidget, QListWidgetItem, QLabel, QDialog, QLineEdit,
     QMessageBox, QFrame, QFileDialog, QComboBox, QProgressBar, QTabWidget,
-    QDateEdit, QGraphicsDropShadowEffect, QMenu, QCheckBox, QGridLayout,
+    QDateEdit, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QMenu, QCheckBox, QGridLayout,
     QTextEdit, QSpinBox, QSystemTrayIcon, QAction, QCompleter, QColorDialog, QInputDialog,
-    QStackedWidget, QSizePolicy
+    QStackedWidget, QSizePolicy, QLayout
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QDate, QEvent, QRectF, QPointF, QUrl, QObject
 from PyQt5.QtGui import QFont, QColor, QPixmap, QBitmap, QPalette, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QIcon, QPen
 from pathlib import Path
 from typing import Optional, Callable
@@ -33,6 +33,11 @@ try:
     import qtawesome as qta
 except Exception:
     qta = None
+
+try:
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+except Exception:
+    QWebEngineView = None
 
 if sys.platform.startswith("win"):
     import winreg
@@ -146,6 +151,24 @@ CHAMPION_SPLASH_OPTIONS = [
     ('Zeri', 'Zeri'), ('Ziggs', 'Ziggs'), ('Zilean', 'Zilean'), ('Zoe', 'Zoe'), ('Zyra', 'Zyra'),
 ]
 CHAMPION_NAME_BY_ID = {champ_id: name for name, champ_id in CHAMPION_SPLASH_OPTIONS}
+
+
+class _ResizeCallbackFilter(QObject):
+    """Event filter that invokes a callback whenever the watched widget is resized.
+
+    Used instead of monkey-patching ``resizeEvent`` on existing QWidget instances,
+    which does not work in PyQt5 because Qt dispatches virtual methods via the C++
+    vtable and ignores Python instance attributes.
+    """
+
+    def __init__(self, callback, parent=None):
+        super().__init__(parent)
+        self._callback = callback
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            self._callback()
+        return False  # always pass the event through
 
 
 class AccountListBackgroundFrame(QFrame):
@@ -588,44 +611,97 @@ QPushButton:disabled {
     color: #585b70;
     border: 1px solid #313244;
 }
-QLineEdit, QComboBox, QDateEdit, QTextEdit, QPlainTextEdit, QSpinBox {
-    background-color: #181825;
+QLineEdit, QDateEdit, QTextEdit, QPlainTextEdit {
+    background-color: #1a1a24;
     color: #cdd6f4;
-    border: 1px solid #45475a;
-    border-radius: 4px;
-    padding: 4px;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 8px 12px;
+    selection-background-color: #7aa2f7;
 }
-QSpinBox::up-button, QSpinBox::down-button {
-    subcontrol-origin: border;
-    background-color: #313244;
-    border-left: 1px solid #45475a;
-    width: 16px;
+QLineEdit:hover, QDateEdit:hover, QTextEdit:hover, QPlainTextEdit:hover {
+    border: 1px solid #585b70;
 }
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #45475a;
+QLineEdit:focus, QDateEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 2px solid #7aa2f7;
+    outline: none;
 }
 QLineEdit::placeholder {
     color: #9aa4bf;
 }
-QComboBox QAbstractItemView {
-    background-color: #181825;
+QSpinBox {
+    background-color: #1a1a24;
     color: #cdd6f4;
-    selection-background-color: #45475a;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+QSpinBox:hover {
+    border: 1px solid #585b70;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #313244;
+    border-left: 1px solid #404758;
+    width: 18px;
+    padding: 2px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #404758;
 }
 QComboBox {
-    padding-right: 24px;
+    background-color: #1a1a24;
+    color: #cdd6f4;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    padding: 4px 12px;
+    padding-right: 32px;
+    min-height: 24px;
+}
+QComboBox:hover {
+    border: 1px solid #585b70;
+    background-color: #1f1f2a;
+}
+QComboBox:focus {
+    border: 2px solid #7aa2f7;
 }
 QComboBox::drop-down {
     subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 20px;
-    border-left: 1px solid #45475a;
-    background-color: #22263a;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
+    subcontrol-position: center right;
+    width: 24px;
+    border: none;
+    background: transparent;
+    margin-right: 4px;
+}
+QComboBox::down-arrow {
+    image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMUw2IDZMMTEgMSIgc3Ryb2tlPSIjY2RkNmY0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==");
+    width: 12px;
+    height: 8px;
+}
+QComboBox QAbstractItemView {
+    background-color: #1a1a24;
+    color: #cdd6f4;
+    border: 1px solid #404758;
+    border-radius: 6px;
+    outline: none;
+    selection-background-color: #404758;
+    show-decoration-selected: 1;
+}
+QComboBox QAbstractItemView::item {
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+QComboBox QAbstractItemView::item:selected {
+    background-color: #7aa2f7;
+    color: #1e1e2e;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #313244;
+    color: #cdd6f4;
 }
 QLabel {
     color: #cdd6f4;
+    font-weight: 500;
 }
 QProgressDialog {
     background-color: #1e1e2e;
@@ -2377,6 +2453,40 @@ class InClientGamePanel(AccountListBackgroundFrame):
             self._fetch_build_data(build_url, self._effective_role_hint())
         else:
             self._apply_empty_build_state("Waiting for champion selection...")
+        
+class ChampSelectWindow(QMainWindow):
+    """Dedicated top-level window that hosts the champ-select assistant."""
+
+    _MIN_WIDTH = 1088
+    _MIN_HEIGHT = 768
+
+    def __init__(self, panel: InClientGamePanel, parent=None):
+        super().__init__(None)
+        self._owner = parent
+        self.setWindowTitle("Champ Select Assistant")
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
+        self.setMinimumSize(self._MIN_WIDTH, self._MIN_HEIGHT)
+        if sys.platform.startswith("win"):
+            self.setAttribute(Qt.WA_NativeWindow, True)
+            self.create()
+            dark_mode = bool(getattr(parent, "_dark_mode", True))
+            _apply_windows11_chrome(self, dark_mode)
+            self.setProperty("_chrome_preapplied", True)
+            _arm_first_show_reveal(self)
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(panel)
+        self.setCentralWidget(container)
+
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        _reveal_after_first_show(self)
 
 
 class MasterPasswordDialog(QDialog):
@@ -2576,6 +2686,12 @@ class AddAccountDialog(QDialog):
         self.display_name_input = QLineEdit()
         layout.addWidget(self.display_name_input)
 
+        # Email (optional)
+        layout.addWidget(QLabel("Email (optional):"))
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("account@example.com")
+        layout.addWidget(self.email_input)
+
         # Region
         layout.addWidget(QLabel("Region:"))
         self.region_combo = QComboBox()
@@ -2632,6 +2748,7 @@ class AddAccountDialog(QDialog):
             self.tag_line_input.setText(getattr(self.editing_account, "tag_line", "NA1"))
             self.password_input.setText(self.editing_account.password)
             self.display_name_input.setText(self.editing_account.display_name)
+            self.email_input.setText(getattr(self.editing_account, "email", "") or "")
             self.tags_input.setText(", ".join(getattr(self.editing_account, "tags", []) or []))
             self.notes_input.setPlainText(getattr(self.editing_account, "notes", "") or "")
             region = self.editing_account.region if getattr(self.editing_account, "region", None) else "NA"
@@ -2679,6 +2796,7 @@ class AddAccountDialog(QDialog):
             'notes': self.notes_input.toPlainText().strip(),
             'ban_status': ban_status,
             'ban_end_date': ban_end_date,
+            'email': self.email_input.text().strip(),
         }
 
 
@@ -2697,7 +2815,7 @@ class SettingsDialog(QDialog):
         "1920x1080",
     ]
 
-    CHAMP_SELECT_DEFAULT_RESOLUTION = "941x1053"
+    CHAMP_SELECT_DEFAULT_RESOLUTION = "1501x1014"
 
     CHAMP_SELECT_RESOLUTIONS = [
         "941x1053",
@@ -2707,6 +2825,7 @@ class SettingsDialog(QDialog):
         "1134x1200",
         "1280x1300",
         "1440x1440",
+        "1501x1014",
         "1600x1600",
         "1920x1080",
         "1920x1200",
@@ -3242,6 +3361,13 @@ class SettingsDialog(QDialog):
             "Automatically open the op.gg in-game page when a live match is detected."
         )
         general_layout.addWidget(self.auto_open_ingame_checkbox)
+
+        self.champ_select_secondary_monitor_checkbox = QCheckBox("Open champ select on secondary monitor")
+        self.champ_select_secondary_monitor_checkbox.setChecked(bool(self._settings.get("champ_select_secondary_monitor", False)))
+        self.champ_select_secondary_monitor_checkbox.setToolTip(
+            "When enabled, champ select window will open on secondary monitor (if available)."
+        )
+        general_layout.addWidget(self.champ_select_secondary_monitor_checkbox)
 
         self.start_minimized_checkbox = QCheckBox("Start minimized to tray")
         self.start_minimized_checkbox.setChecked(bool(self._settings.get("start_minimized_to_tray", False)))
@@ -3873,6 +3999,7 @@ class SettingsDialog(QDialog):
             "show_rank_images": self.show_images_checkbox.isChecked(),
             "show_tags": self.show_tags_checkbox.isChecked(),
             "auto_open_ingame_page": self.auto_open_ingame_checkbox.isChecked(),
+            "champ_select_secondary_monitor": self.champ_select_secondary_monitor_checkbox.isChecked(),
             "tag_size": str(self.tag_size_combo.currentData()),
             "tag_chip_style": str(self.tag_style_combo.currentData()),
             "logged_in_gradient_color": str(self.logged_in_gradient_color_combo.currentData()),
@@ -3934,6 +4061,246 @@ class SettingsDialog(QDialog):
         if getattr(self, "_champion_splash_line_edit", None) is obj and event.type() == QEvent.FocusIn:
             self._champion_splash_line_edit.clear()
         return super().eventFilter(obj, event)
+
+
+class AccountSpotlightPanel(AccountListBackgroundFrame):
+    """Auto-loaded spotlight view for the currently logged-in account."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._profile_url = ""
+        self._active_username = ""
+        self._loaded_profile_url = ""
+        self._is_dark_mode = True
+        self._base_color = QColor(DEFAULT_APP_SURFACE_COLOR)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 8, 0, 0)
+        outer.setSpacing(8)
+
+        self._content_card = QFrame()
+        self._content_card.setObjectName("spotlightContentCard")
+        self._content_card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        content_layout = QVBoxLayout(self._content_card)
+        content_layout.setContentsMargins(6, 6, 6, 6)
+
+        self._web_view = None
+        self._fallback_container = QWidget()
+        self._fallback_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        fallback_layout = QVBoxLayout(self._fallback_container)
+        fallback_layout.setContentsMargins(20, 16, 20, 16)
+        fallback_layout.setSpacing(8)
+        self._fallback_message = QLabel(
+            "Embedded profile view is unavailable in this build.\n"
+            "Open the same u.gg profile in your browser."
+        )
+        self._fallback_message.setWordWrap(True)
+        self._fallback_message.setAlignment(Qt.AlignCenter)
+        self._fallback_open_btn = QPushButton("Open u.gg Profile")
+        self._fallback_open_btn.clicked.connect(self._open_profile_in_browser)
+        fallback_layout.addStretch()
+        fallback_layout.addWidget(self._fallback_message)
+        fallback_layout.addWidget(self._fallback_open_btn, 0, Qt.AlignHCenter)
+        fallback_layout.addStretch()
+
+        if QWebEngineView is not None:
+            try:
+                self._web_view = QWebEngineView(self)
+                self._web_view.setContextMenuPolicy(Qt.NoContextMenu)
+                self._web_view.loadFinished.connect(self._inject_hide_css)
+                self._web_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                content_layout.addWidget(self._web_view, 1)
+            except Exception:
+                self._web_view = None
+
+        if self._web_view is None:
+            content_layout.addWidget(self._fallback_container, 1)
+
+        outer.addWidget(self._content_card, 1)
+        self.setMinimumHeight(420)
+        self._apply_panel_styles()
+
+    def _open_profile_in_browser(self):
+        if not self._profile_url:
+            return
+        try:
+            webbrowser.open_new_tab(self._profile_url)
+        except Exception:
+            webbrowser.open(self._profile_url)
+
+    def _inject_hide_css(self, ok: bool):
+        """Called on loadFinished. Schedules repeated hide-script runs so that
+        React-rendered elements (which arrive after the load event) are also caught."""
+        if not ok or self._web_view is None:
+            return
+        self._run_hide_script()
+        QTimer.singleShot(600,  self._run_hide_script)
+        QTimer.singleShot(1500, self._run_hide_script)
+        QTimer.singleShot(3000, self._run_hide_script)
+
+    def _run_hide_script(self):
+        """Inject CSS + directly force-hide u.gg navigation chrome."""
+        try:
+            if self._web_view is None:
+                return
+            js = r"""
+(function() {
+    /* ── 1. Inject persistent style tag (runs once) ─────────────────── */
+    if (!document.getElementById('_ugg_embed_hide')) {
+        var s = document.createElement('style');
+        s.id = '_ugg_embed_hide';
+        s.textContent =
+            'nav,aside,header,[role="navigation"],[role="complementary"],[role="banner"],' +
+            '[class*="Sidebar"],[class*="sidebar"],[class*="NavBar"],[class*="navbar"] ' +
+            '{ display:none!important; }' +
+            'body,html { margin:0!important; padding:0!important; }';
+        (document.head || document.documentElement).appendChild(s);
+    }
+
+    /* Track whether the user has scrolled — if so, never force-scroll back to top */
+    if (!window._ugg_user_scrolled) {
+        window._ugg_user_scrolled = false;
+        window.addEventListener('scroll', function() {
+            window._ugg_user_scrolled = true;
+        }, { passive: true, once: true });
+    }
+
+    /* ── 2. Core cleanup function ────────────────────────────────────── */
+    function cleanup(allowScroll) {
+        /* Hide fixed/sticky bars and sidebars */
+        document.querySelectorAll('*').forEach(function(el) {
+            var cs = window.getComputedStyle(el);
+            if (cs.position !== 'fixed' && cs.position !== 'sticky') return;
+            var top = parseFloat(cs.top);
+            var left = parseFloat(cs.left);
+            var zIdx = parseInt(cs.zIndex) || 0;
+            /* Fixed top bar */
+            if (!isNaN(top) && top <= 4 && zIdx > 50) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+            /* Fixed left sidebar (narrow) */
+            if (!isNaN(left) && left <= 4 && parseFloat(cs.width) < 120) {
+                el.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        /* Hide any explicit nav/aside/header in the live DOM */
+        document.querySelectorAll('nav,aside,header').forEach(function(el) {
+            el.style.setProperty('display', 'none', 'important');
+        });
+
+        /* Walk top ~6 levels of DOM and zero padding-top/margin-top > threshold.
+           This removes the spacer reserved for the now-hidden fixed navbar
+           regardless of how deeply React nests it. */
+        function zeroTopSpacing(el, depth) {
+            if (!el || depth > 6) return;
+            var cs = window.getComputedStyle(el);
+            var pt = parseFloat(cs.paddingTop) || 0;
+            var mt = parseFloat(cs.marginTop) || 0;
+            if (pt > 20) el.style.setProperty('padding-top', '0', 'important');
+            if (mt > 20) el.style.setProperty('margin-top', '0', 'important');
+            /* Recurse into first few children only */
+            for (var i = 0; i < Math.min(el.children.length, 4); i++) {
+                zeroTopSpacing(el.children[i], depth + 1);
+            }
+        }
+        zeroTopSpacing(document.body, 0);
+
+        document.body.style.setProperty('margin', '0', 'important');
+        document.body.style.setProperty('padding', '0', 'important');
+        document.documentElement.style.setProperty('margin', '0', 'important');
+        document.documentElement.style.setProperty('padding', '0', 'important');
+
+        /* Only scroll to top before the user has scrolled */
+        if (allowScroll && !window._ugg_user_scrolled) {
+            window.scrollTo(0, 0);
+        }
+    }
+
+    /* ── 3. Run immediately and after React finishes rendering ───────── */
+    cleanup(true);
+    setTimeout(function(){ cleanup(true); }, 300);
+    setTimeout(function(){ cleanup(true); }, 800);
+    setTimeout(function(){ cleanup(true); }, 2000);
+
+    /* ── 4. MutationObserver: re-run cleanup when React mutates the DOM ─ */
+    if (!window._ugg_observer) {
+        var _debounce_timer = null;
+        window._ugg_observer = new MutationObserver(function() {
+            clearTimeout(_debounce_timer);
+            /* Never force-scroll on observer-triggered runs */
+            _debounce_timer = setTimeout(function(){ cleanup(false); }, 150);
+        });
+        window._ugg_observer.observe(document.documentElement, {
+            childList: true, subtree: true,
+            attributes: true, attributeFilter: ['style', 'class']
+        });
+    }
+})();
+"""
+            self._web_view.page().runJavaScript(js)
+        except RuntimeError:
+            pass
+
+    def _apply_panel_styles(self):
+        text_main = "#e8eefc" if self._is_dark_mode else "#1f2937"
+        text_muted = "#9fb0d5" if self._is_dark_mode else "#4b5563"
+        content_bg = "rgba(10, 14, 24, 0.86)" if self._is_dark_mode else "rgba(248, 250, 252, 0.98)"
+        border = "#2f3a55" if self._is_dark_mode else "#cbd5e1"
+        accent = "#8ab4ff" if self._is_dark_mode else "#2563eb"
+
+        self.setStyleSheet(
+            "QFrame#spotlightContentCard {"
+            f"background: {content_bg};"
+            f"border: 1px solid {border};"
+            "border-radius: 10px;"
+            "}"
+            f"QLabel {{ color: {text_main}; }}"
+            f"QLabel#spotlightMuted {{ color: {text_muted}; }}"
+            "QPushButton {"
+            f"background: {accent};"
+            "color: #ffffff;"
+            "border: none;"
+            "border-radius: 6px;"
+            "padding: 6px 12px;"
+            "font-weight: 600;"
+            "}"
+            "QPushButton:hover { background: #6b95e8; }"
+        )
+
+    def set_dark_mode(self, enabled: bool):
+        super().set_dark_mode(enabled)
+        self._is_dark_mode = bool(enabled)
+        self._apply_panel_styles()
+
+    def set_base_color(self, color: str):
+        super().set_base_color(color)
+
+    def set_account(self, account: Optional[Account], rank_data: Optional[dict], profile_url: str, force_reload: bool = False):
+        self._profile_url = str(profile_url or "").strip()
+        if not account:
+            self._active_username = ""
+            self._loaded_profile_url = ""
+            return
+
+        self._active_username = account.username
+
+        if self._web_view is not None and self._profile_url:
+            if self._profile_url != self._loaded_profile_url:
+                self._loaded_profile_url = self._profile_url
+                self._web_view.setUrl(QUrl(self._profile_url))
+            elif force_reload:
+                # Defer the reload: calling reload() synchronously right after
+                # the panel's show() races with the renderer resuming its IPC
+                # channel, which causes STATUS_ACCESS_VIOLATION in QtWebEngine.
+                # 300 ms is enough for WasShown() to propagate to the renderer.
+                QTimer.singleShot(300, self._web_view.reload)
+        elif self._profile_url:
+            self._fallback_message.setText(
+                "Embedded profile view is unavailable in this build.\n"
+                "Open the same u.gg profile in your browser."
+            )
 
 
 class AccountListItem(QFrame):
@@ -4680,6 +5047,8 @@ class MainWindow(QMainWindow):
         self.ingame_watch_thread: Optional[InGameWatcherThread] = None
         self.ingame_diag_dialog: Optional[InGameDiagnosticsDialog] = None
         self.game_info_panel: Optional[InClientGamePanel] = None
+        self.champ_select_window: Optional[ChampSelectWindow] = None
+        self.account_spotlight_panel: Optional[AccountSpotlightPanel] = None
         self.main_area_stack: Optional[QStackedWidget] = None
         self.launch_progress: Optional[LaunchProgressDialog] = None
         self.current_launch_username: Optional[str] = None
@@ -4687,6 +5056,9 @@ class MainWindow(QMainWindow):
         self._last_champ_select_signature: str = ""
         self._last_champ_select_role_hint: str = ""
         self._last_champ_select_refresh_at: float = 0.0
+        self._last_champ_select_close_at: float = 0.0
+        self._last_champ_select_geometry: Optional[tuple[int, int, int, int]] = None
+        self._main_hidden_for_champ_select = False
         self._last_launched_username: str = str(self._settings.get('last_launched_username', '') or '')
         self._dark_mode: bool = True
         self._start_minimized_to_tray: bool = bool(self._settings.get('start_minimized_to_tray', False))
@@ -4704,6 +5076,7 @@ class MainWindow(QMainWindow):
         self._show_rank_images: bool = self._settings.get('show_rank_images', True)
         self._show_tags: bool = self._settings.get('show_tags', True)
         self._auto_open_ingame_page: bool = bool(self._settings.get('auto_open_ingame_page', True))
+        self._champ_select_secondary_monitor: bool = bool(self._settings.get('champ_select_secondary_monitor', False))
         self._tag_size: str = str(self._settings.get('tag_size', 'medium'))
         self._tag_chip_style: str = str(self._settings.get('tag_chip_style', 'vibrant'))
         self._text_zoom_percent: int = int(self._settings.get('text_zoom_percent', 110))
@@ -4863,24 +5236,61 @@ class MainWindow(QMainWindow):
         layout.setSpacing(8)
         layout.setContentsMargins(12, 10, 12, 12)
 
+        self._menu_bar_widget = QFrame()
+        self._menu_bar_widget.setObjectName("appMenuBar")
+        menu_bar_layout = QVBoxLayout(self._menu_bar_widget)
+        menu_bar_layout.setContentsMargins(10, 8, 10, 8)
+        menu_bar_layout.setSpacing(0)
+
         top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(8)
 
-        title = QLabel("LOL Account Manager")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        top_row.addWidget(title)
+        self._nav_banner = QLabel()
+        self._nav_banner.setObjectName("appNavBanner")
+        self._nav_banner.setFixedSize(264, 32)
+        self._refresh_nav_banner()
+        top_row.addWidget(self._nav_banner)
 
-        top_row.addStretch()
+        self._filter_row_widget = QWidget()
+        filter_row = QHBoxLayout(self._filter_row_widget)
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(0)
+
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("accountSearchInput")
+        self.search_input.setPlaceholderText("Search by display name, username, or tag")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setMinimumWidth(320)
+        self.search_input.setMaximumWidth(640)
+        self.search_input.textChanged.connect(self._on_filters_changed)
+        self.search_input.returnPressed.connect(self._blur_search_input)
+        self.search_input.editingFinished.connect(self._blur_search_input)
+        self._search_opacity_effect = QGraphicsOpacityEffect(self.search_input)
+        self._search_opacity_effect.setOpacity(1.0)
+        self.search_input.setGraphicsEffect(self._search_opacity_effect)
+        self._search_leading_action = self.search_input.addAction(QIcon(), QLineEdit.LeadingPosition)
+        self._search_leading_action.setEnabled(False)
+        filter_row.addWidget(self.search_input)
+
+        top_row.addSpacing(14)
+        top_row.addWidget(self._filter_row_widget, 1, Qt.AlignVCenter)
+
+        self._home_button = QPushButton("")
+        self._home_button.setObjectName("homeIconButton")
+        self._home_button.setFixedSize(26, 26)
+        self._home_button.setAutoDefault(False)
+        self._home_button.setDefault(False)
+        self._home_button.setToolTip("Back to Home")
+        self._home_button.setEnabled(False)
+        self._home_button.clicked.connect(self._on_home_button_clicked)
+
         self._refresh_button = ClickableIconLabel()
         self._refresh_button.setObjectName("refreshIconButton")
         self._refresh_button.setFixedSize(26, 26)
         self._refresh_button.setAlignment(Qt.AlignCenter)
         self._refresh_button.setToolTip("Refresh UI")
         self._refresh_button.clicked.connect(self.refresh_ui)
-        top_row.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
 
         self._settings_button = QPushButton("")
         self._settings_button.setObjectName("settingsCogButton")
@@ -4889,36 +5299,27 @@ class MainWindow(QMainWindow):
         self._settings_button.setDefault(False)
         self._settings_button.setToolTip("Open Settings")
         self._settings_button.clicked.connect(self.open_settings_dialog)
-        top_row.addWidget(self._settings_button, 0, Qt.AlignVCenter)
-        layout.addLayout(top_row)
 
-        self._filter_row_widget = QWidget()
-        filter_row = QHBoxLayout(self._filter_row_widget)
-        filter_row.setContentsMargins(0, 0, 0, 0)
-        filter_row.setSpacing(8)
-        self._filters_label = QLabel("Filters:")
-        filter_row.addWidget(self._filters_label)
-
-        self.search_input = QLineEdit()
-        self.search_input.setObjectName("accountSearchInput")
-        self.search_input.setPlaceholderText("Search by display name, username, or tag")
-        self.search_input.textChanged.connect(self._on_filters_changed)
-        filter_row.addWidget(self.search_input, 1)
-
-        self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setMinimumWidth(150)
-        self.tag_filter_combo.currentIndexChanged.connect(self._on_filters_changed)
-        filter_row.addWidget(self.tag_filter_combo)
-
-        self.clear_filters_btn = QPushButton("Clear")
-        self.clear_filters_btn.clicked.connect(self._clear_filters)
-        filter_row.addWidget(self.clear_filters_btn)
-
-        layout.addWidget(self._filter_row_widget)
+        self._nav_actions_widget = QFrame()
+        self._nav_actions_widget.setObjectName("appNavActions")
+        self._nav_actions_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        nav_actions_layout = QHBoxLayout(self._nav_actions_widget)
+        nav_actions_layout.setContentsMargins(2, 1, 2, 1)
+        nav_actions_layout.setSpacing(2)
+        nav_actions_layout.setSizeConstraint(QLayout.SetFixedSize)
+        nav_actions_layout.addWidget(self._home_button, 0, Qt.AlignVCenter)
+        nav_actions_layout.addWidget(self._refresh_button, 0, Qt.AlignVCenter)
+        nav_actions_layout.addWidget(self._settings_button, 0, Qt.AlignVCenter)
+        top_row.addWidget(self._nav_actions_widget, 0, Qt.AlignVCenter)
+        menu_bar_layout.addLayout(top_row)
+        layout.addWidget(self._menu_bar_widget)
         
         # Account list
         self._saved_accounts_label = QLabel("Saved Accounts:")
-        layout.addWidget(self._saved_accounts_label)
+        self._saved_accounts_label.setObjectName("savedAccountsTab")
+        self._saved_accounts_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self._saved_accounts_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        layout.addWidget(self._saved_accounts_label, 0, Qt.AlignLeft)
         self.account_list_background = AccountListBackgroundFrame()
         self.account_list_background.setObjectName("accountListContainer")
         account_list_layout = QVBoxLayout(self.account_list_background)
@@ -4941,17 +5342,21 @@ class MainWindow(QMainWindow):
         self.account_list.setFocusPolicy(Qt.NoFocus)
         self.account_list.setAttribute(Qt.WA_TranslucentBackground, True)
         self.account_list.viewport().setAutoFillBackground(False)
+        self.account_list.itemPressed.connect(lambda _: self._blur_search_input())
         self.account_list.itemClicked.connect(self.on_account_selected)
         self.account_list.itemDoubleClicked.connect(lambda _: self.launch_account())
         self.account_list.itemSelectionChanged.connect(self.update_account_item_states)
         self.account_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.account_list.customContextMenuRequested.connect(self.show_account_context_menu)
         account_list_layout.addWidget(self.account_list)
+        self.account_spotlight_panel = AccountSpotlightPanel()
+        self.account_spotlight_panel.setParent(self.account_list_background)
+        self.account_spotlight_panel.hide()
+        self._spotlight_account_username: str = ""  # username whose spotlight is currently visible
         self.game_info_panel = InClientGamePanel()
-        self.main_area_stack = QStackedWidget()
-        self.main_area_stack.addWidget(self.account_list_background)  # index 0: normal account list
-        self.main_area_stack.addWidget(self.game_info_panel)          # index 1: in-client game panel
-        layout.addWidget(self.main_area_stack)
+        self.champ_select_window = ChampSelectWindow(self.game_info_panel, self)
+        self.main_area_stack = None
+        layout.addWidget(self.account_list_background)
         
         # Apply clipping mask to account list viewport
         self._apply_account_list_clipping_mask()
@@ -5055,12 +5460,23 @@ class MainWindow(QMainWindow):
         # Defer mask application until layout is finalized
         QTimer.singleShot(100, apply_clipping_mask)
         
-        # Re-apply mask on container resize
-        original_resize = self.account_list_background.resizeEvent
-        def resize_with_mask(event):
-            original_resize(event)
-            QTimer.singleShot(50, apply_clipping_mask)
-        self.account_list_background.resizeEvent = resize_with_mask
+        # Re-apply mask on container resize.
+        # Use installEventFilter instead of monkey-patching resizeEvent: PyQt5
+        # dispatches virtual methods via the C++ vtable which ignores Python
+        # instance attributes, so a plain assignment never fires.
+        if not hasattr(self, '_bg_resize_filter'):
+            self._bg_resize_filter = _ResizeCallbackFilter(
+                lambda: QTimer.singleShot(50, apply_clipping_mask), self
+            )
+            self.account_list_background.installEventFilter(self._bg_resize_filter)
+
+        # Update spotlight item height whenever account_list itself resizes
+        # (e.g. when filter/button rows are hidden and the list grows taller).
+        if not hasattr(self, '_list_resize_filter'):
+            self._list_resize_filter = _ResizeCallbackFilter(
+                lambda: QTimer.singleShot(0, self._update_spotlight_size_hint), self
+            )
+            self.account_list.installEventFilter(self._list_resize_filter)
 
     def _apply_account_list_background(self):
         if not hasattr(self, "account_list_background"):
@@ -5080,6 +5496,12 @@ class MainWindow(QMainWindow):
         if self.game_info_panel:
             self.game_info_panel.set_dark_mode(self._dark_mode)
             self.game_info_panel.set_base_color(self._app_surface_color)
+        if self.account_spotlight_panel:
+            try:
+                self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+                self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            except RuntimeError:
+                self.account_spotlight_panel = None
 
     def _apply_window_size(self, resolution: str):
         """Resize the window without treating it as a user-initiated custom resize."""
@@ -5106,6 +5528,10 @@ class MainWindow(QMainWindow):
                 screen = None
         if screen is None:
             screen = QApplication.primaryScreen()
+        return self._scale_factor_for_screen(screen)
+
+    def _scale_factor_for_screen(self, screen) -> float:
+        """Return DPI scale factor for the provided screen."""
         if screen is None:
             return 1.0
 
@@ -5118,19 +5544,68 @@ class MainWindow(QMainWindow):
 
         return max(1.0, min(2.0, dpi / 96.0))
 
-    def _apply_champ_select_window_size(self):
-        """Apply champ-select size scaled for the monitor's DPI setting."""
-        base_w, base_h = _parse_resolution(self._champ_select_window_size, fallback=(941, 1053))
-        scale = self._current_screen_scale_factor()
-        self._last_screen_scale_factor = scale
-        width = max(660, int(round(base_w * scale)))
-        height = max(480, int(round(base_h * scale)))
+    def _champ_select_target_screen(self):
+        """Resolve the screen that should host the champ-select window."""
+        screens = QApplication.screens()
+        if self._champ_select_secondary_monitor and len(screens) > 1:
+            return screens[1]
+        if self.champ_select_window:
+            handle = self.champ_select_window.windowHandle()
+            if handle is not None:
+                try:
+                    screen = handle.screen()
+                except Exception:
+                    screen = None
+                if screen is not None:
+                    return screen
+        return QApplication.primaryScreen()
 
+    def _sync_champ_select_window_geometry(self):
+        """Apply saved champ-select geometry from a single code path."""
+        if not self.champ_select_window:
+            return
+
+        self.champ_select_window.setMinimumSize(
+            ChampSelectWindow._MIN_WIDTH,
+            ChampSelectWindow._MIN_HEIGHT,
+        )
+
+        if self.champ_select_window.isVisible():
+            self._last_champ_select_geometry = (
+                self.champ_select_window.x(),
+                self.champ_select_window.y(),
+                self.champ_select_window.width(),
+                self.champ_select_window.height(),
+            )
+            return
+
+        screen = self._champ_select_target_screen()
+        width = max(self.champ_select_window.width(), ChampSelectWindow._MIN_WIDTH)
+        height = max(self.champ_select_window.height(), ChampSelectWindow._MIN_HEIGHT)
+
+        if screen is not None:
+            screen_geo = screen.availableGeometry()
+            x = screen_geo.x() + (screen_geo.width() - width) // 2
+            y = screen_geo.y() + (screen_geo.height() - height) // 2
+        else:
+            x = self.x() + max(0, (self.width() - width) // 2)
+            y = self.y() + max(0, (self.height() - height) // 2)
+
+        geometry_signature = (x, y, width, height)
+        self._last_screen_scale_factor = self._scale_factor_for_screen(screen)
+        if geometry_signature == self._last_champ_select_geometry:
+            return
+
+        self._last_champ_select_geometry = geometry_signature
         self._suppress_window_size_persistence = True
         try:
-            self.resize(width, height)
+            self.champ_select_window.setGeometry(x, y, width, height)
         finally:
             self._suppress_window_size_persistence = False
+
+    def _apply_champ_select_window_size(self):
+        """Apply champ-select size scaled for the monitor's DPI setting."""
+        self._sync_champ_select_window_geometry()
 
     def _maybe_reapply_layout_for_dpi(self):
         """Re-apply active layout dimensions after crossing into another monitor scale."""
@@ -5150,39 +5625,301 @@ class MainWindow(QMainWindow):
         try:
             self._last_screen_scale_factor = current_scale
             if self._in_champ_select_mode:
-                self._apply_champ_select_window_size()
+                self._sync_champ_select_window_geometry()
             else:
                 self._apply_account_list_scale(current_scale)
         finally:
             self._dpi_resize_in_progress = False
 
     def _enter_champ_select_mode(self):
-        """Resize window and hide home-page UI elements for champ select."""
+        """Show the dedicated champ-select window and hide the main client to tray."""
         if self._in_champ_select_mode:
+            self._sync_champ_select_window_geometry()
+            if self.champ_select_window:
+                self.champ_select_window.show()
+                self.champ_select_window.raise_()
+                self.champ_select_window.activateWindow()
             return
         self._in_champ_select_mode = True
-        self._pre_champ_select_size = f"{self.width()}x{self.height()}"
-        self._last_screen_scale_factor = self._current_screen_scale_factor()
-        self._apply_champ_select_window_size()
-        self._filter_row_widget.hide()
-        self._saved_accounts_label.hide()
-        self._button_row_widget.hide()
-        self.lol_path_label.hide()
+        self._sync_champ_select_window_geometry()
+        if self.champ_select_window:
+            self.champ_select_window.show()
+            self.champ_select_window.raise_()
+            self.champ_select_window.activateWindow()
+        if self._tray_icon and self._tray_icon.isVisible() and self.isVisible():
+            self._main_hidden_for_champ_select = True
+            self.hide()
 
     def _exit_champ_select_mode(self):
-        """Restore window size and show home-page UI elements after champ select."""
+        """Hide the champ-select window and restore the main client from tray."""
         if not self._in_champ_select_mode:
             return
         self._in_champ_select_mode = False
-        restore = self._pre_champ_select_size or self._window_size
-        self._pre_champ_select_size = ""
-        self._apply_window_size(restore)
-        self._apply_account_list_scale(self._current_screen_scale_factor())
-        self._filter_row_widget.show()
-        self._saved_accounts_label.show()
+        if self.champ_select_window:
+            self.champ_select_window.hide()
+        self._last_champ_select_geometry = None
+        if self._main_hidden_for_champ_select:
+            self._main_hidden_for_champ_select = False
+            self._show_from_tray()
+        self.update_account_item_states()
+
+    def _build_ugg_profile_overview_url(self, account: Account) -> str:
+        """Build u.gg profile overview URL for the given account."""
+        region_code = str(getattr(account, "region", "NA") or "NA").upper()
+        region_map = {
+            "NA": "na1",
+            "EUW": "euw1",
+            "EUNE": "eun1",
+            "KR": "kr",
+            "LAN": "la1",
+            "LAS": "la2",
+            "BR": "br1",
+            "JP": "jp1",
+            "OCE": "oc1",
+            "TR": "tr1",
+            "RU": "ru",
+            "ME": "me1",
+            "PH": "ph2",
+            "SG": "sg2",
+            "TH": "th2",
+            "TW": "tw2",
+            "VN": "vn2",
+        }
+        region_id = region_map.get(region_code, region_code.lower())
+        display_name = (getattr(account, "display_name", "") or "").strip() or account.username
+        tag_line = (getattr(account, "tag_line", "") or "NA1").strip() or "NA1"
+        encoded_name = quote(display_name, safe="")
+        encoded_tag = quote(tag_line.lower(), safe="")
+        return f"https://u.gg/lol/profile/{region_id}/{encoded_name}-{encoded_tag}/overview"
+
+    def _show_logged_in_spotlight(self):
+        """Ensure the spotlight panel is in the list directly after the logged-in
+        account row and has up-to-date content.  Safe to call at any time."""
+        if self._in_champ_select_mode:
+            return
+        if getattr(self, '_spotlight_user_dismissed', False):
+            return
+        if not (self.account_manager and self._logged_in_username):
+            return
+        if not self._ensure_spotlight_panel():
+            return
+
+        account = self.account_manager.get_account(self._logged_in_username)
+        if not account:
+            return
+
+        # Find the logged-in account row and check if spotlight is already
+        # sitting right after it.
+        logged_in_row = -1
+        spotlight_already_placed = False
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                spotlight_already_placed = True
+                break
+            if item.data(Qt.UserRole) == account.username:
+                logged_in_row = index
+
+        if not spotlight_already_placed:
+            if logged_in_row < 0:
+                # Logged-in account is not currently visible in the list.
+                return
+            # Do NOT call setParent() here.  The panel stays as a viewport()
+            # child so setItemWidget's internal setParent(viewport()) is a
+            # no-op, avoiding unnecessary renderer surface changes.
+            spotlight_item = QListWidgetItem()
+            spotlight_item.setFlags(Qt.NoItemFlags)
+            spotlight_item.setSizeHint(QSize(0, 480))
+            self.account_list.insertItem(logged_in_row + 1, spotlight_item)
+            self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
+
+        self._spotlight_account_username = account.username
+        self.account_spotlight_panel.show()
+        self._enter_spotlight_ui_mode()
+        # Safety fallback: list resize event fires instantly if the viewport grew,
+        # but add shots at 50 ms and 300 ms in case the layout settles later.
+        QTimer.singleShot(50, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
+
+        profile_url = self._build_ugg_profile_overview_url(account)
+        rank_data = self._rank_data_by_username.get(account.username, {})
+        self.account_spotlight_panel.set_account(account, rank_data, profile_url)
+        QTimer.singleShot(200, self._update_webview_zoom)
+
+        # Keep the logged-in account row selected.
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if item.data(Qt.UserRole) == account.username:
+                if self.account_list.currentItem() is not item:
+                    self.account_list.setCurrentItem(item)
+                break
+
+    def _update_spotlight_size_hint(self):
+        """Resize the spotlight list item so it fills the viewport height.
+        Setting height = full list height ensures that, once the account
+        row above is scrolled to the top, all rows below the spotlight are
+        pushed off-screen regardless of any spacing/DPI differences."""
+        try:
+            if not self.account_spotlight_panel:
+                return
+            # Use the list widget height (more reliable than viewport() which may
+            # lag behind layout changes by one event-loop iteration).
+            list_h = self.account_list.height()
+            if list_h <= 0:
+                return
+            new_h = max(380, list_h)
+            for index in range(self.account_list.count()):
+                item = self.account_list.item(index)
+                if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                    # Always apply — skip-guard can silently miss a post-restore
+                    # resize when account_list.height() hasn't settled yet.
+                    item.setSizeHint(QSize(0, new_h))
+                    self.account_spotlight_panel.setMinimumHeight(new_h)
+                    self.account_spotlight_panel.setMaximumHeight(new_h)
+                    self.account_list.doItemsLayout()
+                    self.account_list.viewport().update()
+                    # Restore scroll position that doItemsLayout resets.
+                    if index > 0:
+                        row_above = self.account_list.item(index - 1)
+                        if row_above:
+                            self.account_list.scrollToItem(
+                                row_above, self.account_list.PositionAtTop
+                            )
+                    break
+        except RuntimeError:
+            # C++ object deleted before the deferred timer fired.
+            self.account_spotlight_panel = None
+
+    def _on_home_button_clicked(self):
+        """Exit spotlight mode and return to the normal home view."""
+        if not self.account_spotlight_panel:
+            return
+        spotlight_panel = self.account_spotlight_panel
+        # Suppress auto-reshow until the logged-in account changes
+        self._spotlight_user_dismissed = True
+        self._spotlight_account_username = ""
+        # Remove the spotlight list item without triggering a full list rebuild
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is spotlight_panel:
+                # Re-parent BEFORE takeItem so Qt doesn't delete the widget
+                try:
+                    spotlight_panel.setParent(self.account_list_background)
+                    spotlight_panel.hide()
+                except RuntimeError:
+                    pass
+                self.account_list.takeItem(index)
+                break
+        self.account_spotlight_panel = None
+        self._exit_spotlight_ui_mode()
+
+    def _enter_spotlight_ui_mode(self):
+        """Lock nav search, hide bottom buttons and main scrollbar while spotlight is visible."""
+        self._set_nav_search_collapsed(True)
+        if hasattr(self, "_saved_accounts_label"):
+            self._saved_accounts_label.setText("Spotlight View")
+            self._saved_accounts_label.adjustSize()
+        self._button_row_widget.hide()
+        self.lol_path_label.hide()
+        self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._home_button.setEnabled(True)
+        self._set_icon_state(self._home_button, "normal")
+
+    def _exit_spotlight_ui_mode(self):
+        """Restore nav search, bottom buttons and scrollbar when spotlight is hidden."""
+        self._set_nav_search_collapsed(False)
+        if hasattr(self, "_saved_accounts_label"):
+            self._saved_accounts_label.setText("Saved Accounts:")
+            self._saved_accounts_label.adjustSize()
         self._button_row_widget.show()
         self.lol_path_label.show()
-        self.update_account_item_states()
+        self.account_list.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._home_button.setEnabled(False)
+        self._set_icon_state(self._home_button, "pressed")
+        # Release the fixed-height constraint set during spotlight sizing
+        if self.account_spotlight_panel:
+            try:
+                self.account_spotlight_panel.setMinimumHeight(420)
+                self.account_spotlight_panel.setMaximumHeight(16777215)  # QWIDGETSIZE_MAX
+            except RuntimeError:
+                pass
+
+    def _blur_search_input(self):
+        """Return focus to the main window so the search cursor stops blinking."""
+        if hasattr(self, "search_input") and self.search_input.hasFocus():
+            self.search_input.clearFocus()
+            self.setFocus()
+
+    def mousePressEvent(self, event):
+        """Blur the search bar whenever the user clicks anywhere outside it."""
+        if hasattr(self, "search_input"):
+            widget_under = self.childAt(event.pos())
+            # Walk up the parent chain to check if the click landed inside the search input
+            w = widget_under
+            while w is not None:
+                if w is self.search_input:
+                    break
+                w = w.parent()
+            else:
+                self._blur_search_input()
+        super().mousePressEvent(event)
+
+    def _set_nav_search_collapsed(self, collapsed: bool):
+        """Lock/unlock search without changing nav geometry between modes."""
+        if not hasattr(self, "search_input"):
+            return
+        if collapsed:
+            if hasattr(self, "_search_opacity_effect"):
+                self._search_opacity_effect.setOpacity(0.0)
+            self.search_input.setReadOnly(True)
+            self.search_input.setEnabled(False)
+            self._blur_search_input()
+        else:
+            if hasattr(self, "_search_opacity_effect"):
+                self._search_opacity_effect.setOpacity(1.0)
+            self.search_input.setEnabled(True)
+            self.search_input.setReadOnly(False)
+
+    def _update_webview_zoom(self):
+        """Zoom the embedded webview based on window state."""
+        try:
+            if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
+                return
+            web_view = self.account_spotlight_panel._web_view
+            if web_view is None:
+                return
+            zoom = 1.3 if (self.isMaximized() or self.isFullScreen()) else 1.0
+            web_view.setZoomFactor(zoom)
+        except RuntimeError:
+            # C++ object already deleted (panel or webview was closed before timer fired)
+            pass
+
+    def _scroll_account_row_to_top(self, username: str):
+        """Scroll the matching account row to the top if it still exists."""
+        if not username:
+            return
+        try:
+            for index in range(self.account_list.count()):
+                item = self.account_list.item(index)
+                if item and item.data(Qt.UserRole) == username:
+                    self.account_list.scrollToItem(item, self.account_list.PositionAtTop)
+                    return
+        except RuntimeError:
+            pass
+
+    def _reapply_ugg_embed_css(self):
+        """Dispatch resize event to trigger u.gg's responsive layout."""
+        try:
+            if not (self.account_spotlight_panel and self.account_spotlight_panel.isVisible()):
+                return
+            if self.account_spotlight_panel._web_view is not None:
+                # Only dispatch resize - don't re-apply CSS which breaks layout
+                js = r"""
+window.dispatchEvent(new Event('resize', { bubbles: true }));
+"""
+                self.account_spotlight_panel._web_view.page().runJavaScript(js)
+        except RuntimeError:
+            pass
 
     def _persist_window_size(self):
         """Persist the current window size as the custom startup size."""
@@ -5199,6 +5936,16 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        # Update spotlight size on every resize (manual drag or maximize/restore).
+        # Fire at 10 ms (fast) and 300 ms (safety net after slow layout settle).
+        QTimer.singleShot(10, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
+        # After a window-state change, Qt issues an extra resize; use it to
+        # reapply zoom and CSS for the new dimensions.
+        if getattr(self, '_should_reapply_css_on_resize', False):
+            QTimer.singleShot(50, self._update_webview_zoom)
+            QTimer.singleShot(150, self._reapply_ugg_embed_css)
+            self._should_reapply_css_on_resize = False
         if self._suppress_window_size_persistence:
             return
         if self.isMaximized() or self.isFullScreen():
@@ -5214,16 +5961,32 @@ class MainWindow(QMainWindow):
 
     def changeEvent(self, event):
         super().changeEvent(event)
+        
+        # Re-run the u.gg embed CSS when window is maximized/restored
+        if event.type() == QEvent.WindowStateChange:
+            # Skip spotlight size shots when the window is being *minimized*:
+            # account_list.height() is unreliable while the window is iconified
+            # on some compositors, and no visible update is needed anyway.
+            # The shots below will still fire when the window is restored.
+            is_minimizing = bool(self.windowState() & Qt.WindowMinimized)
+            if not is_minimizing:
+                QTimer.singleShot(100, self._update_spotlight_size_hint)
+                QTimer.singleShot(500, self._update_spotlight_size_hint)  # safety net
+            QTimer.singleShot(200, self._update_webview_zoom)
+            QTimer.singleShot(300, self._reapply_ugg_embed_css)
+            # Set flag to trigger additional CSS reapply on next resize
+            self._should_reapply_css_on_resize = True
+        
         screen_change_type = getattr(QEvent, "ScreenChangeInternal", None)
         if (
             screen_change_type is not None
             and event.type() == screen_change_type
             and self._in_champ_select_mode
         ):
-            QTimer.singleShot(80, self._apply_champ_select_window_size)
+            QTimer.singleShot(0, self._sync_champ_select_window_geometry)
         else:
             self._maybe_reapply_layout_for_dpi()
-    
+
     def toggle_theme(self):
         """Force dark mode."""
         self._dark_mode = True
@@ -5256,8 +6019,30 @@ class MainWindow(QMainWindow):
         list_border = app_border
         search_fg = app_text
         search_bg = app_surface
-        search_border = app_border
+        search_border = app_surface
         search_placeholder = placeholder
+        saved_tab_surface = QColor(app_surface)
+        saved_tab_bg = QColor(app_bg)
+        saved_tab_top = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 220)"
+        )
+        saved_tab_bottom = (
+            f"rgba({saved_tab_bg.red()}, {saved_tab_bg.green()}, {saved_tab_bg.blue()}, 95)"
+        )
+        saved_tab_text = QColor(app_text)
+        saved_tab_text.setAlpha(220)
+        saved_tab_text_rgba = (
+            f"rgba({saved_tab_text.red()}, {saved_tab_text.green()}, {saved_tab_text.blue()}, {saved_tab_text.alpha()})"
+        )
+        list_fade_top = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 160)"
+        )
+        list_fade_mid = (
+            f"rgba({saved_tab_surface.red()}, {saved_tab_surface.green()}, {saved_tab_surface.blue()}, 70)"
+        )
+        list_fade_clear = (
+            f"rgba({saved_tab_bg.red()}, {saved_tab_bg.green()}, {saved_tab_bg.blue()}, 0)"
+        )
         return (
             base
             + f"\nQWidget {{ font-size: {point_size}pt; }}\n"
@@ -5266,58 +6051,105 @@ class MainWindow(QMainWindow):
             + f"    color: {search_fg};\n"
             + f"    background-color: {search_bg};\n"
             + f"    border: 1px solid {search_border};\n"
-            + "    border-radius: 4px;\n"
-            + "    padding: 4px 6px;\n"
+            + "    border-radius: 8px;\n"
+            + "    padding: 5px 12px;\n"
+            + "    min-height: 28px;\n"
+            + "    max-height: 28px;\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:hover {\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:focus {\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:disabled {\n"
+            + f"    background-color: {app_surface};\n"
+            + f"    color: {app_text};\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "}\n"
+            + "QLineEdit#accountSearchInput:disabled::placeholder {\n"
+            + f"    color: {search_placeholder};\n"
             + "}\n"
             + "QLineEdit#accountSearchInput::placeholder {\n"
             + f"    color: {search_placeholder};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton {\n"
+            + "QFrame#appMenuBar {\n"
+            + f"    background-color: {app_bg};\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "    border-radius: 12px;\n"
+            + "}\n"
+            + "QLabel#savedAccountsTab {\n"
+            + f"    color: {saved_tab_text_rgba};\n"
+            + "    background-color: qlineargradient(\n"
+            + "        x1:0, y1:0, x2:0, y2:1,\n"
+            + f"        stop:0 {saved_tab_top},\n"
+            + f"        stop:0.78 {saved_tab_top},\n"
+            + f"        stop:1 {saved_tab_bottom}\n"
+            + "    );\n"
+            + f"    border: 1px solid {app_surface};\n"
+            + "    border-bottom: none;\n"
+            + "    border-top-left-radius: 8px;\n"
+            + "    border-top-right-radius: 8px;\n"
+            + "    border-bottom-left-radius: 2px;\n"
+            + "    border-bottom-right-radius: 2px;\n"
+            + "    padding: 4px 10px 5px 10px;\n"
+            + "    font-weight: 600;\n"
+            + "    font-size: 8.5pt;\n"
+            + "    font-family: 'Segoe UI', 'Inter', 'Arial';\n"
+            + "    letter-spacing: 0.25px;\n"
+            + "    min-height: 22px;\n"
+            + "    max-height: 22px;\n"
+            + "}\n"
+            + "QLabel#appNavTitle {\n"
+            + f"    color: {app_text};\n"
+            + "    font-weight: 700;\n"
+            + "    letter-spacing: 0.2px;\n"
+            + "    background: transparent;\n"
+            + "    padding: 0px 2px 0px 0px;\n"
+            + "}\n"
+            + "QFrame#appNavActions {\n"
+            + "    background-color: transparent;\n"
+            + "    border: none;\n"
+            + "    border-radius: 8px;\n"
+            + "}\n"
+            + "QPushButton#homeIconButton, QPushButton#settingsCogButton {\n"
             + "    min-width: 26px;\n"
             + "    max-width: 26px;\n"
             + "    min-height: 26px;\n"
             + "    max-height: 26px;\n"
             + "    background-color: transparent;\n"
             + f"    color: {cog_fg};\n"
-            + "    border: none;\n"
-            + "    border-radius: 0px;\n"
+            + "    border: 1px solid transparent;\n"
+            + "    border-radius: 6px;\n"
             + "    padding: 0px;\n"
             + "    font-size: 15px;\n"
             + "    font-weight: 400;\n"
             + "    margin: 0px;\n"
             + "    text-align: center;\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:hover {\n"
+            + "QLabel#refreshIconButton {\n"
+            + "    min-width: 26px;\n"
+            + "    max-width: 26px;\n"
+            + "    min-height: 26px;\n"
+            + "    max-height: 26px;\n"
+            + "    border: 1px solid transparent;\n"
+            + "    border-radius: 6px;\n"
+            + "    padding: 0px;\n"
+            + f"    color: {cog_fg};\n"
+            + "    background: transparent;\n"
+            + "}\n"
+            + "QPushButton#homeIconButton:hover, QPushButton#settingsCogButton:hover, QLabel#refreshIconButton:hover {\n"
+            + f"    background-color: {app_hover};\n"
+            + "    border: 1px solid transparent;\n"
             + f"    color: {accent_text};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:pressed {\n"
+            + "QPushButton#homeIconButton:pressed, QPushButton#settingsCogButton:pressed {\n"
+            + f"    background-color: {app_accent};\n"
             + f"    color: {cog_pressed};\n"
             + "}\n"
-            + "QPushButton#settingsCogButton:focus {\n"
+            + "QPushButton#homeIconButton:focus, QPushButton#settingsCogButton:focus {\n"
             + "    outline: none;\n"
-            + "    border: none;\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton {\n"
-            + "    min-width: 26px;\n"
-            + "    max-width: 26px;\n"
-            + "    min-height: 26px;\n"
-            + "    max-height: 26px;\n"
-            + "    background-color: transparent;\n"
-            + f"    color: {cog_fg};\n"
-            + "    border: none;\n"
-            + "    border-radius: 0px;\n"
-            + "    padding: 0px;\n"
-            + "    font-size: 15px;\n"
-            + "    font-weight: 400;\n"
-            + "    margin: 0px;\n"
-            + "    text-align: center;\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton:hover {\n"
-            + f"    color: {accent_text};\n"
-            + "}\n"
-            + "QToolButton#refreshIconButton:focus {\n"
-            + "    outline: none;\n"
-            + "    border: none;\n"
+            + f"    border: 1px solid {app_border};\n"
             + "}\n"
             + "QPushButton#themeTopButton {\n"
             + "    min-width: 132px;\n"
@@ -5332,7 +6164,13 @@ class MainWindow(QMainWindow):
             + "QFrame#accountListContainer {\n"
             + f"    border: 1px solid {list_border};\n"
             + "    border-radius: 10px;\n"
-            + "    background: transparent;\n"
+            + "    background-color: qlineargradient(\n"
+            + "        x1:0, y1:0, x2:0, y2:1,\n"
+            + f"        stop:0 {list_fade_top},\n"
+            + f"        stop:0.10 {list_fade_mid},\n"
+            + f"        stop:0.24 {list_fade_clear},\n"
+            + f"        stop:1 {list_fade_clear}\n"
+            + "    );\n"
             + "}\n"
             + "QListWidget#accountListWidget {\n"
             + "    background: transparent;\n"
@@ -5399,6 +6237,7 @@ class MainWindow(QMainWindow):
     def _apply_theme(self):
         """Apply the current theme stylesheet."""
         self.setStyleSheet(self._theme_with_text_zoom(DARK_STYLESHEET, dark_mode=True))
+        self._refresh_nav_banner()
 
         # Palette fallback prevents first-paint placeholder/text color glitches on some Windows setups.
         self._apply_filter_input_palette()
@@ -5429,6 +6268,7 @@ class MainWindow(QMainWindow):
 
     def _configure_icon_buttons(self):
         self._icon_buttons = {
+            self._home_button: "home",
             self._settings_button: "settings",
         }
         self._settings_icon_latched = False
@@ -5460,16 +6300,24 @@ class MainWindow(QMainWindow):
         for button in getattr(self, "_icon_buttons", {}):
             if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
                 self._set_icon_state(button, "pressed")
+            elif button is self._home_button and not self._home_button.isEnabled():
+                self._set_icon_state(button, "pressed")
             else:
                 self._set_icon_state(button, "hover" if button.underMouse() else "normal")
         # Clean stylesheet for icon buttons
         self._refresh_button.setStyleSheet("background-color: transparent; border: none; padding: 0px; margin: 0px;")
+        self._home_button.setStyleSheet(
+            "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
+        )
         self._settings_button.setStyleSheet(
             "QPushButton { background-color: transparent; border: none; padding: 0px; margin: 0px; }"
         )
 
     def _sync_icon_button_state(self, button: QPushButton):
         if button is self._settings_button and getattr(self, "_settings_icon_latched", False):
+            self._set_icon_state(button, "pressed")
+            return
+        if button is self._home_button and not self._home_button.isEnabled():
             self._set_icon_state(button, "pressed")
             return
         self._set_icon_state(button, "hover" if button.underMouse() else "normal")
@@ -5486,7 +6334,7 @@ class MainWindow(QMainWindow):
         app_accent = self._sanitize_color(self._app_accent_color, DEFAULT_APP_ACCENT_COLOR)
         app_border = self._sanitize_color(self._app_border_color, DEFAULT_APP_BORDER_COLOR)
         
-        if state == "pressed" and button is self._settings_button:
+        if state == "pressed" and button in (self._settings_button, self._home_button):
             color = app_border
         elif state == "hover":
             color = app_accent
@@ -5517,6 +6365,8 @@ class MainWindow(QMainWindow):
         elif icon_type == "settings":
             # Draw gear (settings icon)
             self._draw_settings_icon(painter, size, color)
+        elif icon_type == "home":
+            self._draw_home_icon(painter, size, color)
         
         painter.end()
         return QIcon(pixmap)
@@ -5561,7 +6411,40 @@ class MainWindow(QMainWindow):
         painter.setBrush(color)
         painter.setPen(Qt.NoPen)
         painter.drawPath(arrow_path)
-    
+
+    def _draw_home_icon(self, painter: QPainter, size: int, color: QColor):
+        """Draw a minimalistic house/home icon."""
+        painter.setBrush(color)
+        painter.setPen(Qt.NoPen)
+        m = size / 24.0  # scale factor (designed on 24px grid)
+
+        # Roof triangle
+        roof = QPainterPath()
+        roof.moveTo(12 * m, 2 * m)   # apex
+        roof.lineTo(22 * m, 11 * m)  # right eave
+        roof.lineTo(2  * m, 11 * m)  # left eave
+        roof.closeSubpath()
+        painter.drawPath(roof)
+
+        # House body (rectangle below roof)
+        body_x = 5 * m
+        body_y = 11 * m
+        body_w = 14 * m
+        body_h = 10 * m
+        painter.drawRect(QRectF(body_x, body_y, body_w, body_h))
+
+        # Door cutout (punch out with background colour so it looks like a door)
+        door_w = 5 * m
+        door_h = 6 * m
+        door_x = (size - door_w) / 2
+        door_y = 21 * m - door_h
+        bg = painter.background().color()
+        # Use transparent to cut out the door opening
+        painter.setBrush(Qt.transparent)
+        painter.setCompositionMode(QPainter.CompositionMode_Clear)
+        painter.drawRect(QRectF(door_x, door_y, door_w, door_h))
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+
     def _draw_settings_icon(self, painter: QPainter, size: int, color: QColor):
         """Draw a minimalistic settings/gear icon."""
         painter.setBrush(color)
@@ -5640,7 +6523,6 @@ class MainWindow(QMainWindow):
             return
 
         search_palette = self.search_input.palette()
-        combo_palette = self.tag_filter_combo.palette()
 
         base_color = QColor(self._sanitize_color(self._app_surface_color, DEFAULT_APP_SURFACE_COLOR))
         text_color = QColor(self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR))
@@ -5649,12 +6531,83 @@ class MainWindow(QMainWindow):
         search_palette.setColor(QPalette.Base, base_color)
         search_palette.setColor(QPalette.Text, text_color)
         search_palette.setColor(QPalette.PlaceholderText, placeholder_color)
-        combo_palette.setColor(QPalette.Base, base_color)
-        combo_palette.setColor(QPalette.Text, text_color)
-        combo_palette.setColor(QPalette.ButtonText, text_color)
 
         self.search_input.setPalette(search_palette)
-        self.tag_filter_combo.setPalette(combo_palette)
+        self._sync_search_input_icon()
+
+    def _sync_search_input_icon(self):
+        """Render a leading search icon that matches nav icon styling."""
+        if not hasattr(self, "search_input") or not hasattr(self, "_search_leading_action"):
+            return
+        search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
+
+        asset_icon_path = Path(__file__).resolve().parents[2] / "assets" / "search_icon.svg"
+        if asset_icon_path.exists():
+            asset_icon = QIcon(str(asset_icon_path))
+            if not asset_icon.isNull():
+                self._search_leading_action.setIcon(asset_icon)
+                return
+
+        if qta is not None:
+            for icon_key in ("fa5s.search", "fa.search", "mdi.magnify"):
+                try:
+                    self._search_leading_action.setIcon(qta.icon(icon_key, color=search_fg))
+                    return
+                except Exception:
+                    continue
+        self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
+
+    def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
+        """Build a simple magnifier icon for the search field (fallback)."""
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        color = QColor(color_hex)
+        pen = QPen(color, max(1.2, size * 0.14), Qt.SolidLine)
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+
+        lens_r = size * 0.30
+        lens_cx = size * 0.42
+        lens_cy = size * 0.42
+        painter.drawEllipse(QPointF(lens_cx, lens_cy), lens_r, lens_r)
+
+        handle_start = QPointF(lens_cx + lens_r * 0.58, lens_cy + lens_r * 0.58)
+        handle_end = QPointF(size * 0.90, size * 0.90)
+        painter.drawLine(handle_start, handle_end)
+
+        painter.end()
+        return QIcon(pixmap)
+
+    def _refresh_nav_banner(self):
+        """Load PNG banner from assets; fallback to plain text title."""
+        if not hasattr(self, "_nav_banner"):
+            return
+
+        assets_dir = Path(__file__).resolve().parents[2] / "assets"
+        asset_path = assets_dir / "nav_banner.png"
+        asset_pixmap = QPixmap(str(asset_path))
+        if not asset_pixmap.isNull():
+            scaled = asset_pixmap.scaled(
+                self._nav_banner.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            self._nav_banner.setText("")
+            self._nav_banner.setPixmap(scaled)
+            return
+
+        # Explicit plain-text fallback when the PNG asset is missing/unloadable.
+        self._nav_banner.setPixmap(QPixmap())
+        self._nav_banner.setText("LOL Account Manager")
+        fallback_font = QFont(self.font())
+        fallback_font.setBold(True)
+        fallback_font.setPointSize(12)
+        self._nav_banner.setFont(fallback_font)
+        self._nav_banner.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
 
     def _sanitize_color(self, value: str, fallback: str) -> str:
         candidate = QColor(str(value or "").strip())
@@ -5752,6 +6705,7 @@ class MainWindow(QMainWindow):
         self._show_rank_images = bool(values['show_rank_images'])
         self._show_tags = bool(values['show_tags'])
         self._auto_open_ingame_page = bool(values['auto_open_ingame_page'])
+        self._champ_select_secondary_monitor = bool(values.get('champ_select_secondary_monitor', False))
         self._tag_size = str(values['tag_size'])
         self._tag_chip_style = str(values.get('tag_chip_style', self._tag_chip_style))
         self._text_zoom_percent = int(values['text_zoom_percent'])
@@ -5809,6 +6763,8 @@ class MainWindow(QMainWindow):
         self._configure_diagnostics_logging()
         self._update_rank_refresh_timer()
         self._reset_auto_lock_timer()
+        if self._in_champ_select_mode:
+            self._sync_champ_select_window_geometry()
         theme_after = (
             self._text_zoom_percent,
             self._app_bg_color,
@@ -5852,6 +6808,8 @@ class MainWindow(QMainWindow):
     def _apply_title_bar_theme(self):
         """Update the native Windows title bar to match the active theme."""
         _apply_windows11_chrome(self, self._dark_mode)
+        if self.champ_select_window:
+            _apply_windows11_chrome(self.champ_select_window, self._dark_mode)
 
     def _configure_diagnostics_logging(self):
         """Configure lightweight file logging based on user-selected level."""
@@ -6007,6 +6965,7 @@ QMenu#trayQuickMenu::separator {
 
     def _show_from_tray(self):
         self.showNormal()
+        self._main_hidden_for_champ_select = False
         if not self.account_manager:
             unlocked = self.request_master_password(fatal_on_fail=False)
             if not unlocked:
@@ -6060,6 +7019,7 @@ QMenu#trayQuickMenu::separator {
         self.launch_btn.setEnabled(False)
         self.edit_btn.setEnabled(False)
         self.delete_btn.setEnabled(False)
+        self._show_logged_in_spotlight()
 
         if hide_window:
             self.hide()
@@ -6689,6 +7649,8 @@ QMenu#trayQuickMenu::separator {
         self._last_screen_scale_factor = self._current_screen_scale_factor()
         self._apply_account_list_scale(self._last_screen_scale_factor)
         self._apply_title_bar_theme()
+        # Defer blur until after Qt assigns initial focus, preventing a parked caret.
+        QTimer.singleShot(0, self._blur_search_input)
         _reveal_after_first_show(self)
 
     def check_master_password(self):
@@ -6748,39 +7710,17 @@ QMenu#trayQuickMenu::separator {
 
     def _on_filters_changed(self, *_):
         self._search_query = self.search_input.text().strip().lower()
-        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
-        self.refresh_account_list()
+        self.refresh_account_list(fetch_ranks=False)
 
     def _clear_filters(self):
         self.search_input.clear()
-        idx = self.tag_filter_combo.findData("__all__")
-        if idx >= 0:
-            self.tag_filter_combo.setCurrentIndex(idx)
         self._on_filters_changed()
 
     def _rebuild_tag_filter_options(self, accounts: list[Account]):
-        selected = str(self.tag_filter_combo.currentData() or "__all__")
-        tags = sorted({t for acc in accounts for t in (getattr(acc, 'tags', []) or [])})
-
-        self.tag_filter_combo.blockSignals(True)
-        self.tag_filter_combo.clear()
-        self.tag_filter_combo.addItem("All tags", "__all__")
-        for tag in tags:
-            self.tag_filter_combo.addItem(f"#{tag}", tag)
-
-        idx = self.tag_filter_combo.findData(selected)
-        if idx < 0:
-            idx = 0
-        self.tag_filter_combo.setCurrentIndex(idx)
-        self.tag_filter_combo.blockSignals(False)
-        self._tag_filter_value = str(self.tag_filter_combo.currentData() or "__all__")
+        """No longer used - tag filtering removed."""
+        pass
 
     def _account_matches_filters(self, account: Account) -> bool:
-        if self._tag_filter_value != "__all__":
-            tags = set(getattr(account, 'tags', []) or [])
-            if self._tag_filter_value not in tags:
-                return False
-
         if self._search_query:
             haystack = " ".join([
                 str(getattr(account, 'display_name', '') or ''),
@@ -6861,8 +7801,30 @@ QMenu#trayQuickMenu::separator {
     
     def refresh_account_list(self, fetch_ranks: bool = True):
         """Refresh the account list display"""
+        # Remember which spotlight was open so we can restore it after the rebuild.
+        _was_spotlight_username = getattr(self, '_spotlight_account_username', '')
         self.account_list.setUpdatesEnabled(False)
         try:
+            # On Windows, QWidget::setParent() destroys and recreates the HWND.
+            # If the spotlight panel contains an active QWebEngineView the renderer
+            # process holds a reference to the old surface and crashes (0xC0000005)
+            # the moment that HWND is gone.  The fix is to NEVER call setParent
+            # during a refresh: just stop the web-view, take the spotlight item out
+            # of the list, and hide the panel.  The panel stays a child of the
+            # viewport throughout.  When _show_logged_in_spotlight() later calls
+            # setItemWidget() again, Qt calls setParent(viewport()) but the widget
+            # is already a viewport child so no HWND is recreated.
+            if self.account_spotlight_panel:
+                try:
+                    for idx in range(self.account_list.count()):
+                        item = self.account_list.item(idx)
+                        if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                            self.account_list.takeItem(idx)
+                            break
+                    self.account_spotlight_panel.hide()
+                    self._exit_spotlight_ui_mode()
+                except RuntimeError:
+                    self.account_spotlight_panel = None
             self.account_list.clear()
 
             if not self.account_manager:
@@ -6870,7 +7832,6 @@ QMenu#trayQuickMenu::separator {
 
             accounts = self.account_manager.get_all_accounts()
             accounts = self._sorted_accounts(accounts)
-            self._rebuild_tag_filter_options(accounts)
             filtered_accounts = [acc for acc in accounts if self._account_matches_filters(acc)]
 
             if not accounts:
@@ -6927,6 +7888,46 @@ QMenu#trayQuickMenu::separator {
                     self._start_rank_fetches()
         finally:
             self.account_list.setUpdatesEnabled(True)
+            if not self._in_champ_select_mode:
+                _re_shown = False
+                if _was_spotlight_username and self.account_manager:
+                    _acct = self.account_manager.get_account(_was_spotlight_username)
+                    if _acct:
+                        # Recreate the panel to eliminate stale QPersistentModelIndex
+                        # entries that accumulate in Qt's private indexWidgetHash.
+                        #
+                        # Each setItemWidget() call inserts {QPersistentModelIndex: panel}
+                        # into indexWidgetHash.  When clear() resets the model, those
+                        # indices become invalid but are NEVER removed from the hash.
+                        # After re-insertion the hash has both a stale-invalid entry and
+                        # a new valid entry for the same panel.  doItemsLayout() triggers
+                        # updateEditorGeometries() which does a linear scan of the hash
+                        # via indexWidgetHash.key(panel); if the stale entry is found
+                        # first it calls panel.hide() immediately after panel.show(),
+                        # creating a rapid WasShown→WasHidden flip in the QtWebEngine
+                        # renderer IPC that causes STATUS_ACCESS_VIOLATION (-1073741819).
+                        #
+                        # A freshly created panel has no entries in indexWidgetHash at
+                        # all, so updateEditorGeometries() always finds the one valid
+                        # key and positions the panel correctly — no flip, no crash.
+                        if self.account_spotlight_panel:
+                            old_panel = self.account_spotlight_panel
+                            old_panel.hide()  # pause renderer before discarding
+                            self.account_spotlight_panel = AccountSpotlightPanel()
+                            self.account_spotlight_panel.setParent(self.account_list_background)
+                            self.account_spotlight_panel.hide()
+                            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+                            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+                            # old_panel may still be referenced by pending singleShot
+                            # timers (e.g. _run_hide_script).  Those callbacks are safe
+                            # on a hidden panel and old_panel will be GC'd when they
+                            # expire.
+                        # force_reload=False: new panel always does a fresh setUrl()
+                        # because _loaded_profile_url starts empty.
+                        self._show_spotlight_for_account(_acct, force_reload=False)
+                        _re_shown = True
+                if not _re_shown:
+                    self._show_logged_in_spotlight()
     
     def _start_rank_fetches(self):
         """Kick off a background rank fetch for every visible account row."""
@@ -6971,6 +7972,8 @@ QMenu#trayQuickMenu::separator {
             if isinstance(widget, AccountListItem) and widget.account.username == username:
                 widget.set_rank(rank_data)
                 break
+        if self._logged_in_username and username == self._logged_in_username and not self._in_champ_select_mode:
+            self._show_logged_in_spotlight()
 
     def on_account_selected(self):
         """Handle account selection"""
@@ -7003,11 +8006,7 @@ QMenu#trayQuickMenu::separator {
         if bool(status.get("in_game", False)):
             return f"In Game ({queue_type})" if queue_type else "In Game"
 
-        # Keep a short, explicit transition after game end before settling to Logged In.
-        ended_at = float(status.get("last_game_timestamp", 0) or 0)
-        if ended_at > 0 and (time.time() - ended_at) <= 15.0:
-            return "Out of Game"
-
+        # Always return "Logged In" after a game ends (removed "Out of Game" display)
         return "Logged In"
 
     def _normalize_champion_slug(self, champion_name: str) -> str:
@@ -7111,6 +8110,13 @@ QMenu#trayQuickMenu::separator {
             return
 
         now = time.time()
+        
+        # Debounce rapid close/reopen cycles: if we just closed champ select within 0.8 seconds,
+        # skip re-opening to prevent double-trigger. This fixes the issue where LCU signal changes
+        # cause the window to flicker open and closed.
+        if (now - self._last_champ_select_close_at) < 0.8 and not self._in_champ_select_mode:
+            return
+        
         if not force and (now - self._last_champ_select_refresh_at) < 1.4:
             return
         self._last_champ_select_refresh_at = now
@@ -7167,8 +8173,9 @@ QMenu#trayQuickMenu::separator {
         ])
         if (
             signature == self._last_champ_select_signature
-            and self.main_area_stack
-            and self.main_area_stack.currentIndex() == 1
+            and self._in_champ_select_mode
+            and self.champ_select_window
+            and self.champ_select_window.isVisible()
         ):
             return
         self._last_champ_select_signature = signature
@@ -7176,24 +8183,21 @@ QMenu#trayQuickMenu::separator {
 
         if self.game_info_panel:
             self.game_info_panel.update_payload(payload)
-        if self.main_area_stack:
-            if self.main_area_stack.currentIndex() != 1:
-                self._enter_champ_select_mode()
-            self.main_area_stack.setCurrentIndex(1)
+        self._enter_champ_select_mode()
 
     def _close_champ_select_assistant(self):
         """Hide the in-client game panel and switch back to the account list."""
         self._last_champ_select_signature = ""
         self._last_champ_select_role_hint = ""
         self._last_champ_select_refresh_at = 0.0
-        if self.main_area_stack:
-            if self.main_area_stack.currentIndex() == 1:
-                self._exit_champ_select_mode()
-            self.main_area_stack.setCurrentIndex(0)
+        self._last_champ_select_close_at = time.time()
+        if self._in_champ_select_mode:
+            self._exit_champ_select_mode()
+        self._show_logged_in_spotlight()
 
     def _show_game_panel_ingame(self):
         """Show the inline game panel with in-game state, reusing last known champion data."""
-        if not (self.main_area_stack and self.game_info_panel):
+        if not self.game_info_panel:
             return
         if not self._in_champ_select_mode:
             self._enter_champ_select_mode()
@@ -7229,7 +8233,7 @@ QMenu#trayQuickMenu::separator {
             "fallback_url": fallback_url,
         }
         self.game_info_panel.update_payload(payload)
-        self.main_area_stack.setCurrentIndex(1)
+        self._enter_champ_select_mode()
 
     @staticmethod
     def _normalize_identity_value(value: str) -> str:
@@ -7296,12 +8300,14 @@ QMenu#trayQuickMenu::separator {
             self._session_miss_count = 0
             if matched_username != self._logged_in_username:
                 self._logged_in_username = matched_username
+                self._spotlight_user_dismissed = False  # new account logged in — allow spotlight
                 self.update_account_item_states()
                 # Start in-game watcher for externally logged-in account if not already running
                 if not self.ingame_watch_thread or not self.ingame_watch_thread.isRunning():
                     account = self.account_manager.get_account(matched_username)
                     if account:
                         self._start_ingame_watcher(account)
+            self._show_logged_in_spotlight()
             return
 
         if not self._logged_in_username:
@@ -7316,6 +8322,99 @@ QMenu#trayQuickMenu::separator {
         self._session_miss_count = 0
         self.update_account_item_states()
         self._stop_ingame_watcher()
+        self._show_logged_in_spotlight()
+
+    def _ensure_spotlight_panel(self) -> bool:
+        """Return True if account_spotlight_panel is alive, recreating it if deleted."""
+        if self.account_spotlight_panel is None:
+            self.account_spotlight_panel = AccountSpotlightPanel()
+            self.account_spotlight_panel.setParent(self.account_list_background)
+            self.account_spotlight_panel.hide()
+            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            return True
+        try:
+            # Accessing isVisible() will raise RuntimeError if C++ object is gone
+            self.account_spotlight_panel.isVisible()
+            return True
+        except RuntimeError:
+            # C++ object was deleted — recreate the panel
+            self.account_spotlight_panel = AccountSpotlightPanel()
+            self.account_spotlight_panel.setParent(self.account_list_background)
+            self.account_spotlight_panel.hide()
+            self.account_spotlight_panel.set_dark_mode(self._dark_mode)
+            self.account_spotlight_panel.set_base_color(self._app_surface_color)
+            return True
+
+    def _show_spotlight_for_account(self, account: "Account", force_reload: bool = False):
+        """Show the spotlight panel for any account row (not just the logged-in one)."""
+        if not self._ensure_spotlight_panel():
+            return
+        # Only clear the dismissed flag when showing the logged-in account's spotlight.
+        # For any other account, keep it True so the recurring timer cannot overwrite.
+        if account.username == self._logged_in_username:
+            self._spotlight_user_dismissed = False
+        else:
+            self._spotlight_user_dismissed = True
+
+        # If spotlight is already in the list, just update content and scroll
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if self.account_list.itemWidget(item) is self.account_spotlight_panel:
+                profile_url = self._build_ugg_profile_overview_url(account)
+                rank_data = self._rank_data_by_username.get(account.username, {})
+                self._spotlight_account_username = account.username
+                self.account_spotlight_panel.set_account(account, rank_data, profile_url, force_reload=force_reload)
+                QTimer.singleShot(200, self._update_webview_zoom)
+                self._enter_spotlight_ui_mode()
+                # Ensure size is correct in case account_list grew (e.g. after
+                # a refresh_account_list that temporarily showed filter rows).
+                QTimer.singleShot(50, self._update_spotlight_size_hint)
+                QTimer.singleShot(300, self._update_spotlight_size_hint)
+                # Scroll to the account row above the spotlight
+                if index > 0:
+                    row_above = self.account_list.item(index - 1)
+                    if row_above:
+                        row_above_username = row_above.data(Qt.UserRole)
+                        if row_above_username:
+                            QTimer.singleShot(
+                                50,
+                                lambda u=str(row_above_username): self._scroll_account_row_to_top(u),
+                            )
+                return
+
+        # Find the row for this account and insert spotlight after it
+        target_row = -1
+        for index in range(self.account_list.count()):
+            item = self.account_list.item(index)
+            if item.data(Qt.UserRole) == account.username:
+                target_row = index
+                break
+        if target_row < 0:
+            return
+
+        # Do NOT call setParent() here — the panel must stay as a viewport()
+        # child so setItemWidget's internal setParent(viewport()) is a no-op.
+        spotlight_item = QListWidgetItem()
+        spotlight_item.setFlags(Qt.NoItemFlags)
+        spotlight_item.setSizeHint(QSize(0, 480))
+        self.account_list.insertItem(target_row + 1, spotlight_item)
+        self.account_list.setItemWidget(spotlight_item, self.account_spotlight_panel)
+
+        self._spotlight_account_username = account.username
+        self.account_spotlight_panel.show()
+        self._enter_spotlight_ui_mode()
+        # Safety fallback at 50 ms and 300 ms; the list's own resizeEvent will also fire
+        # immediately if the viewport height changed when filter rows were hidden.
+        QTimer.singleShot(50, self._update_spotlight_size_hint)
+        QTimer.singleShot(300, self._update_spotlight_size_hint)
+
+        profile_url = self._build_ugg_profile_overview_url(account)
+        rank_data = self._rank_data_by_username.get(account.username, {})
+        self.account_spotlight_panel.set_account(account, rank_data, profile_url, force_reload=force_reload)
+        QTimer.singleShot(200, self._update_webview_zoom)
+        # Defer scroll until layout has settled so PositionAtTop takes effect
+        QTimer.singleShot(50, lambda u=account.username: self._scroll_account_row_to_top(u))
 
     def show_account_context_menu(self, position):
         """Show copy actions for the account row under the cursor."""
@@ -7338,8 +8437,7 @@ QMenu#trayQuickMenu::separator {
         menu.setStyleSheet(self._account_context_menu_stylesheet())
         toggle_pin_action = menu.addAction("Unpin Account" if getattr(account, "is_pinned", False) else "Pin Account")
         menu.addSeparator()
-        open_opgg_profile_action = menu.addAction("Open OP.GG Profile")
-        open_opgg_ingame_action = menu.addAction("Open Live-Game Page")
+        open_spotlight_action = menu.addAction("View Account Spotlight")
         menu.addSeparator()
         copy_username_action = menu.addAction("Copy Username")
         copy_password_action = menu.addAction("Copy Password")
@@ -7352,10 +8450,8 @@ QMenu#trayQuickMenu::separator {
                 self.refresh_account_list()
             except Exception as exc:
                 self._show_error("Pin", f"Could not update pin state: {exc}")
-        elif chosen_action == open_opgg_profile_action:
-            self._open_opgg_profile(account)
-        elif chosen_action == open_opgg_ingame_action:
-            self._open_ingame_webpage(self._build_opgg_ingame_url(account))
+        elif chosen_action == open_spotlight_action:
+            self._show_spotlight_for_account(account)
         elif chosen_action == copy_username_action:
             self.copy_to_clipboard(account.username)
         elif chosen_action == copy_password_action:
@@ -7528,6 +8624,7 @@ QMenu::separator {
                 if self._logged_in_username == username:
                     self._logged_in_username = None
                 self.refresh_account_list()
+                self._show_logged_in_spotlight()
                 QMessageBox.information(self, "Success", "Account deleted successfully!")
             except Exception as e:
                 self._show_error("Error", f"Failed to delete account: {str(e)}")
@@ -7609,6 +8706,7 @@ QMenu::separator {
                 self._logged_in_username = account.username
                 self._session_miss_count = 0
                 self.refresh_account_list()
+                self._show_logged_in_spotlight()
             if account and self._auto_open_ingame_page:
                 self._start_ingame_watcher(account)
         else:
