@@ -6517,11 +6517,12 @@ window.dispatchEvent(new Event('resize', { bubbles: true }));
             return
         search_fg = self._sanitize_color(self._app_text_color, DEFAULT_APP_TEXT_COLOR)
         if qta is not None:
-            try:
-                self._search_leading_action.setIcon(qta.icon("fa5s.search", color=search_fg))
-                return
-            except Exception:
-                pass
+            for icon_key in ("fa5s.search", "fa.search", "mdi.magnify"):
+                try:
+                    self._search_leading_action.setIcon(qta.icon(icon_key, color=search_fg))
+                    return
+                except Exception:
+                    continue
         self._search_leading_action.setIcon(self._build_search_icon(search_fg, 14))
 
     def _build_search_icon(self, color_hex: str, size: int) -> QIcon:
